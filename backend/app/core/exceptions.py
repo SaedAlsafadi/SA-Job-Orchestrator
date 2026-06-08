@@ -213,3 +213,20 @@ class ApplicationSubmissionError(JobPlatformError):
     def __init__(self, platform: str = "", message: str = "Application submission failed") -> None:
         super().__init__(platform, message)
         self.code = "PLATFORM_APPLICATION_ERROR"
+
+
+# --- Auth / Rate-limit Errors ---
+
+
+class AuthError(AutoApplyError):
+    """Authentication or authorization failure (maps to HTTP 401)."""
+
+    def __init__(self, message: str = "Not authenticated") -> None:
+        super().__init__(message, code="AUTH_ERROR")
+
+
+class RateLimitError(AutoApplyError):
+    """Too many requests (maps to HTTP 429)."""
+
+    def __init__(self, message: str = "Rate limit exceeded") -> None:
+        super().__init__(message, code="RATE_LIMIT")

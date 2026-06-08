@@ -74,6 +74,40 @@ class BrowserSettings(BaseSettings):
         return max(1, min(5, v))
 
 
+class AuthSettings(BaseSettings):
+    """Authentication / JWT configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="AUTH__")
+
+    secret_key: SecretStr = SecretStr("dev-insecure-change-me")
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
+    ws_ticket_expire_seconds: int = 60
+
+
+class SecretsSettings(BaseSettings):
+    """Envelope-encryption configuration for per-user secrets (BYO-key)."""
+
+    model_config = SettingsConfigDict(env_prefix="SECRETS__")
+
+    provider: str = "local"
+    # Comma-separated Fernet keys; the first is the current KEK. If empty outside
+    # production, an ephemeral dev key is generated at runtime.
+    app_keys: str = ""
+
+
+class StorageSettings(BaseSettings):
+    """File storage configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="STORAGE__")
+
+    provider: str = "local"
+    local_root: str = "./data/storage"
+    url_signing_secret: SecretStr = SecretStr("dev-insecure-change-me")
+    url_default_expiry: int = 300
+
+
 class Settings(BaseSettings):
     """Root application settings."""
 
@@ -98,6 +132,9 @@ class Settings(BaseSettings):
     # Nested settings
     llm: LLMSettings = LLMSettings()
     browser: BrowserSettings = BrowserSettings()
+    auth: AuthSettings = AuthSettings()
+    secrets: SecretsSettings = SecretsSettings()
+    storage: StorageSettings = StorageSettings()
 
     # Job discovery
     exa_api_key: SecretStr = SecretStr("")

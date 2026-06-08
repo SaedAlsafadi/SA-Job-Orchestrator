@@ -124,49 +124,6 @@ class ExaJobSearch:
             logger.error("exa_search_failed", query=query, error=str(exc))
             return []
 
-    async def find_company_careers(
-        self,
-        company_name: str,
-        num_results: int = 5,
-    ) -> list[str]:
-        """Find career/jobs pages for a specific company.
-
-        Uses Exa's semantic understanding to locate career pages
-        even when URL patterns vary across companies.
-
-        Args:
-            company_name: Company name to search for.
-            num_results: Max career page URLs to return.
-
-        Returns:
-            List of career page URLs.
-        """
-        import asyncio
-
-        if not self.available:
-            return []
-
-        try:
-            loop = asyncio.get_running_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: self._get_client().search(
-                    f"{company_name} careers jobs openings",
-                    type="auto",
-                    use_autoprompt=True,
-                    num_results=num_results,
-                ),
-            )
-            return [r.url for r in results.results if r.url]
-
-        except Exception as exc:
-            logger.error(
-                "exa_career_search_failed",
-                company=company_name,
-                error=str(exc),
-            )
-            return []
-
     def _build_query(
         self,
         query: str,
