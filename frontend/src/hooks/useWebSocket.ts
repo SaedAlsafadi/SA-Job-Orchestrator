@@ -1,5 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
+import { authService } from '@/services/authService';
+import { useAuthStore } from '@/store/useAuthStore';
+
 /** Shape of a WebSocket event message from the backend. */
 export interface WSMessage {
   type: string;
@@ -56,16 +59,29 @@ export function useWebSocket(
     setConnected(false);
   }, [clearReconnectTimer]);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     disconnect();
+
+    // The WebSocket handshake is authenticated with a short-lived ticket. Only
+    // connect when authenticated; if the ticket cannot be fetched, stay disconnected.
+    if (!useAuthStore.getState().token) {
+      return;
+    }
+    let ticket: string;
+    try {
+      ticket = await authService.getWsTicket();
+    } catch {
+      return;
+    }
 
     const envWsUrl = import.meta.env.VITE_WS_URL as string | undefined;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = envWsUrl
+    const base = envWsUrl
       ? envWsUrl
       : url.startsWith('ws')
         ? url
         : `${protocol}//${window.location.host}${url}`;
+    const wsUrl = `${base}?ticket=${encodeURIComponent(ticket)}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

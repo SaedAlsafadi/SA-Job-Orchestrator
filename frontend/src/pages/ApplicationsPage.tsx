@@ -9,14 +9,17 @@ import Alert from '@mui/material/Alert';
 import InboxIcon from '@mui/icons-material/Inbox';
 
 import ApplicationCard from '@/components/applications/ApplicationCard';
+import StatusUpdateDialog from '@/components/applications/StatusUpdateDialog';
 import LoadingState from '@/components/common/LoadingState';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { useApplications, useApproveApplication } from '@/hooks/useApplications';
 import { useAppStore } from '@/store/useAppStore';
 
+// Values match the backend ApplicationStatus enum.
 const STATUS_TABS = [
   { label: 'All', value: undefined },
-  { label: 'Pending', value: 'pending' },
+  { label: 'Queued', value: 'queued' },
+  { label: 'Pending Review', value: 'pending_review' },
   { label: 'Approved', value: 'approved' },
   { label: 'Applied', value: 'applied' },
   { label: 'Interview', value: 'interview' },
@@ -27,6 +30,7 @@ const STATUS_TABS = [
 function ApplicationsPage() {
   const [tabIndex, setTabIndex] = useState(0);
   const [page, setPage] = useState(1);
+  const [statusAppId, setStatusAppId] = useState<string | null>(null);
   const showNotification = useAppStore((s) => s.showNotification);
 
   const currentStatus = STATUS_TABS[tabIndex]?.value;
@@ -101,7 +105,11 @@ function ApplicationsPage() {
             <Grid container spacing={2}>
               {appsData.items.map((app) => (
                 <Grid item xs={12} sm={6} lg={4} key={app.id}>
-                  <ApplicationCard application={app} onApprove={handleApprove} />
+                  <ApplicationCard
+                    application={app}
+                    onApprove={handleApprove}
+                    onUpdateStatus={setStatusAppId}
+                  />
                 </Grid>
               ))}
             </Grid>
@@ -118,6 +126,12 @@ function ApplicationsPage() {
             )}
           </>
         )}
+
+        <StatusUpdateDialog
+          appId={statusAppId}
+          open={statusAppId !== null}
+          onClose={() => setStatusAppId(null)}
+        />
       </Box>
     </ErrorBoundary>
   );
