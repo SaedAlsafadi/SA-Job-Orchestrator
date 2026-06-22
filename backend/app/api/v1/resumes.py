@@ -1,14 +1,17 @@
 """Resume management API routes."""
 
+import os
 from pathlib import Path
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
 
-from app.api.deps import get_db
+from app.api.deps import CurrentUser, get_tenant_db
 from app.core.exceptions import RecordNotFoundError
+from app.core.storage import StorageService, get_storage
 from app.schemas.resume import (
     ResumeGenerateRequest,
     ResumeListResponse,
@@ -40,7 +43,8 @@ ALLOWED_MIME_TYPES = {
 )
 async def upload_resume(
     file: UploadFile,
-    db: AsyncSession = Depends(get_db),
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> ResumeUploadResponse:
     """Upload a PDF or DOCX resume for parsing and storage."""
     # Validate file extension
@@ -67,7 +71,7 @@ async def upload_resume(
             raise HTTPException(status_code=413, detail="File too large. Max 10MB.")
     await file.seek(0)
 
-    return await resume_service.upload_resume(db, file)
+    return await resume_service.upload_resume(db, file, user.id)
 
 
 @router.get(
@@ -76,7 +80,7 @@ async def upload_resume(
     summary="List all resumes",
 )
 async def list_resumes(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> ResumeListResponse:
     """List all uploaded and generated resumes."""
     return await resume_service.list_resumes(db)
@@ -90,13 +94,15 @@ async def list_resumes(
 )
 async def generate_resume(
     request: ResumeGenerateRequest,
-    db: AsyncSession = Depends(get_db),
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> ResumeResponse:
     """Generate a job-tailored resume from a base resume.
 
-    Uses LLM to rewrite content. Placeholder until Phase 5.
+    Tailors the base resume to the target job via the per-user LLM and renders
+    PDF/DOCX through the document generator.
     """
-    return await resume_service.generate_tailored_resume(db, request)
+    return await resume_service.generate_tailored_resume(db, request, user.id)
 
 
 @router.post(
@@ -107,7 +113,7 @@ async def generate_resume(
 async def score_resume(
     resume_id: str,
     request: ResumeScoreRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> ResumeScoreResponse:
     """Score a resume's ATS compatibility against a specific job."""
     return await resume_service.score_resume(db, resume_id, request)
@@ -120,15 +126,16 @@ async def score_resume(
 )
 async def optimize_resume(
     resume_id: str,
+    user: CurrentUser,
     request: ResumeOptimizeRequest = ResumeOptimizeRequest(),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> ResumeResponse:
     """Optimize a resume for ATS keyword matching using LLM rewriting.
 
     Creates a new optimized resume linked to the original with improved
     ATS compatibility scores.
     """
-    return await resume_service.optimize_resume(db, resume_id, request.job_id)
+    return await resume_service.optimize_resume(db, resume_id, user.id, request.job_id)
 
 
 @router.get(
@@ -137,24 +144,33 @@ async def optimize_resume(
 )
 async def download_resume(
     resume_id: str,
+    user: CurrentUser,
     format: str = Query(default="pdf", pattern="^(pdf|docx)$"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> FileResponse:
-    """Download a resume in PDF or DOCX format."""
+    """Download a resume in PDF or DOCX format (materialized from per-tenant storage)."""
     resume = await resume_service.get_resume(db, resume_id)
 
-    file_path = resume.file_path_pdf if format == "pdf" else resume.file_path_docx
-    if not file_path or not Path(file_path).exists():
+    key = resume.file_path_pdf if format == "pdf" else resume.file_path_docx
+    if not key:
         raise RecordNotFoundError("Resume file", resume_id)
+    try:
+        tmp_path = await StorageService(get_storage(), user.id).materialize_to_temp(
+            key, suffix=f".{format}"
+        )
+    except (FileNotFoundError, PermissionError) as exc:
+        raise RecordNotFoundError("Resume file", resume_id) from exc
 
     media_type = (
-        "application/pdf" if format == "pdf" else
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/pdf"
+        if format == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     return FileResponse(
-        path=file_path,
+        path=tmp_path,
         media_type=media_type,
         filename=f"{resume.name}.{format}",
+        background=BackgroundTask(os.remove, tmp_path),  # delete the temp after streaming
     )
 
 
@@ -165,7 +181,7 @@ async def download_resume(
 )
 async def extract_profile_from_resume(
     resume_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> CandidateProfileSchema:
     """Extract structured candidate profile data from a resume.
 

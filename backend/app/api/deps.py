@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AuthError
+from app.core.exceptions import AuthError, AuthorizationError
 from app.core.security import decode_token
 from app.db.redis import get_redis as _get_redis
 from app.db.session import async_session_factory
@@ -36,13 +36,26 @@ async def get_current_user(
 ) -> User:
     """Resolve the authenticated, active, non-deleted user from a bearer token."""
     payload = decode_token(token, expected_type="access")
-    user = await db.get(User, payload.get("sub"))
+    sub = payload.get("sub")
+    if not isinstance(sub, str):
+        raise AuthError("Invalid token subject")
+    user = await db.get(User, sub)
     if user is None or not user.is_active or user.deleted_at is not None:
         raise AuthError("Invalid or inactive user")
     return user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_superuser(user: CurrentUser) -> User:
+    """Authorize a superuser-only route (admin/health views)."""
+    if not user.is_superuser:
+        raise AuthorizationError("Superuser privileges required")
+    return user
+
+
+SuperUser = Annotated[User, Depends(require_superuser)]
 
 
 async def get_tenant_db(user: CurrentUser) -> AsyncGenerator[AsyncSession, None]:

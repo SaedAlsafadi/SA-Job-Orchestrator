@@ -7,6 +7,8 @@ import type { PaginatedResponse } from './api';
 export interface Application {
   id: string;
   job_id: string;
+  job_title: string | null;
+  company: string | null;
   resume_id: string | null;
   status: string;
   apply_mode: string;

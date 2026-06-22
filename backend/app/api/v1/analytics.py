@@ -4,7 +4,7 @@ import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_tenant_db
 from app.schemas.analytics import (
     ApplicationFunnelData,
     ATSScoreDistribution,
@@ -24,7 +24,7 @@ router = APIRouter()
     summary="Get dashboard statistics",
 )
 async def dashboard(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> DashboardStats:
     """Get aggregated dashboard statistics."""
     return await analytics_service.get_dashboard_stats(db)
@@ -36,7 +36,7 @@ async def dashboard(
     summary="Get application funnel",
 )
 async def funnel(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> list[ApplicationFunnelData]:
     """Get application funnel stage counts."""
     return await analytics_service.get_funnel(db)
@@ -48,7 +48,7 @@ async def funnel(
     summary="Get ATS score distribution",
 )
 async def ats_scores(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> list[ATSScoreDistribution]:
     """Get ATS score distribution histogram."""
     return await analytics_service.get_ats_distribution(db)
@@ -60,7 +60,7 @@ async def ats_scores(
     summary="Get LLM usage stats",
 )
 async def llm_usage(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> list[LLMUsageStats]:
     """Get LLM provider usage statistics."""
     return await analytics_service.get_llm_usage(db)
@@ -72,7 +72,7 @@ async def llm_usage(
     summary="Get daily activity timeline",
 )
 async def timeline(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> list[TimelineEntry]:
     """Get daily activity timeline entries."""
     return await analytics_service.get_timeline(db)

@@ -6,11 +6,15 @@ import Toolbar from '@mui/material/Toolbar';
 import Sidebar, { DRAWER_WIDTH } from './Sidebar';
 import Header from './Header';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useApplicationEvents } from '@/hooks/useApplicationEvents';
 import { useAppStore } from '@/store/useAppStore';
 
 function AppLayout() {
-  const { connected } = useWebSocket('/ws');
+  const { connected, lastMessage } = useWebSocket('/ws');
   const setWsConnected = useAppStore((s) => s.setWsConnected);
+
+  // Live application updates: refresh cached queries when the worker reports progress.
+  useApplicationEvents(lastMessage);
 
   useEffect(() => {
     setWsConnected(connected);
