@@ -24,6 +24,7 @@ from app.core.llm.prompts.cover_letter import (
     render_prompt,
     select_best_template,
 )
+from app.observability.metrics import documents_generated_total
 
 logger = structlog.get_logger(__name__)
 
@@ -140,6 +141,9 @@ class DocumentGenerator:
                     error=str(result),
                 )
             elif isinstance(result, Path):
+                documents_generated_total.labels(
+                    document_type="resume", template=template_name, format=fmt
+                ).inc()
                 if fmt == "pdf":
                     pdf_path = str(result)
                 else:
@@ -240,6 +244,9 @@ class DocumentGenerator:
                     error=str(result),
                 )
             elif isinstance(result, Path):
+                documents_generated_total.labels(
+                    document_type="cover_letter", template=template.value, format=fmt
+                ).inc()
                 if fmt == "pdf":
                     pdf_path = str(result)
                 else:

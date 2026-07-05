@@ -37,6 +37,16 @@ class LLMResponse(BaseModel):
     latency_ms: float = 0.0
 
 
+class ResolvedLLMCredentials(BaseModel):
+    """A single user's resolved BYO LLM credentials (decrypted key + routing)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: str
+    api_key: str
+    default_model: str
+
+
 class LLMClient:
     """Unified async LLM client with provider fallback and cost tracking.
 
@@ -45,9 +55,16 @@ class LLMClient:
     metrics recording for every call.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self, credentials: ResolvedLLMCredentials | None = None, user_id: str | None = None
+    ) -> None:
         settings = get_settings()
         self._llm = settings.llm
+        # When set (BYO-key per user), the user's key is passed per request and only
+        # their preferred model is used. When None, fall back to global env keys.
+        self._credentials = credentials
+        # When set, every successful call persists an LLMUsage row owned by this user.
+        self._user_id = user_id
         self._configure_portkey()
         self._configure_api_keys()
 
@@ -85,6 +102,9 @@ class LLMClient:
 
     def _get_model_chain(self, model: str | None) -> list[str]:
         """Return the ordered list of models to try (primary + fallbacks)."""
+        # BYO-key: use only the user's preferred model (their key won't work cross-provider).
+        if self._credentials is not None:
+            return [model or self._credentials.default_model]
         primary = model or self._llm.default_model
         fallbacks = [
             f"{provider}/{primary.split('/')[-1]}"
@@ -154,13 +174,23 @@ class LLMClient:
                     kwargs["response_format"] = response_format
                 if metadata:
                     kwargs["metadata"] = metadata
+                if self._credentials is not None:
+                    kwargs["api_key"] = self._credentials.api_key
 
                 response = await litellm.acompletion(**kwargs)
                 latency_s = time.perf_counter() - start
                 elapsed_ms = latency_s * 1000
 
                 usage = response.usage or litellm.Usage()
-                cost = litellm.completion_cost(completion_response=response)
+                try:
+                    cost = litellm.completion_cost(completion_response=response)
+                except Exception as cost_exc:
+                    # A model missing from litellm's static price map raises here even
+                    # though the call already succeeded — never fail a billed call on it.
+                    cost = 0.0
+                    logger.warning(
+                        "llm_cost_unavailable", model=attempt_model, error=str(cost_exc)
+                    )
 
                 self._record_metrics(
                     provider=provider,
@@ -181,7 +211,7 @@ class LLMClient:
                     cost_usd=round(cost, 6),
                     latency_ms=round(elapsed_ms, 1),
                 )
-                return LLMResponse(
+                llm_response = LLMResponse(
                     content=content,
                     model=attempt_model,
                     provider=provider,
@@ -191,6 +221,8 @@ class LLMClient:
                     cost_usd=cost,
                     latency_ms=elapsed_ms,
                 )
+                await self._persist_usage(llm_response, purpose)
+                return llm_response
 
             except litellm.RateLimitError as exc:
                 last_error = exc
@@ -232,6 +264,21 @@ class LLMClient:
                 logger.error(
                     "llm_api_error", model=attempt_model, error=str(exc)
                 )
+                continue
+
+            except Exception as exc:
+                # Auth/Connection/ServiceUnavailable/BadRequest errors are NOT subclasses
+                # of litellm.APIError — without this they'd escape uncaught, skipping the
+                # fallback chain and leaking a raw provider error to the caller.
+                last_error = exc
+                self._record_metrics(
+                    provider=provider,
+                    model=attempt_model,
+                    purpose=purpose,
+                    status="error",
+                    latency_s=(time.perf_counter() - start),
+                )
+                logger.error("llm_unexpected_error", model=attempt_model, error=str(exc))
                 continue
 
         # All models exhausted — raise the appropriate typed error
@@ -296,6 +343,15 @@ class LLMClient:
                 provider=response.provider,
                 message=f"Failed to parse structured output: {exc}",
             ) from exc
+
+    async def _persist_usage(self, response: LLMResponse, purpose: str) -> None:
+        """Persist a per-user usage row after a successful call (no-op when unbound)."""
+        if not self._user_id:
+            return
+        # Lazy import: usage_tracker imports LLMResponse from this module.
+        from app.core.llm.usage_tracker import persist_usage_for_user
+
+        await persist_usage_for_user(self._user_id, response, purpose)
 
     def _record_metrics(
         self,
