@@ -1,11 +1,12 @@
-"""User settings API routes with database persistence."""
+"""User settings API routes with per-user database persistence."""
 
 import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import CurrentUser, get_tenant_db
 from app.config.settings import get_settings as get_app_settings
 from app.models.user_settings import UserSettings
 from app.schemas.settings import LLMProviderStatus, SettingsResponse, SettingsUpdate
@@ -14,45 +15,45 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
-async def _get_or_create_settings(db: AsyncSession) -> UserSettings:
-    """Return the singleton UserSettings row, creating it if absent."""
-    result = await db.execute(
-        select(UserSettings).where(UserSettings.id == "singleton")
-    )
+async def _get_or_create_settings(db: AsyncSession, user_id: str) -> UserSettings:
+    """Return the user's settings row, creating defaults if absent."""
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
     settings = result.scalar_one_or_none()
     if settings is None:
-        settings = UserSettings(id="singleton")
+        settings = UserSettings(user_id=user_id)
         db.add(settings)
-        await db.commit()
-        await db.refresh(settings)
-        logger.info("settings_created_defaults")
+        try:
+            await db.commit()
+        except IntegrityError:
+            # Concurrent first-write from the same user — re-fetch the winner's row.
+            await db.rollback()
+            settings = (
+                await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+            ).scalar_one()
+        else:
+            await db.refresh(settings)
+            logger.info("settings_created_defaults", user_id=user_id)
     return settings
 
 
-@router.get(
-    "/",
-    response_model=SettingsResponse,
-    summary="Get current settings",
-)
+@router.get("/", response_model=SettingsResponse, summary="Get current settings")
 async def get_settings(
-    db: AsyncSession = Depends(get_db),
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> SettingsResponse:
-    """Get the current user settings from the database."""
-    settings = await _get_or_create_settings(db)
+    """Get the current user's settings from the database."""
+    settings = await _get_or_create_settings(db, user.id)
     return SettingsResponse.model_validate(settings)
 
 
-@router.put(
-    "/",
-    response_model=SettingsResponse,
-    summary="Update settings",
-)
+@router.put("/", response_model=SettingsResponse, summary="Update settings")
 async def update_settings(
     update: SettingsUpdate,
-    db: AsyncSession = Depends(get_db),
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> SettingsResponse:
-    """Update user settings. Only provided fields are changed."""
-    settings = await _get_or_create_settings(db)
+    """Update the current user's settings. Only provided fields are changed."""
+    settings = await _get_or_create_settings(db, user.id)
 
     update_data = update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -61,7 +62,7 @@ async def update_settings(
     await db.commit()
     await db.refresh(settings)
 
-    logger.info("settings_updated", changed_fields=list(update_data.keys()))
+    logger.info("settings_updated", user_id=user.id, changed_fields=list(update_data.keys()))
     return SettingsResponse.model_validate(settings)
 
 

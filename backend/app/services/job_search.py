@@ -18,6 +18,7 @@ from app.core.exceptions import RecordNotFoundError
 from app.core.job_discovery.exa_search import ExaJobSearch
 from app.models.job import Job
 from app.models.resume import Resume
+from app.observability.metrics import job_searches_total, jobs_found_total
 from app.schemas.job import (
     JobAnalysisResponse,
     JobListingResponse,
@@ -31,6 +32,7 @@ logger = structlog.get_logger(__name__)
 async def search_jobs(
     db: AsyncSession,
     request: JobSearchRequest,
+    user_id: str,
 ) -> JobListResponse:
     """Search for jobs across configured platforms.
 
@@ -88,6 +90,8 @@ async def search_jobs(
                 platform=platform_name,
                 count=len(listings),
             )
+            job_searches_total.labels(platform=platform_name).inc()
+            jobs_found_total.labels(platform=platform_name).inc(len(listings))
         except Exception as exc:
             logger.error(
                 "job_search.platform_search_failed",
@@ -98,10 +102,11 @@ async def search_jobs(
 
         for listing in listings:
             try:
-                job = _listing_to_job(listing)
+                job = _listing_to_job(listing, user_id)
                 # Check for duplicates before inserting
                 existing = await db.execute(
                     select(Job).where(
+                        Job.user_id == user_id,
                         Job.platform == job.platform,
                         Job.platform_job_id == job.platform_job_id,
                     ),
@@ -137,9 +142,10 @@ async def search_jobs(
             )
             for listing in exa_listings:
                 try:
-                    job = _listing_to_job(listing)
+                    job = _listing_to_job(listing, user_id)
                     existing = await db.execute(
                         select(Job).where(
+                            Job.user_id == user_id,
                             Job.platform == job.platform,
                             Job.platform_job_id == job.platform_job_id,
                         ),
@@ -150,6 +156,8 @@ async def search_jobs(
                 except Exception:
                     continue
             logger.info("job_search.exa_results", count=len(exa_listings))
+            job_searches_total.labels(platform="exa").inc()
+            jobs_found_total.labels(platform="exa").inc(len(exa_listings))
     except Exception as exc:
         logger.debug("job_search.exa_skipped", reason=str(exc))
 
@@ -176,7 +184,7 @@ async def search_jobs(
     )
 
 
-def _listing_to_job(listing: JobListing) -> Job:
+def _listing_to_job(listing: JobListing, user_id: str) -> Job:
     """Convert a platform ``JobListing`` to a ``Job`` database model.
 
     Args:
@@ -204,6 +212,7 @@ def _listing_to_job(listing: JobListing) -> Job:
         }
 
     return Job(
+        user_id=user_id,
         platform=listing.platform,
         platform_job_id=listing.platform_job_id,
         title=listing.title,
