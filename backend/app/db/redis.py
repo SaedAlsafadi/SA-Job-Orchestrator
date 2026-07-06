@@ -1,5 +1,7 @@
 """Async Redis connection pool management."""
 
+import contextlib
+
 import structlog
 from redis.asyncio import ConnectionPool, Redis
 from redis.exceptions import RedisError
@@ -34,6 +36,14 @@ async def init_redis_pool(redis_url: str) -> None:
             url=redis_url,
             error=str(e),
         )
+        # Close the half-open client/pool before dropping the references, or the failed
+        # connection leaks (the pool's finalizer is not guaranteed under asyncio).
+        if _redis_client is not None:
+            with contextlib.suppress(Exception):
+                await _redis_client.aclose()
+        if _redis_pool is not None:
+            with contextlib.suppress(Exception):
+                await _redis_pool.disconnect()
         _redis_pool = None
         _redis_client = None
 

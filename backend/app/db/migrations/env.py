@@ -3,14 +3,20 @@
 import asyncio
 from logging.config import fileConfig
 
+import alembic_postgresql_enum  # noqa: F401  # registers enum autogenerate/sync hooks
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from app.config.settings import get_settings
 from app.models import Base
 
 # Alembic Config object
 config = context.config
+
+# Use the application's configured database URL (respects the DATABASE_URL env var),
+# so migrations target the same DB the app uses on both SQLite and Postgres.
+config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:
@@ -33,6 +39,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
+        render_as_batch=True,
     )
 
     with context.begin_transaction():
@@ -46,6 +53,7 @@ def do_run_migrations(connection) -> None:  # noqa: ANN001
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
+        render_as_batch=True,
     )
 
     with context.begin_transaction():

@@ -5,15 +5,16 @@ from datetime import datetime
 from sqlalchemy import JSON, Boolean, DateTime, Float, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.enums import JobStatus
 
 
-class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     """A job listing scraped from a platform."""
 
     __tablename__ = "jobs"
     __table_args__ = (
-        UniqueConstraint("platform", "platform_job_id", name="uq_job_platform_id"),
+        UniqueConstraint("user_id", "platform", "platform_job_id", name="uq_job_platform_id"),
         Index("ix_job_status", "status"),
         Index("ix_job_match_score", "match_score"),
     )
@@ -41,7 +42,9 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     skills_required: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Status tracking
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="new")
+    status: Mapped[JobStatus] = mapped_column(
+        pg_enum(JobStatus, "job_status"), nullable=False, default=JobStatus.NEW
+    )
 
     # Relationships
     applications: Mapped[list["Application"]] = relationship(  # noqa: F821
