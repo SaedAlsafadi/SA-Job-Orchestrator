@@ -7,6 +7,7 @@ import structlog
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError as DBIntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_db
@@ -91,7 +92,13 @@ async def register(
         full_name=data.full_name,
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except DBIntegrityError as exc:
+        # Two concurrent registrations for the same email both pass the check above; the loser's
+        # unique-constraint violation becomes a clean 409 rather than an uncaught 500.
+        await db.rollback()
+        raise IntegrityError("Email already registered") from exc
     await db.refresh(user)
     logger.info("user_registered", user_id=user.id)
     return UserResponse.model_validate(user)

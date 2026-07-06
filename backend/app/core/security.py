@@ -67,7 +67,7 @@ def decode_token(token: str, *, expected_type: str | None = None) -> dict[str, A
     """Decode and validate a JWT. Raises :class:`AuthError` on any failure."""
     auth = get_settings().auth
     try:
-        payload = jwt.decode(token, _secret(), algorithms=[auth.algorithm])
+        payload: dict[str, Any] = jwt.decode(token, _secret(), algorithms=[auth.algorithm])
     except jwt.PyJWTError as exc:
         raise AuthError("Invalid or expired token") from exc
     if expected_type is not None and payload.get("type") != expected_type:

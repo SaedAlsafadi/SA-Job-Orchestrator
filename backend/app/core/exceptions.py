@@ -230,3 +230,10 @@ class RateLimitError(AutoApplyError):
 
     def __init__(self, message: str = "Rate limit exceeded") -> None:
         super().__init__(message, code="RATE_LIMIT")
+
+
+class AuthorizationError(AutoApplyError):
+    """Authenticated but lacking the required privileges (maps to HTTP 403)."""
+
+    def __init__(self, message: str = "Forbidden") -> None:
+        super().__init__(message, code="FORBIDDEN_ERROR")

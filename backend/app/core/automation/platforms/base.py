@@ -5,6 +5,8 @@ base class that all platform plugins (LinkedIn, Indeed, Glassdoor, etc.)
 must implement.
 """
 
+import contextlib
+import json
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -12,6 +14,35 @@ import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = structlog.get_logger(__name__)
+
+
+def coerce_agent_list(raw_result: Any) -> list[Any]:
+    """Best-effort: turn a browser-use ``Agent.run()`` result into the list of scraped items.
+
+    On the search path no ``output_model`` is passed, so browser-use returns an
+    ``AgentHistoryList`` (not a ``list``). Extract its final structured payload (a JSON array,
+    or a ``{"jobs": [...]}``-style object) so the parsers see the array they expect instead of
+    silently yielding zero listings. Returns ``[]`` when nothing list-like can be recovered.
+    """
+    if isinstance(raw_result, list):
+        return raw_result
+    final = getattr(raw_result, "final_result", None)
+    payload: Any = None
+    if callable(final):
+        with contextlib.suppress(Exception):
+            payload = final()
+    else:
+        payload = raw_result
+    if isinstance(payload, str):
+        with contextlib.suppress(Exception):
+            payload = json.loads(payload)
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for value in payload.values():  # e.g. {"jobs": [...]}
+            if isinstance(value, list):
+                return value
+    return []
 
 
 class JobListing(BaseModel):

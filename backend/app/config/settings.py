@@ -66,6 +66,10 @@ class BrowserSettings(BaseSettings):
     max_failures: int = 3
     step_timeout: int = 120
     use_vision: str = "auto"
+    # When False (default), the worker uses a placeholder submit so the loop is
+    # demoable/CI-safe. Set True (with a real browser + assisted-login session) to drive
+    # the live browser-use apply (run_apply).
+    live_apply: bool = False
 
     @field_validator("max_parallel")
     @classmethod
@@ -98,7 +102,7 @@ class SecretsSettings(BaseSettings):
 
 
 class StorageSettings(BaseSettings):
-    """File storage configuration."""
+    """File storage configuration (local FS or any S3-compatible store: AWS S3, R2, B2, MinIO)."""
 
     model_config = SettingsConfigDict(env_prefix="STORAGE__")
 
@@ -106,6 +110,13 @@ class StorageSettings(BaseSettings):
     local_root: str = "./data/storage"
     url_signing_secret: SecretStr = SecretStr("dev-insecure-change-me")
     url_default_expiry: int = 300
+
+    # S3-compatible settings (used when provider == "s3").
+    bucket: str = ""
+    region: str = ""
+    endpoint_url: str = ""  # e.g. https://<account>.r2.cloudflarestorage.com for Cloudflare R2
+    access_key_id: SecretStr = SecretStr("")
+    secret_access_key: SecretStr = SecretStr("")
 
 
 class Settings(BaseSettings):
@@ -128,6 +139,8 @@ class Settings(BaseSettings):
     min_ats_score: float = 0.75
     environment: Environment = Environment.DEVELOPMENT
     log_level: str = "INFO"
+    # Bearer token required to scrape /metrics in production (fail-closed if unset there).
+    metrics_token: SecretStr = SecretStr("")
 
     # Nested settings
     llm: LLMSettings = LLMSettings()

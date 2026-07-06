@@ -1,15 +1,17 @@
-"""Skill matching engine using fuzzy and semantic NLP techniques.
+"""Skill matching engine using exact + fuzzy string matching.
 
-Matches candidate skills against job requirements using exact matching,
-fuzzy string matching, and spaCy semantic similarity.
+Matches candidate skills against job requirements using alias normalization, exact matching,
+and fuzzy string matching (SequenceMatcher). spaCy word-vector similarity was removed — the
+shipped ``en_core_web_sm`` model has no vectors, so it always returned 0.0 while paying a spaCy
+parse per skill pair on the hot scoring path.
 """
 
 from __future__ import annotations
 
 import re
 from difflib import SequenceMatcher
+from typing import Any
 
-import spacy
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -97,17 +99,19 @@ SKILL_CATEGORIES: dict[str, list[str]] = {
 
 
 class SkillMatcher:
-    """Matches candidate skills against job requirements using fuzzy and semantic matching.
+    """Matches candidate skills against job requirements using exact + fuzzy matching.
 
-    Uses a combination of exact matching, fuzzy string matching (SequenceMatcher),
-    and spaCy word-vector semantic similarity to determine whether a candidate
-    possesses a required skill.
+    Uses exact matching (after alias normalization) and fuzzy string matching
+    (SequenceMatcher). Word-vector semantic similarity was removed: the shipped
+    ``en_core_web_sm`` model has no vectors, so it always returned 0.0 while paying a
+    spaCy parse per skill pair on the hot scoring path.
 
     Args:
-        nlp: A loaded spaCy language model with word vectors.
+        nlp: A loaded spaCy language model (retained for API compatibility with the other
+            analyzers; skill matching itself no longer needs it).
     """
 
-    def __init__(self, nlp: spacy.Language) -> None:
+    def __init__(self, nlp: Any) -> None:
         self._nlp = nlp
         self._variation_index: dict[str, str] = self._build_variation_index()
         logger.info("skill_matcher.initialized", variation_count=len(self._variation_index))
@@ -133,8 +137,6 @@ class SkillMatcher:
                 return True
             if self._is_fuzzy_match(norm_candidate, norm_required):
                 return True
-            if self._is_semantic_match(norm_candidate, norm_required):
-                return True
         return False
 
     def find_similar_skills(self, skill: str, threshold: float = 0.8) -> list[str]:
@@ -152,13 +154,8 @@ class SkillMatcher:
         for canonical in SKILL_VARIATIONS:
             if canonical == norm:
                 continue
-            ratio = SequenceMatcher(None, norm, canonical).ratio()
-            if ratio >= threshold:
+            if SequenceMatcher(None, norm, canonical).ratio() >= threshold:
                 similar.append(canonical)
-            else:
-                sim = self._calculate_semantic_similarity(norm, canonical)
-                if sim >= threshold:
-                    similar.append(canonical)
         return similar
 
     def extract_skills(self, text: str) -> set[str]:
@@ -233,15 +230,3 @@ class SkillMatcher:
     def _is_fuzzy_match(self, skill_a: str, skill_b: str, threshold: float = 0.85) -> bool:
         """Return True if two skill strings are a fuzzy match."""
         return SequenceMatcher(None, skill_a, skill_b).ratio() >= threshold
-
-    def _is_semantic_match(self, skill_a: str, skill_b: str, threshold: float = 0.8) -> bool:
-        """Return True if two skills are semantically similar via word vectors."""
-        return self._calculate_semantic_similarity(skill_a, skill_b) >= threshold
-
-    def _calculate_semantic_similarity(self, text_a: str, text_b: str) -> float:
-        """Calculate semantic similarity between two strings using spaCy vectors."""
-        doc_a = self._nlp(text_a)
-        doc_b = self._nlp(text_b)
-        if not doc_a.has_vector or not doc_b.has_vector:
-            return 0.0
-        return float(doc_a.similarity(doc_b))

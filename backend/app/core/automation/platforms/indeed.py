@@ -9,7 +9,11 @@ from typing import Any
 import structlog
 
 from app.core.automation.agent import BrowserAgent
-from app.core.automation.platforms.base import JobListing, JobPlatform
+from app.core.automation.platforms.base import (
+    JobListing,
+    JobPlatform,
+    coerce_agent_list,
+)
 from app.core.automation.session_manager import SessionManager
 from app.core.exceptions import (
     ApplicationSubmissionError,
@@ -287,20 +291,19 @@ class IndeedPlatform(JobPlatform):
             List of parsed ``JobListing`` objects.
         """
         listings: list[JobListing] = []
-        if isinstance(raw_result, list):
-            for item in raw_result:
-                if isinstance(item, dict):
-                    listings.append(
-                        JobListing(
-                            platform="indeed",
-                            platform_job_id=str(item.get("id", "")),
-                            title=item.get("title", ""),
-                            company=item.get("company", ""),
-                            location=item.get("location", ""),
-                            url=item.get("url", ""),
-                            remote=item.get("remote", False),
-                        )
+        for item in coerce_agent_list(raw_result):
+            if isinstance(item, dict):
+                listings.append(
+                    JobListing(
+                        platform="indeed",
+                        platform_job_id=str(item.get("id", "")),
+                        title=item.get("title", ""),
+                        company=item.get("company", ""),
+                        location=item.get("location", ""),
+                        url=item.get("url", ""),
+                        remote=item.get("remote", False),
                     )
+                )
         return listings
 
     def _parse_job_details(

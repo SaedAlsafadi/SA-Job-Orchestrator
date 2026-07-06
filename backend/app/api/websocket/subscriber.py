@@ -14,6 +14,7 @@ from fastapi import WebSocket
 from redis.asyncio import Redis
 
 from app.api.websocket.bus import user_channel
+from app.api.websocket.events import manager
 
 logger = structlog.get_logger(__name__)
 
@@ -28,11 +29,13 @@ async def forward_user_events(redis: Redis, user_id: str, ws: WebSocket) -> None
                 continue
             data = message["data"]
             text = data.decode() if isinstance(data, bytes) else data
-            await ws.send_text(text)
+            # Route through the manager's locked sender so this task's writes serialize with
+            # the ping/pong handler on the same socket (concurrent send_text corrupts frames).
+            await manager.send_raw(ws, text)
     except asyncio.CancelledError:
         raise
     except Exception as exc:
         logger.warning("ws_subscriber_error", user_id=user_id, error=str(exc))
     finally:
         await pubsub.unsubscribe(user_channel(user_id))
-        await pubsub.aclose()
+        await pubsub.aclose()  # type: ignore[no-untyped-call]
