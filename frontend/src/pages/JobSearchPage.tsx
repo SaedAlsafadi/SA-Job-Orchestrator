@@ -165,8 +165,17 @@ export default function JobSearchPage() {
       ) : jobs.length === 0 ? (
         <div style={{ ...card, ...notice, flexDirection: 'column', gap: 8, padding: '46px 20px' }}>
           <div style={{ display: 'grid', placeItems: 'center', width: 44, height: 44, borderRadius: 12, background: 'var(--accent-soft)', color: 'var(--accent)' }}><Icon name="search" size={20} /></div>
-          <div style={{ font: '700 14px/1.2 var(--font)', color: 'var(--text)' }}>No jobs yet</div>
-          <span>Run a search above to discover roles across platforms.</span>
+          {search.isSuccess ? (
+            <>
+              <div style={{ font: '700 14px/1.2 var(--font)', color: 'var(--text)' }}>No matching roles</div>
+              <span>Nothing matched your search. Try broadening the keywords, changing the location, or enabling more platforms.</span>
+            </>
+          ) : (
+            <>
+              <div style={{ font: '700 14px/1.2 var(--font)', color: 'var(--text)' }}>No jobs yet</div>
+              <span>Run a search above to discover roles across platforms.</span>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>

@@ -16,7 +16,7 @@ const controlStyle: React.CSSProperties = {
 
 export default function SettingsPage() {
   const notify = useAppStore((s) => s.showNotification);
-  const { data } = useSettings();
+  const { data, isError, refetch } = useSettings();
   const { data: providers } = useLLMProviders();
   const update = useUpdateSettings();
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -24,6 +24,21 @@ export default function SettingsPage() {
   useEffect(() => {
     if (data) setDraft(data);
   }, [data]);
+
+  if (isError && !draft) {
+    return (
+      <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '40px 20px', textAlign: 'center' }}>
+        <span style={{ color: 'var(--failed)', display: 'grid', placeItems: 'center' }}><Icon name="alert" size={18} /></span>
+        <span style={{ font: '600 13px/1.4 var(--font)', color: 'var(--text-2)' }}>Couldn't load your settings.</span>
+        <button
+          onClick={() => void refetch()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 16px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', font: '700 12.5px/1 var(--font)', cursor: 'pointer' }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (!draft) {
     return <div style={{ ...card, height: 120, background: 'linear-gradient(90deg,var(--surface-2),var(--hover),var(--surface-2))', backgroundSize: '200% 100%', animation: 'aaShimmer 1.3s linear infinite' }} />;

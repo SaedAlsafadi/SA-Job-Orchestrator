@@ -30,8 +30,3 @@ export async function analyzeJob(jobId: string): Promise<JobAnalysisResponse> {
   const { data } = await api.post<JobAnalysisResponse>(`/jobs/${jobId}/analyze`);
   return data;
 }
-
-/** Delete a job listing and its associated applications. */
-export async function deleteJob(jobId: string): Promise<void> {
-  await api.delete(`/jobs/${jobId}`);
-}

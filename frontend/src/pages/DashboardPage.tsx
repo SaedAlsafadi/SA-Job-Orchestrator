@@ -60,7 +60,7 @@ export default function DashboardPage() {
             {greeting()}, {firstName(user?.full_name, user?.email)}
           </h1>
           <p style={{ margin: '7px 0 0', font: '500 13.5px/1.4 var(--font)', color: 'var(--text-3)' }}>
-            Your agent applied to <span style={{ color: 'var(--applied)', fontWeight: 700 }}>{fmt(stats?.applications_applied)} roles</span> and flagged{' '}
+            Your agent applied to <span style={{ color: 'var(--applied)', fontWeight: 700 }}>{fmt(stats?.applications_applied)} {stats?.applications_applied === 1 ? 'role' : 'roles'}</span> and flagged{' '}
             <span style={{ color: 'var(--review)', fontWeight: 700 }}>{fmt(stats?.applications_pending)}</span> for review.
           </p>
         </div>
