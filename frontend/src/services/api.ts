@@ -27,7 +27,7 @@ type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
 /** Requests to these paths must never trigger a refresh-retry (they ARE the auth flow). */
 const isAuthEntry = (url: string): boolean =>
-  /\/auth\/(login|register|refresh)/.test(url);
+  /\/auth\/(login|register|refresh|forgot-password|reset-password)/.test(url);
 
 // Single-flight refresh: concurrent 401s (and concurrent boot refreshes — React StrictMode's
 // dev double-invoke, or several tabs) share ONE `/auth/refresh` call so we don't stampede the

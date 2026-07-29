@@ -46,12 +46,6 @@ export async function optimizeResume(resumeId: string): Promise<Resume> {
   return data;
 }
 
-/** Get the download URL for a resume file. */
-export function getDownloadUrl(resumeId: string, format: 'pdf' | 'docx' = 'pdf'): string {
-  const baseURL = api.defaults.baseURL ?? '/api/v1';
-  return `${baseURL}/resumes/${resumeId}/download?format=${format}`;
-}
-
 /**
  * Download a resume file. The endpoint streams a bearer-gated FileResponse, so a plain link
  * can't authenticate — fetch it through the api client (which attaches the token) as a blob

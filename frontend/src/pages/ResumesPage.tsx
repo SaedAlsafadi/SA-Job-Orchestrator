@@ -69,8 +69,12 @@ export default function ResumesPage() {
     );
   };
 
+  const canGenerate = Boolean(baseResumeId) && Boolean(targetJobId) && !generate.isPending;
+  const generateHint = !baseResumeId ? 'Upload a base résumé first' : !targetJobId ? 'Pick a target job in the panel' : undefined;
+
   const onGenerate = () => {
     if (!baseResumeId || !targetJobId) { notify('Pick a target job (in the panel) first', 'warning'); return; }
+    if (!canGenerate) return; // aria-disabled doesn't block clicks — also guards a double submit while pending
     generate.mutate(
       { base_resume_id: baseResumeId, job_id: targetJobId },
       {
@@ -79,8 +83,6 @@ export default function ResumesPage() {
       },
     );
   };
-
-  const canGenerate = Boolean(baseResumeId) && Boolean(targetJobId) && !generate.isPending;
 
   return (
     <div style={{ animation: 'aaUp .4s var(--ease) both' }}>
@@ -91,12 +93,18 @@ export default function ResumesPage() {
         </div>
         <button
           onClick={onGenerate}
-          disabled={!canGenerate}
-          title={!baseResumeId ? 'Upload a base résumé first' : !targetJobId ? 'Pick a target job in the panel' : undefined}
+          aria-disabled={!canGenerate}
+          aria-describedby={generateHint ? 'generate-tailored-hint' : undefined}
+          title={generateHint}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 36, padding: '0 14px', borderRadius: 'var(--r-md)', background: canGenerate ? 'var(--accent)' : 'var(--surface-2)', border: canGenerate ? '1px solid var(--accent)' : '1px solid var(--border)', color: canGenerate ? 'var(--accent-ink)' : 'var(--text-4)', font: '700 12.5px/1 var(--font)', cursor: canGenerate ? 'pointer' : 'not-allowed' }}
         >
           <Icon name="sparkle" size={14} /> {generate.isPending ? 'Generating…' : 'Generate tailored'}
         </button>
+        {generateHint && (
+          <span id="generate-tailored-hint" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+            {generateHint}
+          </span>
+        )}
       </div>
 
       {isError ? (
@@ -158,6 +166,12 @@ export default function ResumesPage() {
               scoring={score.isPending}
               jobs={jobs}
               targetJobId={targetJobId}
+              // The base résumé's stored pre-optimization ATS — powers the before/after delta pill.
+              baseAtsScore={
+                selected.type === 'optimized' && selected.base_resume_id
+                  ? resumes.find((r) => r.id === selected.base_resume_id)?.ats_score ?? null
+                  : null
+              }
               onSelectJob={setTargetJobId}
               onScore={onScore}
               onDownload={(fmt) => onDownload(selected, fmt)}

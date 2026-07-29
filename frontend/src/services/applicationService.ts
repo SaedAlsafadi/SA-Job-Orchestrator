@@ -2,7 +2,6 @@ import api from './api';
 import type {
   Application,
   ApplicationCreate,
-  ApplicationBatchCreate,
   ApplicationStatusUpdate,
   ApplicationListResponse,
 } from '@/types/application';
@@ -12,14 +11,6 @@ export async function createApplication(
   data: ApplicationCreate,
 ): Promise<Application> {
   const { data: result } = await api.post<Application>('/applications/', data);
-  return result;
-}
-
-/** Create multiple job applications at once. */
-export async function batchCreateApplications(
-  data: ApplicationBatchCreate,
-): Promise<Application[]> {
-  const { data: result } = await api.post<Application[]>('/applications/batch', data);
   return result;
 }
 

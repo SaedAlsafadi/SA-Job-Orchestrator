@@ -5,7 +5,7 @@ import RunTimeline from '@/components/applications/RunTimeline';
 import { useApplication, useUpdateApplicationStatus } from '@/hooks/useApplications';
 import { useAppStore } from '@/store/useAppStore';
 import { buildAppTimeline } from '@/lib/timeline';
-import { statusMeta, atsColor, relativeTime } from '@/lib/status';
+import { statusMeta, atsColor, atsPercent, relativeTime } from '@/lib/status';
 
 const card: React.CSSProperties = {
   background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-1)',
@@ -68,7 +68,7 @@ export default function AppDetailPage() {
                   </div>
                   {app.ats_score != null && (
                     <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                      <span style={{ font: '800 24px/1 var(--mono)', color: atsColor(app.ats_score) }}>{Math.round(app.ats_score)}</span>
+                      <span style={{ font: '800 24px/1 var(--mono)', color: atsColor(atsPercent(app.ats_score)) }}>{atsPercent(app.ats_score)}</span>
                       <span style={{ font: '600 9px/1 var(--mono)', letterSpacing: '.1em', color: 'var(--text-4)' }}>ATS</span>
                     </div>
                   )}

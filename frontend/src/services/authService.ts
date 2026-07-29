@@ -24,6 +24,16 @@ export const authService = {
     return res.data;
   },
 
+  /** Request a password-reset link. Always resolves the same way (no account enumeration). */
+  async forgotPassword(email: string): Promise<void> {
+    await api.post('/auth/forgot-password', { email });
+  },
+
+  /** Redeem a reset token and set a new password. Rejects on an invalid/expired token. */
+  async resetPassword(token: string, password: string): Promise<void> {
+    await api.post('/auth/reset-password', { token, password });
+  },
+
   /** Silent refresh via the httpOnly refresh cookie. Endpoint lands in Phase 1. */
   async refresh(): Promise<TokenResponse> {
     const res = await api.post<TokenResponse>('/auth/refresh');
