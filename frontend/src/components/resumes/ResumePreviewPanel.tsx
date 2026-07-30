@@ -15,18 +15,27 @@ interface ResumePreviewPanelProps {
   scoring: boolean;
   jobs: Job[];
   targetJobId: string;
+  /** The source (base) résumé's stored ATS — the "before" for an optimized variant's delta pill. */
+  baseAtsScore?: number | null;
   onSelectJob: (id: string) => void;
   onScore: () => void;
   onDownload: (format: 'pdf' | 'docx') => void;
 }
 
 /** Sticky "Preview & score" panel for the selected résumé (design §RÉSUMÉS right column). */
-export default function ResumePreviewPanel({ resume, score, scoring, jobs, targetJobId, onSelectJob, onScore, onDownload }: ResumePreviewPanelProps) {
+export default function ResumePreviewPanel({ resume, score, scoring, jobs, targetJobId, baseAtsScore, onSelectJob, onScore, onDownload }: ResumePreviewPanelProps) {
   const t = TYPE_META[resume.type] ?? TYPE_META['base']!;
   // Only honor a score that was computed for THIS résumé — the selection can shift (e.g. after a
   // generate/optimize puts a new variant at the top of the list) while a stale score is still held.
   const applicable = score && score.resume_id === resume.id ? score : null;
   const overall = applicable ? atsPercent(applicable.overall_score) : resume.ats_score != null ? atsPercent(resume.ats_score) : 0;
+  // Before/after delta (design §RÉSUMÉS): an optimized variant vs its base's stored pre-opt score.
+  const afterRaw = applicable ? applicable.overall_score : resume.ats_score;
+  const showDelta = resume.type === 'optimized' && baseAtsScore != null && afterRaw != null;
+  const wasPct = baseAtsScore != null ? atsPercent(baseAtsScore) : 0;
+  const deltaPct = afterRaw != null ? atsPercent(afterRaw) - wasPct : 0;
+  const deltaColor = deltaPct >= 0 ? 'var(--offer)' : 'var(--rejected)';
+  const deltaSoft = deltaPct >= 0 ? 'var(--offer-soft)' : 'var(--rejected-soft)';
   const subs = applicable
     ? [
         { label: 'Skill', v: atsPercent(applicable.skill_score) },
@@ -79,6 +88,16 @@ export default function ResumePreviewPanel({ resume, score, scoring, jobs, targe
           )}
         </div>
       </div>
+
+      {showDelta && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 8, background: deltaSoft, alignSelf: 'flex-start' }}>
+          <span style={{ display: 'grid', placeItems: 'center', color: deltaColor }}><Icon name="arrowUR" size={13} /></span>
+          <span style={{ font: '700 11.5px/1 var(--font)', color: deltaColor }}>
+            {deltaPct >= 0 ? '+' : ''}{deltaPct} ATS after optimization
+          </span>
+          <span style={{ font: '600 11px/1 var(--font)', color: 'var(--text-3)' }}>· was {wasPct}</span>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8 }}>
         <select

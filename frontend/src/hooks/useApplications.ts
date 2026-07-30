@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as appService from '@/services/applicationService';
 import type {
   ApplicationCreate,
-  ApplicationBatchCreate,
   ApplicationStatusUpdate,
 } from '@/types/application';
 
@@ -30,17 +29,6 @@ export function useCreateApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: ApplicationCreate) => appService.createApplication(data),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: APPS_KEY });
-    },
-  });
-}
-
-/** Batch create applications. */
-export function useBatchCreateApplications() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: ApplicationBatchCreate) => appService.batchCreateApplications(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: APPS_KEY });
     },

@@ -11,6 +11,7 @@ const CRUMB: Record<string, string> = {
   '/resumes': 'Résumés',
   '/analytics': 'Insights',
   '/settings': 'Settings',
+  '/admin': 'System health',
 };
 
 export default function Header() {
@@ -19,6 +20,7 @@ export default function Header() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const { data: stats } = useDashboardStats();
   const current = CRUMB[pathname] ?? 'AutoApply AI';
+  const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform ?? '');
 
   return (
     <header
@@ -61,7 +63,7 @@ export default function Header() {
           Search jobs, applications, résumés…
         </span>
         <span style={{ flex: '0 0 auto', display: 'flex', gap: 2 }}>
-          <kbd style={{ font: '600 10px/16px var(--mono)', color: 'var(--text-3)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 4px', minWidth: 16, textAlign: 'center' }}>⌘</kbd>
+          <kbd style={{ font: '600 10px/16px var(--mono)', color: 'var(--text-3)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 4px', minWidth: 16, textAlign: 'center' }}>{isMac ? '⌘' : 'Ctrl'}</kbd>
           <kbd style={{ font: '600 10px/16px var(--mono)', color: 'var(--text-3)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 5px' }}>K</kbd>
         </span>
       </button>
@@ -75,16 +77,7 @@ export default function Header() {
           <span style={{ font: '700 12px/1 var(--mono)', color: 'var(--text)' }}>${stats.total_llm_cost_usd.toFixed(2)}</span>
         </div>
       )}
-
-      <button
-        aria-label="Activity"
-        style={{
-          flex: '0 0 auto', width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'var(--surface-3)',
-          border: '1px solid var(--border)', color: 'var(--text-2)', cursor: 'pointer', display: 'grid', placeItems: 'center',
-        }}
-      >
-        <Icon name="bell" size={17} />
-      </button>
+      {/* Activity bell intentionally removed — the activity feed lands with live-apply. */}
     </header>
   );
 }

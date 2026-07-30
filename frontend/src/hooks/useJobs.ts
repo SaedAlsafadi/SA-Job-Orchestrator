@@ -38,14 +38,3 @@ export function useAnalyzeJob() {
     mutationFn: (jobId: string) => jobService.analyzeJob(jobId),
   });
 }
-
-/** Delete a job listing. */
-export function useDeleteJob() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (jobId: string) => jobService.deleteJob(jobId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: JOBS_KEY });
-    },
-  });
-}

@@ -30,7 +30,7 @@ export default function ResumeCard({ resume, jobLabel, selected, onSelect, onOpt
     <div style={{ background: 'var(--surface)', border: `1px solid ${selected ? 'var(--accent-line)' : 'var(--border)'}`, borderRadius: 'var(--r-lg)', boxShadow: selected ? '0 0 0 1px var(--accent-line)' : 'var(--shadow-1)', padding: 12, display: 'flex', flexDirection: 'column', gap: 11 }}>
       <button
         onClick={onSelect}
-        aria-label={`Select résumé ${resume.name}`}
+        aria-label={`Select résumé ${resume.name} — ${t.label}${jobLabel ? `, tailored for ${jobLabel}` : ''}`}
         style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0, margin: 0, background: 'none', border: 0, cursor: 'pointer', color: 'inherit' }}
       >
         <div style={{ height: 116, borderRadius: 'var(--r-md)', background: 'repeating-linear-gradient(135deg,var(--surface-2),var(--surface-2) 7px,var(--surface-3) 7px,var(--surface-3) 14px)', border: '1px solid var(--border)', display: 'grid', placeItems: 'center', position: 'relative' }}>

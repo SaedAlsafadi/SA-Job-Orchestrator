@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 
 import { authService } from '@/services/authService';
-import { useAuthStore } from '@/store/useAuthStore';
+import { refreshAccessToken } from '@/services/api';
+import { useAuthStore, hasSessionHint } from '@/store/useAuthStore';
 
 /**
  * Initializes auth state on boot via a silent refresh (httpOnly cookie). In Phase 0
@@ -13,11 +14,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    // A fresh / logged-out visitor has no session hint. Skip the refresh probe entirely so it
+    // doesn't fire a guaranteed 401 (which the browser logs as a console error — BUG-005). Only
+    // a device that previously held a session is worth probing.
+    if (!hasSessionHint()) {
+      useAuthStore.getState().clear();
+      return () => {
+        active = false;
+      };
+    }
     (async () => {
       try {
-        const { access_token } = await authService.refresh();
-        // Attach the token (keep status 'loading') so the me() call is authenticated.
-        useAuthStore.setState({ token: access_token });
+        // Go through the shared single-flight refresh so StrictMode's dev double-invoke
+        // (and multi-tab boots) collapse to ONE /auth/refresh — presenting the rotating
+        // cookie twice would trip reuse-detection and revoke the session. It also sets
+        // the token in the store so the me() call below is authenticated.
+        const access_token = await refreshAccessToken();
         const user = await authService.me();
         if (active) {
           useAuthStore.getState().setAuth(access_token, user);
