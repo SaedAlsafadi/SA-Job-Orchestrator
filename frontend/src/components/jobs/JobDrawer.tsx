@@ -23,11 +23,12 @@ export default function JobDrawer({ job, analysis, analyzing, baseResumeId, gene
   const paras = job.description.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
   const match = analysis ? atsPercent(analysis.match_score) : job.match_score != null ? atsPercent(job.match_score) : null;
   const canGenerate = Boolean(baseResumeId) && !generating;
+  const generateHint = !baseResumeId ? 'Upload a résumé first' : undefined;
 
   return (
     <>
       <div onClick={onClose} role="presentation" style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(4,7,9,.5)', backdropFilter: 'blur(3px)', animation: 'aaPop .16s var(--ease)' }} />
-      <aside role="dialog" aria-label="Job details" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(94vw,540px)', zIndex: 71, background: 'var(--surface)', borderLeft: '1px solid var(--border-2)', boxShadow: 'var(--shadow-pop)', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font)', color: 'var(--text)' }}>
+      <aside role="dialog" aria-label="Job details" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(94vw,540px)', zIndex: 71, background: 'var(--surface)', borderLeft: '1px solid var(--border-2)', boxShadow: 'var(--shadow-pop)', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font)', color: 'var(--text)', animation: 'aaDrawer .28s var(--ease)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '20px 22px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ flex: '1 1 auto', minWidth: 0 }}>
             <div style={{ font: '800 18px/1.2 var(--font)', letterSpacing: '-.02em' }}>{job.title}</div>
@@ -92,10 +93,19 @@ export default function JobDrawer({ job, analysis, analyzing, baseResumeId, gene
         </div>
 
         <div style={{ flex: '0 0 auto', display: 'flex', gap: 9, padding: '16px 22px', borderTop: '1px solid var(--border)' }}>
-          <button onClick={onGenerate} disabled={!canGenerate} title={!baseResumeId ? 'Upload a résumé first' : undefined}
+          <button
+            onClick={() => { if (!canGenerate) return; onGenerate(); }}
+            aria-disabled={!canGenerate}
+            aria-describedby={generateHint ? 'drawer-generate-hint' : undefined}
+            title={generateHint}
             style={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 'var(--r-md)', background: canGenerate ? 'var(--accent)' : 'var(--surface-2)', border: canGenerate ? '0' : '1px solid var(--border)', color: canGenerate ? 'var(--accent-ink)' : 'var(--text-4)', font: '700 13px/1 var(--font)', cursor: canGenerate ? 'pointer' : 'not-allowed' }}>
             <Icon name="sparkle" size={14} /> {generating ? 'Generating…' : 'Generate tailored résumé'}
           </button>
+          {generateHint && (
+            <span id="drawer-generate-hint" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+              {generateHint}
+            </span>
+          )}
           <a href={job.url} target="_blank" rel="noreferrer" style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 7, height: 44, padding: '0 16px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-2)', font: '700 13px/1 var(--font)', textDecoration: 'none' }}>
             <Icon name="ext" size={14} /> View posting
           </a>
