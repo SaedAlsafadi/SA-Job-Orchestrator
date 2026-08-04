@@ -7,10 +7,11 @@ import { MemoryRouter } from 'react-router-dom';
 import { server } from '@/__tests__/mocks/server';
 import DashboardPage from '@/pages/DashboardPage';
 
-function dashStats() {
+function dashStats(overrides: Record<string, unknown> = {}) {
   return {
     total_jobs_found: 40, total_applications: 128, applications_pending: 3, applications_applied: 86,
     applications_interview: 11, applications_rejected: 8, applications_offer: 2, avg_ats_score: 0.82, total_llm_cost_usd: 14.62,
+    ...overrides,
   };
 }
 function app(overrides: Record<string, unknown> = {}) {
@@ -47,5 +48,22 @@ describe('DashboardPage live-now card', () => {
     renderDash();
     await screen.findByText('Senior Product Manager');
     expect(screen.queryByText(/live now/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage greeting pluralization (BUG-006)', () => {
+  it('says "1 role" (singular) when exactly one application has been sent', async () => {
+    server.use(http.get('/api/v1/analytics/dashboard', () => HttpResponse.json(dashStats({ applications_applied: 1 }))));
+    server.use(http.get('/api/v1/applications/', () => HttpResponse.json(listOf(app()))));
+    renderDash();
+    expect(await screen.findByText('1 role')).toBeInTheDocument();
+    expect(screen.queryByText('1 roles')).not.toBeInTheDocument();
+  });
+
+  it('says "N roles" (plural) for more than one', async () => {
+    server.use(http.get('/api/v1/analytics/dashboard', () => HttpResponse.json(dashStats({ applications_applied: 86 }))));
+    server.use(http.get('/api/v1/applications/', () => HttpResponse.json(listOf(app()))));
+    renderDash();
+    expect(await screen.findByText('86 roles')).toBeInTheDocument();
   });
 });
