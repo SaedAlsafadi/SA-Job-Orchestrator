@@ -29,6 +29,7 @@ export default function AnalyticsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16 }}>
         {/* Funnel */}
         <Panel icon="filter" title="Application funnel">
+          <ChartState isLoading={funnel.isLoading} isError={funnel.isError}>
           {funnelData.length === 0 ? <Empty /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {funnelData.map((f) => (
@@ -42,10 +43,12 @@ export default function AnalyticsPage() {
               ))}
             </div>
           )}
+          </ChartState>
         </Panel>
 
         {/* ATS distribution */}
         <Panel icon="gauge" title="ATS score distribution">
+          <ChartState isLoading={ats.isLoading} isError={ats.isError}>
           {atsData.length === 0 ? <Empty /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {atsData.map((b) => (
@@ -59,10 +62,12 @@ export default function AnalyticsPage() {
               ))}
             </div>
           )}
+          </ChartState>
         </Panel>
 
         {/* Activity timeline */}
         <Panel icon="activity" title="Activity (applied / day)">
+          <ChartState isLoading={timeline.isLoading} isError={timeline.isError}>
           {days.length === 0 ? <Empty /> : (
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 90 }}>
               {days.map((d) => (
@@ -70,10 +75,12 @@ export default function AnalyticsPage() {
               ))}
             </div>
           )}
+          </ChartState>
         </Panel>
 
         {/* LLM usage */}
         <Panel icon="cpu" title="AI usage & spend">
+          <ChartState isLoading={llm.isLoading} isError={llm.isError}>
           {llmData.length === 0 ? <Empty /> : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {llmData.map((u) => (
@@ -87,10 +94,32 @@ export default function AnalyticsPage() {
               ))}
             </div>
           )}
+          </ChartState>
         </Panel>
       </div>
     </div>
   );
+}
+
+/**
+ * Per-panel fetch-state gate: error → house error notice, loading → shimmer,
+ * else the panel body. Keeps one failing endpoint from blanking the other panels.
+ */
+function ChartState({ isLoading, isError, children }: { isLoading: boolean; isError: boolean; children: React.ReactNode }) {
+  if (isError) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '20px 0', color: 'var(--text-3)', font: '500 12.5px/1.4 var(--font)' }}>
+        <span style={{ color: 'var(--failed)', display: 'grid', placeItems: 'center' }}><Icon name="alert" size={16} /></span>
+        Couldn't load this chart. Retry in a moment.
+      </div>
+    );
+  }
+  if (isLoading) {
+    return (
+      <div style={{ height: 90, borderRadius: 'var(--r-md)', background: 'linear-gradient(90deg,var(--surface-2),var(--hover),var(--surface-2))', backgroundSize: '200% 100%', animation: 'aaShimmer 1.3s linear infinite' }} />
+    );
+  }
+  return <>{children}</>;
 }
 
 function Panel({ icon, title, children }: { icon: IconName; title: string; children: React.ReactNode }) {
