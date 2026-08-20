@@ -11,6 +11,20 @@ class GreenhouseJobSource(JobSource):
     def name(self) -> str:
         return "greenhouse"
 
+    def capabilities(self):
+        from app.core.connectors.base import ConnectorCapabilities
+        return ConnectorCapabilities(
+            discovery=True,
+            job_details=True,
+            application_preparation=True,
+            prefilled_profile_detection=True,
+            resume_upload=True,
+            question_handling=True,
+            human_review=True,
+            submission=False,
+            status_monitoring=False
+        )
+
     def _extract_board_token(self, url: str) -> str:
         # e.g., https://boards.greenhouse.io/companyname or https://boards.eu.greenhouse.io/companyname
         match = re.search(r"boards\.(?:eu\.)?greenhouse\.io/([^/]+)", url)

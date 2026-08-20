@@ -32,6 +32,14 @@ class DiscoverResponse(BaseModel):
     discovered_jobs: int
     jobs: List[Any]
 
+@router.get("/capabilities")
+async def get_capabilities(
+    user: CurrentUser,
+    discovery: DiscoveryService = Depends(get_discovery_service)
+):
+    """Return a map of platform -> capabilities so frontend can disable unsupported features."""
+    return discovery.get_all_capabilities()
+
 @router.post("/discover")
 async def discover_jobs(
     request: DiscoverRequest,
@@ -39,7 +47,7 @@ async def discover_jobs(
     discovery: DiscoveryService = Depends(get_discovery_service)
 ):
     jobs = await discovery.discover_and_store(user.id, request.url)
-    return {"discovered_jobs": len(jobs), "jobs": [{"id": j.id, "title": j.title, "company": j.company} for j in jobs]}
+    return {"discovered_jobs": len(jobs), "jobs": [{"id": j.id, "title": j.title, "company": j.company, "platform": j.platform} for j in jobs]}
 
 class AnalyzeJobRequest(BaseModel):
 

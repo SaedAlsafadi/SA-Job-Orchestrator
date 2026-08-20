@@ -11,6 +11,17 @@ class QuestionCategory(str, Enum):
     E_UNKNOWN_HIGH_RISK = "E"
     F_OPTIONAL_EMPTY = "F"
 
+class ConnectorCapabilities(BaseModel):
+    discovery: bool
+    job_details: bool
+    application_preparation: bool
+    prefilled_profile_detection: bool
+    resume_upload: bool
+    question_handling: bool
+    human_review: bool
+    submission: bool
+    status_monitoring: bool
+
 class ApplicationQuestion(BaseModel):
     model_config = ConfigDict(frozen=False)
 
@@ -38,6 +49,10 @@ class JobSource(ABC):
     
     @abstractmethod
     def name(self) -> str:
+        pass
+
+    @abstractmethod
+    def capabilities(self) -> ConnectorCapabilities:
         pass
 
     @abstractmethod
