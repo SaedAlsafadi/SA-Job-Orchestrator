@@ -20,6 +20,8 @@ import SystemStatePage from '@/pages/SystemStatePage';
 import { RequireAuth } from '@/components/auth/RequireAuth';
 import { RequireSuperuser } from '@/components/auth/RequireSuperuser';
 import { PublicOnly } from '@/components/auth/PublicOnly';
+import { CandidateProfilePage } from '@/pages/CandidateProfilePage';
+import { ApplicationWorkflow } from '@/pages/ApplicationWorkflow';
 
 function App() {
   return (
@@ -40,6 +42,8 @@ function App() {
           }
         >
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<CandidateProfilePage />} />
+          <Route path="/workflow" element={<ApplicationWorkflow />} />
           <Route path="/jobs" element={<JobSearchPage />} />
           <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/applications/:id" element={<AppDetailPage />} />

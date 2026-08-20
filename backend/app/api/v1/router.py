@@ -1,6 +1,7 @@
 """API v1 router aggregating all sub-routers."""
 
 from fastapi import APIRouter, Depends
+from app.config.settings import get_settings
 
 from app.api.deps import get_current_user, require_superuser
 from app.api.v1.admin import router as admin_router
@@ -11,11 +12,18 @@ from app.api.v1.jobs import router as jobs_router
 from app.api.v1.platform_sessions import router as platform_sessions_router
 from app.api.v1.resumes import router as resumes_router
 from app.api.v1.settings import router as settings_router
+from app.api.v1.dev import router as dev_router
+from app.api.v1 import candidate_profile
+from app.api.v1 import workflow
 
 v1_router = APIRouter()
 
 # Auth routes are public (no guard).
 v1_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+
+# Core Domain
+v1_router.include_router(candidate_profile.router, prefix="/candidate-profile", tags=["candidate-profile"])
+v1_router.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 
 # All other routers require an authenticated user (router-level guard).
 _auth = [Depends(get_current_user)]
@@ -39,3 +47,7 @@ v1_router.include_router(
 v1_router.include_router(
     admin_router, prefix="/admin", tags=["Admin"], dependencies=[Depends(require_superuser)]
 )
+
+# Dev routes for local testing
+if get_settings().environment.value == "development":
+    v1_router.include_router(dev_router, prefix="/dev", tags=["Development"])

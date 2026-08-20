@@ -34,9 +34,9 @@ class LLMSettings(BaseSettings):
     gemini_api_key: SecretStr = SecretStr("")
     openrouter_api_key: SecretStr = SecretStr("")
     github_token: SecretStr = SecretStr("")
-    preferred_provider: str = "openai"
+    preferred_provider: str = "gemini"
     fallback_providers: list[str] = ["groq", "openrouter"]
-    default_model: str = "gpt-4o"
+    default_model: str = "gemini/gemini-3.5-flash"
     temperature: float = 0.7
     max_tokens: int = 4096
     # AWS Bedrock: platform-authenticated via the standard AWS credential chain (env vars,

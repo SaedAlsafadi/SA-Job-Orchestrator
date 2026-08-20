@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { font-family: sans-serif; padding: 20px; }
+h1 { color: #333; }
+.experience { margin-bottom: 15px; }
+</style>
+</head>
+<body>
+    <h1>{{ summary }}</h1>
+    <h2>Experience</h2>
+    {% for exp in experiences %}
+    <div class="experience">
+        <h3>{{ exp.job_title }} at {{ exp.company_name }}</h3>
+        <p>{{ exp.start_date }} - {{ exp.end_date }}</p>
+        <p>{{ exp.description }}</p>
+    </div>
+    {% endfor %}
+    <h2>Skills</h2>
+    <ul>
+    {% for skill in skills %}
+        <li>{{ skill }}</li>
+    {% endfor %}
+    </ul>
+</body>
+</html>

@@ -54,10 +54,10 @@ class TestLLMSettings:
         settings = LLMSettings(max_tokens=0)
         assert settings.max_tokens == 1
 
-    def test_default_provider_is_openai(self) -> None:
-        """Default preferred provider should be openai."""
+    def test_default_provider_is_gemini(self) -> None:
+        """Default preferred provider should be gemini."""
         settings = LLMSettings()
-        assert settings.preferred_provider == "openai"
+        assert settings.preferred_provider == "gemini"
 
 
 class TestBrowserSettings:

@@ -63,10 +63,37 @@ class Application(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     # Metadata
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     browser_screenshots: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    audit_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
     job: Mapped["Job"] = relationship(back_populates="applications")  # noqa: F821
     resume: Mapped["Resume | None"] = relationship(back_populates="applications")  # noqa: F821
+    runs: Mapped[list["ApplicationRun"]] = relationship(back_populates="application", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Application(id={self.id}, job_id={self.job_id}, status='{self.status}')>"
+
+
+class ApplicationRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
+    """An execution run for an application (e.g. preparing, submitting)."""
+
+    __tablename__ = "application_runs"
+
+    application_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("applications.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    state_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    artifacts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    application: Mapped["Application"] = relationship(back_populates="runs")
+
+    def __repr__(self) -> str:
+        return f"<ApplicationRun(id={self.id}, app_id={self.application_id}, status='{self.status}')>"
+

@@ -63,3 +63,8 @@ Thumbs.db
 temp.py
 .qodo
 uv.lock
+# Local test files
+*.db
+data/storage/
+*_test.py
+*.sqlite3

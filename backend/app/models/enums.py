@@ -13,6 +13,14 @@ from enum import StrEnum
 class ApplicationStatus(StrEnum):
     """Lifecycle of a job application."""
 
+    # Workflow v1 states
+    DISCOVERED = "discovered"
+    MATCHED = "matched"
+    PREPARING = "preparing"
+    READY = "ready"
+    WAITING_FOR_REVIEW = "waiting_for_review"
+
+    # Legacy/Future states
     QUEUED = "queued"
     PENDING_REVIEW = "pending_review"
     APPROVED = "approved"

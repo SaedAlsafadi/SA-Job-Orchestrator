@@ -5,6 +5,20 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import structlog
+import os
+import app
+
+# --- STALE PACKAGE REGRESSION CHECK ---
+app_path = getattr(app, "__file__", "")
+if "site-packages" in app_path or "dist-packages" in app_path:
+    raise RuntimeError(
+        f"CRITICAL ENVIRONMENT ERROR: The 'app' module was imported from {app_path}. "
+        "It appears the project was installed using 'pip install .' instead of '-e .', "
+        "causing the server to run a stale, cached copy of the code rather than the local working tree. "
+        "Fix this by running 'pip uninstall -y app autoapply' and ensuring PYTHONPATH is set."
+    )
+# --------------------------------------
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

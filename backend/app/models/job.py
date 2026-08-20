@@ -27,15 +27,28 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     company: Mapped[str] = mapped_column(String(200), nullable=False)
     location: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    application_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    responsibilities: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Optional fields
     salary_range: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    salary: Mapped[str | None] = mapped_column(String(200), nullable=True)
     job_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    employment_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     remote: Mapped[bool] = mapped_column(Boolean, default=False)
+    work_model: Mapped[str | None] = mapped_column(String(50), nullable=True)
     posted_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     experience_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    seniority: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # GCC specific and raw data
+    gcc_eligibility: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    raw_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Analysis
     match_score: Mapped[float | None] = mapped_column(Float, nullable=True)

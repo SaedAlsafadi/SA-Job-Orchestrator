@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
@@ -20,6 +20,10 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_superuser: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Soft-delete (D9): hidden immediately, purged after a grace period in Phase 4.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    profile: Mapped["CandidateProfile"] = relationship(  # type: ignore # noqa: F821
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email='{self.email}')>"
