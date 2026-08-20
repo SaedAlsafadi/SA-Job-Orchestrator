@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Greenhouse Mock Job Page</title>
+</head>
+<body>
+    <div id="job-page">
+        <h1>Software Engineer (Greenhouse)</h1>
+        <p>This is a fake job posting on Greenhouse.</p>
+        <button id="apply_button" onclick="openPanel()">Apply for this job</button>
+    </div>
+
+    <!-- Application Panel / Form -->
+    <div id="application-panel" style="display:none; border:1px solid #ccc; padding:20px; margin-top:20px;">
+        <h2>Apply for Software Engineer</h2>
+        <form id="application_form">
+            <!-- Prefilled fields -->
+            <div class="field">
+                <label for="first_name">First Name *</label>
+                <input type="text" id="first_name" name="job_application[first_name]" value="Jane" required>
+            </div>
+            <div class="field">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="job_application[email]" value="jane@example.com" required>
+            </div>
+
+            <!-- Unresolved fields -->
+            <div class="field">
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="job_application[phone]">
+            </div>
+
+            <!-- Required Unknown -->
+            <div class="field">
+                <label for="custom_q">Why do you want this job? *</label>
+                <textarea id="custom_q" name="job_application[answers][custom_q]" required></textarea>
+            </div>
+
+            <!-- CV present (mocking Greenhouse data-cv-present or remove button) -->
+            <div class="field">
+                <label>Resume</label>
+                <a href="#">Remove resume</a>
+                <input type="file" name="job_application[resume]" style="display:none;">
+            </div>
+
+            <button type="submit">Submit Application</button>
+        </form>
+    </div>
+
+    <script>
+        function openPanel() {
+            document.getElementById('application-panel').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
