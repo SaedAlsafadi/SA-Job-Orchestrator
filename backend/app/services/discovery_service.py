@@ -5,18 +5,21 @@ import structlog
 
 from app.models.job import Job
 from app.core.connectors.workable_source import WorkableJobSource
+from app.core.connectors.greenhouse_source import GreenhouseJobSource
 
 logger = structlog.get_logger(__name__)
 
 class DiscoveryService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.sources = [WorkableJobSource()]
+        self.sources = [WorkableJobSource(), GreenhouseJobSource()]
 
     def _get_source(self, url: str):
         # Naive implementation for MVP
         if "workable" in url:
             return self.sources[0]
+        elif "greenhouse" in url:
+            return self.sources[1]
         raise ValueError(f"No source connector supports URL: {url}")
 
     async def discover_and_store(self, user_id: str, url: str) -> List[Job]:

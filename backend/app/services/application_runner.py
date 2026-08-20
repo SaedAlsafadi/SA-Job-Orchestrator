@@ -12,12 +12,17 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
     async with db_session_maker() as db:
         try:
             from app.core.connectors.workable_app import WorkableApplicationConnector
+            from app.core.connectors.greenhouse_app import GreenhouseApplicationConnector
             from app.services.question_engine import QuestionEngine
             from app.core.llm.client import LLMClient
             from sqlalchemy import update
             from app.models.application import ApplicationRun, Application
             
-            connector = WorkableApplicationConnector()
+            if "greenhouse" in job_url:
+                connector = GreenhouseApplicationConnector()
+            else:
+                connector = WorkableApplicationConnector()
+                
             engine = QuestionEngine(profile_data, LLMClient())
             
             async with async_playwright() as p:
