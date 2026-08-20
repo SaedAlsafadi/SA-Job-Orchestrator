@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workable Mock Job Page</title>
+</head>
+<body>
+    <div id="job-page">
+        <h1>Software Engineer</h1>
+        <p>This is a fake job posting.</p>
+        <button data-ui="apply-button" onclick="openPanel()">Apply for this job</button>
+    </div>
+
+    <!-- Application Panel (Hidden initially) -->
+    <div id="application-panel" role="dialog" style="display:none; border:1px solid #ccc; padding:20px; margin-top:20px;">
+        <h2>Apply for Software Engineer</h2>
+        <form id="apply-form" data-ui="application-form">
+            <!-- Case 2/4: Prefilled fields -->
+            <div>
+                <label for="firstname">First Name</label>
+                <input type="text" id="firstname" name="firstname" value="Jane" required>
+            </div>
+            <div>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="jane@example.com" required>
+            </div>
+
+            <!-- Case 3/4: Unresolved fields -->
+            <div>
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="phone">
+            </div>
+
+            <!-- Case 5: Required Unknown -->
+            <div>
+                <label for="custom_q">Why do you want this job?</label>
+                <textarea id="custom_q" name="custom_q" required></textarea>
+            </div>
+
+            <!-- Case 6: CV present -->
+            <div>
+                <span>Resume: jane_doe_cv.pdf</span>
+                <button type="button" aria-label="Remove resume">X</button>
+                <input type="file" data-ui="resume" style="display:none;">
+            </div>
+
+            <button type="submit">Submit Application</button>
+        </form>
+    </div>
+
+    <script>
+        function openPanel() {
+            document.getElementById('application-panel').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

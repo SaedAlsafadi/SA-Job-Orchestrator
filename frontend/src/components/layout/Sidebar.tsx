@@ -17,6 +17,8 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'grid' },
+  { to: '/profile', label: 'Candidate Profile', icon: 'user' },
+  { to: '/workflow', label: 'Prepare Application', icon: 'zap' },
   { to: '/jobs', label: 'Jobs', icon: 'briefcase' },
   { to: '/applications', label: 'Applications', icon: 'inbox' },
   { to: '/resumes', label: 'Résumés', icon: 'file' },

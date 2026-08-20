@@ -24,6 +24,7 @@ if config.config_file_name is not None:
 
 # Target metadata for autogenerate
 target_metadata = Base.metadata
+print('TABLES IN METADATA:', target_metadata.tables.keys())
 
 
 def run_migrations_offline() -> None:

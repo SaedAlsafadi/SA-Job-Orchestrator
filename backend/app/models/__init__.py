@@ -2,6 +2,7 @@
 
 from app.models.application import Application
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.candidate_profile import CandidateProfile
 from app.models.harness import (
     DomainSkill,
     RunDiagnosis,
@@ -24,6 +25,7 @@ from app.models.user_settings import UserSettings
 __all__ = [
     "Application",
     "Base",
+    "CandidateProfile",
     "DomainSkill",
     "Job",
     "LLMUsage",

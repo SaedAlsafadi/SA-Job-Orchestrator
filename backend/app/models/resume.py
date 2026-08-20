@@ -1,6 +1,6 @@
 """Resume database model."""
 
-from sqlalchemy import Float, ForeignKey, Index, String, Text
+from sqlalchemy import Float, ForeignKey, Index, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
@@ -43,6 +43,9 @@ class Resume(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
 
     # Extracted text for search and analysis
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Audit metadata for generated tailored variants
+    audit_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
     base_resume: Mapped["Resume | None"] = relationship(
