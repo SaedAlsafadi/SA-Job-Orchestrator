@@ -6,13 +6,14 @@ import structlog
 from app.models.job import Job
 from app.core.connectors.workable_source import WorkableJobSource
 from app.core.connectors.greenhouse_source import GreenhouseJobSource
+from app.core.connectors.lever_source import LeverJobSource
 
 logger = structlog.get_logger(__name__)
 
 class DiscoveryService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.sources = [WorkableJobSource(), GreenhouseJobSource()]
+        self.sources = [WorkableJobSource(), GreenhouseJobSource(), LeverJobSource()]
 
     def _get_source(self, url: str):
         # Naive implementation for MVP
@@ -20,6 +21,8 @@ class DiscoveryService:
             return self.sources[0]
         elif "greenhouse" in url:
             return self.sources[1]
+        elif "lever" in url:
+            return self.sources[2]
         raise ValueError(f"No source connector supports URL: {url}")
 
     def get_all_capabilities(self) -> Dict[str, Any]:
