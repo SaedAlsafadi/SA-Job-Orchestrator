@@ -22,6 +22,9 @@ class DiscoveryService:
             return self.sources[1]
         raise ValueError(f"No source connector supports URL: {url}")
 
+    def get_all_capabilities(self) -> Dict[str, Any]:
+        return {s.name(): s.capabilities().model_dump() for s in self.sources}
+
     async def discover_and_store(self, user_id: str, url: str) -> List[Job]:
         source = self._get_source(url)
         raw_jobs = await source.discover_jobs(url)

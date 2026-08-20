@@ -21,13 +21,18 @@ export function ApplicationWorkflow() {
   const [step, setStep] = useState(1);
   const [jobUrl, setJobUrl] = useState("");
   const [discoveredJobs, setDiscoveredJobs] = useState<any[]>([]);
-  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<any>(null);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [appId, setAppId] = useState<string | null>(null);
   const [appState, setAppState] = useState<any>(null);
+
+  useEffect(() => {
+    api.get("/workflow/capabilities").then(res => {
+      setCapabilities(res.data);
+    }).catch(err => console.error("Failed to load capabilities", err));
+  }, []);
 
   const discoverJobs = async () => {
     if (!jobUrl) return setError("Please enter a job URL");
@@ -41,15 +46,13 @@ export function ApplicationWorkflow() {
   };
 
   const prepareApplication = async (jobId: string) => {
-    setSelectedJob(jobId);
     setLoading(true); setError(null);
     try {
       // Mocking tailored data payload as we skip LLM generation for MVP UI demo
       const payload = {
         summary: "Expert Engineer", experiences: [], skills: ["Python"]
       };
-      const res = await api.post(`/workflow/jobs/${jobId}/prepare-application`, payload);
-      setAppId(res.data.application_id);
+      await api.post(`/workflow/jobs/${jobId}/prepare-application`, payload);
       setStep(3); // PREPARING
       
       // Simulate polling for WAITING_FOR_REVIEW state
@@ -82,7 +85,7 @@ export function ApplicationWorkflow() {
   return (
     <div style={{ padding: "40px", maxWidth: "800px", margin: "0 auto", fontFamily: "var(--font)" }}>
       <h1 style={{ fontSize: "24px", fontWeight: 700, margin: "0 0 8px 0" }}>Prepare Application</h1>
-      <p style={{ color: "var(--text-2)", marginBottom: "32px" }}>Provide a Workable URL to prepare an application.</p>
+      <p style={{ color: "var(--text-2)", marginBottom: "32px" }}>Provide a Job Board URL (Workable, Greenhouse) to prepare an application.</p>
 
       {error && <div style={{ padding: 12, background: "var(--failed-soft)", color: "var(--failed)", borderRadius: "var(--r-sm)", marginBottom: 20 }}>{error}</div>}
 
@@ -102,8 +105,8 @@ export function ApplicationWorkflow() {
 
         {step === 1 && (
           <div>
-            <label style={labelStyle}>Workable Job URL
-              <input style={inputStyle} value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://apply.workable.com/company/j/12345" />
+            <label style={labelStyle}>Job Board URL
+              <input style={inputStyle} value={jobUrl} onChange={e => setJobUrl(e.target.value)} placeholder="https://apply.workable.com/... or https://boards.greenhouse.io/..." />
             </label>
             <button style={buttonStyle} onClick={discoverJobs} disabled={loading}>{loading ? "Discovering..." : "Discover Jobs"}</button>
           </div>
@@ -184,7 +187,11 @@ export function ApplicationWorkflow() {
 
             <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid var(--border)", display: "flex", gap: 12, justifyContent: "flex-end" }}>
               <button style={{...buttonStyle, background: "var(--surface-2)", color: "var(--text)"}}>Cancel</button>
-              <button style={{...buttonStyle, opacity: 0.5, cursor: "not-allowed"}} disabled>Submit Application (Disabled for MVP)</button>
+              {capabilities && appState.job.platform && capabilities[appState.job.platform]?.submission ? (
+                 <button style={buttonStyle}>Submit Application</button>
+              ) : (
+                 <button style={{...buttonStyle, opacity: 0.5, cursor: "not-allowed"}} disabled title="This integration does not support automated submission yet.">Submit Application (Unsupported)</button>
+              )}
             </div>
           </div>
         )}

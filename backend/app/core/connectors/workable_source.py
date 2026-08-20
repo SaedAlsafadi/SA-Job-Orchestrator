@@ -8,6 +8,20 @@ class WorkableJobSource(JobSource):
     def name(self) -> str:
         return "workable"
 
+    def capabilities(self):
+        from app.core.connectors.base import ConnectorCapabilities
+        return ConnectorCapabilities(
+            discovery=True,
+            job_details=True,
+            application_preparation=True,
+            prefilled_profile_detection=True,
+            resume_upload=True,
+            question_handling=True,
+            human_review=True,
+            submission=False,
+            status_monitoring=False
+        )
+
     def _extract_account(self, url: str) -> str:
         # e.g. https://apply.workable.com/company-name/
         # or https://apply.workable.com/company-name/j/12345
