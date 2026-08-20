@@ -13,12 +13,15 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
         try:
             from app.core.connectors.workable_app import WorkableApplicationConnector
             from app.core.connectors.greenhouse_app import GreenhouseApplicationConnector
+            from app.core.connectors.lever_app import LeverApplicationConnector
             from app.services.question_engine import QuestionEngine
             from app.core.llm.client import LLMClient
             from sqlalchemy import update
             from app.models.application import ApplicationRun, Application
             
-            if "greenhouse" in job_url:
+            if "lever" in job_url:
+                connector = LeverApplicationConnector()
+            elif "greenhouse" in job_url:
                 connector = GreenhouseApplicationConnector()
             else:
                 connector = WorkableApplicationConnector()
