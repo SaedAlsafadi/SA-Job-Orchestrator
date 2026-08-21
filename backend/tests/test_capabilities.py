@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from httpx import AsyncClient
 from app.main import app
 
@@ -15,7 +15,7 @@ async def test_connector_capabilities(client: AsyncClient):
     workable = data["workable"]
     assert workable["discovery"] is True
     assert workable["application_preparation"] is True
-    assert workable["submission"] is False
+    assert workable["submission"] is True
     assert workable["status_monitoring"] is False
     
     # Verify greenhouse capabilities
@@ -25,3 +25,4 @@ async def test_connector_capabilities(client: AsyncClient):
     assert greenhouse["application_preparation"] is True
     assert greenhouse["submission"] is False
     assert greenhouse["status_monitoring"] is False
+

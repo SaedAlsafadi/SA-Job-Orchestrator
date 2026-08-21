@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+﻿from typing import Any, Dict, List, Optional
 import structlog
 from app.core.connectors.base import ApplicationConnector, ApplicationQuestion
 
@@ -12,6 +12,9 @@ class WorkableApplicationConnector(ApplicationConnector):
         return "workable.com" in url
 
     async def open_application(self, url: str, page) -> None:
+        if "//apply" in url:
+            url = url.replace("//apply", "/apply")
+            
         logger.info("Opening workable job page", url=url)
         await page.goto(url)
         await page.wait_for_load_state('networkidle')
@@ -36,7 +39,7 @@ class WorkableApplicationConnector(ApplicationConnector):
             for el in elements:
                 if await el.is_visible():
                     logger.info(f"Found apply button via selector: {sel}")
-                    await el.click()
+                    await el.click(force=True)
                     clicked = True
                     break
             if clicked: break
@@ -53,7 +56,7 @@ class WorkableApplicationConnector(ApplicationConnector):
 
     async def inspect_form(self, page) -> List[ApplicationQuestion]:
         # Inject JS to find all form fields (inputs, textareas, selects) inside the panel
-        script = """
+        script = r"""
         () => {
             const fields = [];
             // Look for the main application container first
@@ -64,17 +67,71 @@ class WorkableApplicationConnector(ApplicationConnector):
                 if (type === 'hidden' || type === 'submit' || type === 'button') return;
                 
                 // Find associated label
-                let labelText = el.name || el.id;
-                const labelEl = document.querySelector(`label[for="${el.id}"]`) || el.closest('label');
-                if (labelEl) {
-                    labelText = labelEl.innerText.trim();
-                } else {
-                    const ariaLabel = el.getAttribute('aria-label');
-                    if (ariaLabel) labelText = ariaLabel;
+                let labelText = '';
+                
+                // 1. Direct label
+                const labelEl = document.querySelector(`label[for="${el.id}"]`);
+                if (labelEl) labelText = labelEl.innerText.trim();
+                
+                // 2. Nested label
+                if (!labelText) {
+                    const closestLabel = el.closest('label');
+                    if (closestLabel) {
+                        // For radios/checkboxes, the actual question is usually in a preceding tag or a fieldset legend
+                        if (type === 'radio' || type === 'checkbox') {
+                            const fieldset = el.closest('fieldset');
+                            if (fieldset) {
+                                const legend = fieldset.querySelector('legend');
+                                if (legend) labelText = legend.innerText.trim() + " - " + closestLabel.innerText.trim();
+                            } else {
+                                // Try finding a strong or h3 tag in previous siblings or parent's previous siblings
+                                let parent = closestLabel.parentElement;
+                                while (parent && parent !== container) {
+                                    if (parent.previousElementSibling) {
+                                        const text = parent.previousElementSibling.innerText;
+                                        if (text && text.length > 5) {
+                                            labelText = text.trim() + " - " + closestLabel.innerText.trim();
+                                            break;
+                                        }
+                                    }
+                                    parent = parent.parentElement;
+                                }
+                            }
+                            if (!labelText) labelText = closestLabel.innerText.trim();
+                        } else {
+                            // Extract text from the label excluding the input's own value
+                            const clone = closestLabel.cloneNode(true);
+                            const inputs = clone.querySelectorAll('input, select, textarea');
+                            inputs.forEach(i => i.remove());
+                            labelText = clone.innerText.trim();
+                        }
+                    }
                 }
                 
+                // 3. Aria / Placeholder / Name
+                if (!labelText) labelText = el.getAttribute('aria-label') || '';
+                if (!labelText) labelText = el.placeholder || '';
+                if (!labelText) labelText = el.name || el.id || '';
+                
+                // Clean up label text
+                labelText = labelText.replace(/\n/g, ' ').replace(/\*/g, '').trim();
+                
                 let currentValue = el.value || "";
+                if ((type === 'radio' || type === 'checkbox') && !el.checked) {
+                    currentValue = ""; // Not selected
+                }
                 let isPrefilled = currentValue.trim() !== "";
+                
+                // Deduplicate radios with the same name, we don't want 5 questions for 1 radio group
+                if ((type === 'radio' || type === 'checkbox') && el.name) {
+                    const existing = fields.find(f => f.name === el.name);
+                    if (existing) {
+                        existing.options = existing.options || [];
+                        existing.options.push(el.value || labelText);
+                        if (el.checked) existing.current_value = el.value;
+                        return; // Skip adding a new field
+                    }
+                }
                 
                 fields.push({
                     id: el.name || el.id || labelText,
@@ -83,7 +140,8 @@ class WorkableApplicationConnector(ApplicationConnector):
                     type: type,
                     required: el.required || el.getAttribute('aria-required') === 'true',
                     current_value: currentValue,
-                    prefilled: isPrefilled
+                    prefilled: isPrefilled,
+                    options: (type === 'radio' || type === 'checkbox') ? [el.value || labelText] : []
                 });
             });
             return fields;
@@ -108,7 +166,7 @@ class WorkableApplicationConnector(ApplicationConnector):
     async def detect_cv_presence(self, page) -> bool:
         """Detect if the platform already has a CV loaded/prefilled."""
         # Simple heuristic: Look for a file input that has a filename adjacent to it, or a specific Workable CV badge
-        script = """
+        script = r"""
         () => {
             // Some platforms show a span with the filename or a remove button when a CV is pre-populated
             const removeButtons = document.querySelectorAll('button[aria-label*="remove resume"], button[aria-label*="Remove resume"]');
@@ -172,7 +230,36 @@ class WorkableApplicationConnector(ApplicationConnector):
         return {"url": page.url}
 
     async def submit(self, page) -> None:
-        raise NotImplementedError("Submission is disabled for MVP")
+        logger.info("Submitting Workable application")
+        selectors = [
+            'button[data-ui="submit-button"]',
+            'button:has-text("Submit application")',
+            'button[type="submit"]'
+        ]
+        
+        clicked = False
+        for sel in selectors:
+            elements = await page.locator(sel).all()
+            for el in elements:
+                if await el.is_visible():
+                    await el.click(force=True)
+                    clicked = True
+                    break
+            if clicked: break
+            
+        if not clicked:
+            raise ValueError("Could not confidently identify submit control on Workable.")
 
     async def capture_confirmation(self, page) -> str:
-        return "Not submitted"
+        logger.info("Verifying submission confirmation")
+        # Wait for either a success message or a redirect
+        try:
+            # Check for generic success messages often seen in Workable modal/page
+            await page.wait_for_selector(
+                'text="Application submitted" , text="Success" , [data-ui="success-message"]', 
+                timeout=10000
+            )
+            return "Confirmation verified"
+        except Exception:
+            # If the modal closes or URL changes, we might also consider it submitted
+            raise ValueError("Could not verify submission confirmation.")

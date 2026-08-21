@@ -17,7 +17,11 @@ async def init_arq_pool() -> None:
     """Create the Arq pool at startup. Degrades gracefully if Redis is unavailable."""
     global _pool
     try:
-        _pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
+        settings = RedisSettings.from_dsn(get_settings().redis_url)
+        # Fail fast during startup if Redis is unavailable
+        settings.conn_retries = 1
+        settings.conn_timeout = 1
+        _pool = await create_pool(settings)
         logger.info("arq_pool_ready")
     except Exception as exc:
         _pool = None

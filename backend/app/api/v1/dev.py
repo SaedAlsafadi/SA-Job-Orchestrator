@@ -21,21 +21,22 @@ class LLMHealthResponse(BaseModel):
 async def llm_health() -> LLMHealthResponse:
     """Development-only endpoint to verify LLM connectivity and configuration."""
     settings = get_settings()
-    # Check if Gemini key exists
-    if not settings.llm.gemini_api_key.get_secret_value():
+    # Check if preferred provider key exists
+    provider_key = f"{settings.llm.preferred_provider}_api_key"
+    if not getattr(settings.llm, provider_key, None) or not getattr(settings.llm, provider_key).get_secret_value():
         return LLMHealthResponse(
-            provider="gemini",
+            provider=settings.llm.preferred_provider,
             model=settings.llm.default_model,
             success=False,
             latency_ms=0.0,
-            error_message="GEMINI_API_KEY is not configured in .env"
+            error_message=f"{provider_key.upper()} is not configured in .env"
         )
     
     client = LLMClient()
     
     try:
         start_time = time.perf_counter()
-        # Minimal request to Gemini
+        # Minimal request
         response = await client.complete(
             prompt="Reply with the exact word 'OK'",
             model=settings.llm.default_model,
@@ -44,7 +45,7 @@ async def llm_health() -> LLMHealthResponse:
         )
         latency_ms = (time.perf_counter() - start_time) * 1000
         
-        success = response.content.strip() == "OK"
+        success = "OK" in response.content.strip()
         
         return LLMHealthResponse(
             provider=response.provider,
@@ -55,7 +56,7 @@ async def llm_health() -> LLMHealthResponse:
         )
     except Exception as exc:
         return LLMHealthResponse(
-            provider="gemini",
+            provider=settings.llm.preferred_provider,
             model=settings.llm.default_model,
             success=False,
             latency_ms=0.0,

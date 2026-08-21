@@ -15,6 +15,10 @@ class Identity(BaseModel):
     last_name: str = ""
     email: str = ""
     phone: str = ""
+    linkedin: str = ""
+    github: str = ""
+    portfolio: str = ""
+    professional_summary: str = ""
 
 class Location(BaseModel):
     country: str = ""
@@ -92,6 +96,7 @@ class CandidateProfileSchema(BaseModel):
     skills: list[SkillEntry] = Field(default_factory=list)
     projects: list[ProjectEntry] = Field(default_factory=list)
     certifications: list[CertificationEntry] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
     preferences: Preferences = Field(default_factory=Preferences)
 
     def get_all_evidence_ids(self) -> set[str]:
@@ -114,3 +119,63 @@ class CandidateProfileResponse(CandidateProfileSchema):
     id: str
     user_id: str
     version: int
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class DraftValue(BaseModel, Generic[T]):
+    value: T | None = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source: str = "resume"
+
+class DraftIdentity(BaseModel):
+    first_name: DraftValue[str] = Field(default_factory=DraftValue)
+    last_name: DraftValue[str] = Field(default_factory=DraftValue)
+    email: DraftValue[str] = Field(default_factory=DraftValue)
+    phone: DraftValue[str] = Field(default_factory=DraftValue)
+    linkedin: DraftValue[str] = Field(default_factory=DraftValue)
+    github: DraftValue[str] = Field(default_factory=DraftValue)
+    portfolio: DraftValue[str] = Field(default_factory=DraftValue)
+    professional_summary: DraftValue[str] = Field(default_factory=DraftValue)
+
+class DraftLocation(BaseModel):
+    country: DraftValue[str] = Field(default_factory=DraftValue)
+    city: DraftValue[str] = Field(default_factory=DraftValue)
+
+class DraftEducationEntry(BaseModel):
+    evidence_id: str = Field(default_factory=lambda: generate_evidence_id("edu"))
+    degree: DraftValue[str] = Field(default_factory=DraftValue)
+    institution: DraftValue[str] = Field(default_factory=DraftValue)
+    field_of_study: DraftValue[str] = Field(default_factory=DraftValue)
+    graduation_year: DraftValue[str] = Field(default_factory=DraftValue)
+
+class DraftExperienceEntry(BaseModel):
+    evidence_id: str = Field(default_factory=lambda: generate_evidence_id("exp"))
+    company: DraftValue[str] = Field(default_factory=DraftValue)
+    title: DraftValue[str] = Field(default_factory=DraftValue)
+    start_date: DraftValue[str] = Field(default_factory=DraftValue)
+    end_date: DraftValue[str] = Field(default_factory=DraftValue)
+    description: DraftValue[str] = Field(default_factory=DraftValue)
+
+class DraftProjectEntry(BaseModel):
+    evidence_id: str = Field(default_factory=lambda: generate_evidence_id("proj"))
+    name: DraftValue[str] = Field(default_factory=DraftValue)
+    description: DraftValue[str] = Field(default_factory=DraftValue)
+    url: DraftValue[str] = Field(default_factory=DraftValue)
+
+class DraftCertificationEntry(BaseModel):
+    evidence_id: str = Field(default_factory=lambda: generate_evidence_id("cert"))
+    name: DraftValue[str] = Field(default_factory=DraftValue)
+    issuer: DraftValue[str] = Field(default_factory=DraftValue)
+    date: DraftValue[str] = Field(default_factory=DraftValue)
+
+class CandidateProfileDraft(BaseModel):
+    identity: DraftIdentity = Field(default_factory=DraftIdentity)
+    location: DraftLocation = Field(default_factory=DraftLocation)
+    education: list[DraftEducationEntry] = Field(default_factory=list)
+    experience: list[DraftExperienceEntry] = Field(default_factory=list)
+    skills: list[DraftValue[str]] = Field(default_factory=list)
+    projects: list[DraftProjectEntry] = Field(default_factory=list)
+    certifications: list[DraftCertificationEntry] = Field(default_factory=list)
+    languages: list[DraftValue[str]] = Field(default_factory=list)
+
