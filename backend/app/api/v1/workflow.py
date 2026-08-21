@@ -49,17 +49,34 @@ async def discover_jobs(
     jobs = await discovery.discover_and_store(user.id, request.url)
     return {"discovered_jobs": len(jobs), "jobs": [{"id": j.id, "title": j.title, "company": j.company, "platform": j.platform} for j in jobs]}
 
-class AnalyzeJobRequest(BaseModel):
+class SubmitResponse(BaseModel):
+    status: str
+    run_id: str
 
-    job_url: str | None = None
-    job_description: str | None = None
-    title: str | None = None
-    company: str | None = None
+@router.post("/applications/{application_id}/submit", response_model=SubmitResponse)
+async def submit_application(
+    application_id: str,
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    from app.services.submission_service import SubmissionService
+    service = SubmissionService(db)
+    try:
+        run_id = await service.approve_and_submit(user.id, application_id)
+        return {"status": "submitting", "run_id": run_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 class JobResponse(BaseModel):
     id: str
     title: str
     company: str
+
+class AnalyzeJobRequest(BaseModel):
+    job_url: str | None = None
+    job_description: str | None = None
+    title: str | None = None
+    company: str | None = None
 
 @router.post("/jobs/analyze")
 async def analyze_job(
@@ -117,7 +134,7 @@ async def prepare_application(
     from app.models.application import Application, ApplicationRun
     from app.models.candidate_profile import CandidateProfile
     from app.services.application_runner import run_application_preparation
-    from app.db.session import async_session_maker
+    from app.db.session import async_session_factory
     
     # 1. Verify Job and Profile
     result = await db.execute(select(Job).where(Job.id == job_id, Job.user_id == user.id))
@@ -154,15 +171,93 @@ async def prepare_application(
     await db.refresh(run)
 
     # 4. Trigger Background Task
-    # Note: async_session_maker is typically accessible from app.db.session
+    # Note: async_session_factory is typically accessible from app.db.session
     background_tasks.add_task(
         run_application_preparation,
         run_id=run.id,
         app_id=app_entity.id,
         job_url=job.application_url or job.url,
-        db_session_maker=async_session_maker,
+        db_session_maker=async_session_factory,
         profile_data={"identity": profile.identity, "preferences": profile.preferences},
         resume_path="data/storage/mock_resume.pdf" # Mock for now
     )
     
     return {"message": "Application preparation started", "run_id": run.id, "application_id": app_entity.id}
+
+@router.get("/applications/{application_id}")
+async def get_application(
+    application_id: str,
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    from app.models.application import Application, ApplicationRun
+    result = await db.execute(select(Application).where(Application.id == application_id, Application.user_id == user.id))
+    app = result.scalar_one_or_none()
+    if not app:
+        raise HTTPException(404, "Application not found")
+        
+    run_result = await db.execute(
+        select(ApplicationRun)
+        .where(ApplicationRun.application_id == application_id)
+        .order_by(ApplicationRun.created_at.desc())
+    )
+    run = run_result.scalars().first()
+    
+    return {
+        "id": app.id,
+        "status": app.status,
+        "job_id": app.job_id,
+        "run": {
+            "status": run.status if run else None,
+            "error": run.error if run else None,
+            "state_data": run.state_data if run else None,
+            "artifacts": run.artifacts if run else None
+        }
+    }
+
+class UpdateQuestionsRequest(BaseModel):
+    answers: dict[str, str]
+
+@router.patch("/applications/{application_id}/questions")
+async def update_application_questions(
+    application_id: str,
+    request: UpdateQuestionsRequest,
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    from app.models.application import Application, ApplicationRun
+    
+    # Verify ownership
+    result = await db.execute(select(Application).where(Application.id == application_id, Application.user_id == user.id))
+    app = result.scalar_one_or_none()
+    if not app:
+        raise HTTPException(404, "Application not found")
+        
+    # Get latest run
+    run_result = await db.execute(
+        select(ApplicationRun)
+        .where(ApplicationRun.application_id == application_id)
+        .order_by(ApplicationRun.created_at.desc())
+    )
+    run = run_result.scalars().first()
+    if not run or not run.state_data or "questions" not in run.state_data:
+        raise HTTPException(400, "No questions state found for this application")
+        
+    questions = run.state_data["questions"]
+    modified = False
+    
+    for q in questions:
+        if q["question_id"] in request.answers:
+            q["answer"] = request.answers[q["question_id"]]
+            q["requires_human"] = False
+            modified = True
+            
+    if modified:
+        # We need to re-assign to trigger SQLAlchemy JSON mutation detection, 
+        # or use flag_modified
+        from sqlalchemy.orm.attributes import flag_modified
+        run.state_data["questions"] = questions
+        flag_modified(run, "state_data")
+        await db.commit()
+        
+    return {"status": "success", "message": "Questions updated"}

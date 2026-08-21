@@ -1,4 +1,4 @@
-"""Tests for application settings configuration."""
+﻿"""Tests for application settings configuration."""
 
 
 
@@ -54,10 +54,10 @@ class TestLLMSettings:
         settings = LLMSettings(max_tokens=0)
         assert settings.max_tokens == 1
 
-    def test_default_provider_is_gemini(self) -> None:
+    def test_default_provider_is_openrouter(self) -> None:
         """Default preferred provider should be gemini."""
         settings = LLMSettings()
-        assert settings.preferred_provider == "gemini"
+        assert settings.preferred_provider == "openrouter"
 
 
 class TestBrowserSettings:
@@ -75,3 +75,4 @@ class TestBrowserSettings:
         """Browser should default to headless mode."""
         settings = BrowserSettings()
         assert settings.headless is True
+

@@ -52,32 +52,107 @@ export function ApplicationWorkflow() {
       const payload = {
         summary: "Expert Engineer", experiences: [], skills: ["Python"]
       };
-      await api.post(`/workflow/jobs/${jobId}/prepare-application`, payload);
+      const res = await api.post(`/workflow/jobs/${jobId}/prepare-application`, payload);
+      const newAppId = res.data.application_id;
       setStep(3); // PREPARING
       
-      // Simulate polling for WAITING_FOR_REVIEW state
-      setTimeout(() => {
-        setAppState({
-          status: "waiting_for_review",
-          match_score: 85,
-          job: discoveredJobs.find(j => j.id === jobId),
-          screenshot: "/smoke_test.png",
-          cv_present: true,
-          prefilled_fields: [
-            { label: "First Name", value: "Jane" },
-            { label: "Email", value: "jane@example.com" }
-          ],
-          filled_fields: [
-            { label: "Phone", value: "+1234567890", confidence: 1.0 }
-          ],
-          unanswered_questions: [
-            { label: "Why do you want this job?", category: "E_UNKNOWN_HIGH_RISK" }
-          ],
-          warnings: ["Manual review required for UNKNOWN questions", "Platform CV detected. We recommend reviewing if it needs replacement."]
-        });
-        setStep(4);
-      }, 3000);
+      // Real polling for WAITING_FOR_REVIEW state
+      const pollInterval = setInterval(async () => {
+        try {
+          const pollRes = await api.get(`/workflow/applications/${newAppId}`);
+          if (pollRes.data.status !== "preparing" && pollRes.data.status !== "running") {
+            clearInterval(pollInterval);
+            
+            // Reconstruct state from backend real state_data
+            const stateData = pollRes.data.state_data || {};
+            
+            // Map real state_data questions to prefilled, filled, unanswered arrays
+            const prefilled_fields = (stateData.questions || []).filter((q: any) => q.prefilled);
+            const filled_fields = (stateData.questions || []).filter((q: any) => !q.prefilled && !q.requires_human && q.answer);
+            const unanswered = (stateData.questions || []).filter((q: any) => q.requires_human || (!q.prefilled && !q.answer));
+            
+            const warnings = [];
+            if (stateData.cv_present) {
+               warnings.push("Platform CV detected. We recommend reviewing if it needs replacement.");
+            }
+            
+            if (pollRes.data.status === "failed") {
+                setError("Application preparation failed.");
+                setStep(1);
+                return;
+            }
 
+            setAppState({
+              id: newAppId,
+              status: pollRes.data.status,
+              match_score: discoveredJobs.find((j: any) => j.id === jobId)?.match_score || pollRes.data.ats_score || 85,
+              job: discoveredJobs.find((j: any) => j.id === jobId),
+              screenshot: stateData.screenshot ? `http://localhost:8000/${stateData.screenshot}` : "/smoke_test.png", // Point to Uvicorn static or fallback
+              cv_present: stateData.cv_present || false,
+              prefilled_fields: prefilled_fields.map((q: any) => ({ label: q.label, value: q.answer || q.current_value })),
+              filled_fields: filled_fields.map((q: any) => ({ label: q.label, value: q.answer, confidence: q.confidence || 0.9 })),
+              unanswered_questions: unanswered.map((q: any) => ({ id: q.question_id, label: q.label, category: q.category || 'unknown', answer: '' })),
+              warnings: warnings
+            });
+            setStep(4);
+          }
+        } catch (pollErr) {
+            console.error("Polling error:", pollErr);
+        }
+      }, 2000);
+
+    } catch (e: any) { setError(e.response?.data?.detail || e.message); }
+    setLoading(false);
+  };
+
+  const handleAnswerChange = (id: string, value: string) => {
+    setAppState((prev: any) => {
+      const updated = prev.unanswered_questions.map((q: any) => q.id === id ? { ...q, answer: value } : q);
+      return { ...prev, unanswered_questions: updated };
+    });
+  };
+
+  const saveAnswers = async () => {
+    if (!appState || !appState.id) return;
+    setLoading(true); setError(null);
+    try {
+      const answers: Record<string, string> = {};
+      appState.unanswered_questions.forEach((q: any) => {
+        if (q.answer.trim() !== '') {
+          answers[q.id] = q.answer;
+        }
+      });
+      await api.patch(`/workflow/applications/${appState.id}/questions`, { answers });
+      alert("Answers saved successfully! You can now submit.");
+      // Move answered ones to filled_fields
+      const newFilled = [...appState.filled_fields];
+      const newUnanswered = [];
+      for (const q of appState.unanswered_questions) {
+        if (answers[q.id]) {
+          newFilled.push({ label: q.label, value: answers[q.id], confidence: 1.0 });
+        } else {
+          newUnanswered.push(q);
+        }
+      }
+      setAppState({ ...appState, filled_fields: newFilled, unanswered_questions: newUnanswered });
+    } catch (e: any) { setError(e.response?.data?.detail || e.message); }
+    setLoading(false);
+  };
+
+  const submitApplication = async () => {
+    if (!appState || !appState.id) return;
+    
+    if (appState.unanswered_questions.length > 0) {
+      if (!window.confirm("You have unanswered questions. The submission might fail. Proceed anyway?")) {
+        return;
+      }
+    }
+    
+    setLoading(true); setError(null);
+    try {
+      await api.post(`/workflow/applications/${appState.id}/submit`);
+      setAppState({ ...appState, status: "submitting" });
+      alert("Submission started! Transitioning to Submitting state.");
     } catch (e: any) { setError(e.response?.data?.detail || e.message); }
     setLoading(false);
   };
@@ -170,17 +245,37 @@ export function ApplicationWorkflow() {
                 </div>
                 
                 <h4 style={{ margin: "0 0 12px 0", color: "var(--text-2)", fontSize: "12px", textTransform: "uppercase" }}>Human attention required</h4>
-                {appState.unanswered_questions.map((q: any, i: number) => (
-                  <div key={i} style={{ background: "var(--failed-soft)", color: "var(--failed)", padding: 12, borderRadius: "var(--r-sm)", fontSize: "13px", marginBottom: 8 }}>
-                    <strong>{q.label}</strong> (Category: {q.category})
+                {appState.unanswered_questions.length > 0 ? (
+                  <div>
+                    {appState.unanswered_questions.map((q: any) => (
+                      <div key={q.id} style={{ background: "var(--failed-soft)", padding: 12, borderRadius: "var(--r-sm)", fontSize: "13px", marginBottom: 8, display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ color: "var(--failed)" }}>
+                          <strong>{q.label}</strong> (ID: {q.id})
+                        </div>
+                        <input 
+                          type="text" 
+                          placeholder="Your answer..." 
+                          value={q.answer || ''}
+                          onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                          style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border)", width: "100%", boxSizing: "border-box" }} 
+                        />
+                      </div>
+                    ))}
+                    <button style={{ ...buttonStyle, marginTop: "8px", width: "100%", background: "var(--review)", color: "#fff" }} onClick={saveAnswers} disabled={loading}>
+                      {loading ? "Saving..." : "Save Manual Answers"}
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  <div style={{ background: "var(--surface-2)", padding: 12, borderRadius: "var(--r-sm)", fontSize: "13px", marginBottom: 16 }}>
+                    No manual attention required.
+                  </div>
+                )}
               </div>
               
               <div>
                 <h4 style={{ margin: "0 0 12px 0", color: "var(--text-2)", fontSize: "12px", textTransform: "uppercase" }}>Browser Screenshot</h4>
                 <div style={{ height: "300px", background: "var(--surface-2)", borderRadius: "var(--r-sm)", border: "1px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: "12px" }}>
-                  [Screenshot Rendered Here]
+                  <img src={appState.screenshot} alt="Form state" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                 </div>
               </div>
             </div>
@@ -188,7 +283,9 @@ export function ApplicationWorkflow() {
             <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid var(--border)", display: "flex", gap: 12, justifyContent: "flex-end" }}>
               <button style={{...buttonStyle, background: "var(--surface-2)", color: "var(--text)"}}>Cancel</button>
               {capabilities && appState.job.platform && capabilities[appState.job.platform]?.submission ? (
-                 <button style={buttonStyle}>Submit Application</button>
+                 <button style={buttonStyle} onClick={submitApplication} disabled={loading}>
+                   {loading ? "Submitting..." : "Submit Application"}
+                 </button>
               ) : (
                  <button style={{...buttonStyle, opacity: 0.5, cursor: "not-allowed"}} disabled title="This integration does not support automated submission yet.">Submit Application (Unsupported)</button>
               )}

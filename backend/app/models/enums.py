@@ -19,6 +19,9 @@ class ApplicationStatus(StrEnum):
     PREPARING = "preparing"
     READY = "ready"
     WAITING_FOR_REVIEW = "waiting_for_review"
+    SUBMITTING = "submitting"
+    SUBMISSION_BLOCKED = "submission_blocked"
+    SUBMISSION_UNKNOWN = "submission_unknown"
 
     # Legacy/Future states
     QUEUED = "queued"

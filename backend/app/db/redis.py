@@ -25,6 +25,8 @@ async def init_redis_pool(redis_url: str) -> None:
             redis_url,
             max_connections=20,
             decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
         )
         _redis_client = Redis(connection_pool=_redis_pool)
         # Verify connectivity
