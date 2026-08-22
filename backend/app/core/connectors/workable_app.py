@@ -1,4 +1,4 @@
-﻿from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import structlog
 from app.core.connectors.base import ApplicationConnector, ApplicationQuestion
 
@@ -12,9 +12,6 @@ class WorkableApplicationConnector(ApplicationConnector):
         return "workable.com" in url
 
     async def open_application(self, url: str, page) -> None:
-        if "//apply" in url:
-            url = url.replace("//apply", "/apply")
-            
         logger.info("Opening workable job page", url=url)
         await page.goto(url)
         await page.wait_for_load_state('networkidle')
