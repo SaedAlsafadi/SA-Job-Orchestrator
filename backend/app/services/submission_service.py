@@ -1,10 +1,12 @@
 import os
 import uuid
 import structlog
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from app.models.application import Application, ApplicationRun
+
+from app.models.application import Application, ApplicationRun, ApplicationApproval
 from app.models.enums import ApplicationStatus
 from app.models.job import Job
 from app.services.discovery_service import DiscoveryService
@@ -14,106 +16,6 @@ from playwright.async_api import async_playwright
 
 logger = structlog.get_logger(__name__)
 
-class SubmissionService:
-    def __init__(self, db: AsyncSession):
-        self.db = db
-        self.discovery = DiscoveryService(db)
-        self.llm_client = LLMClient()
-
-    async def _get_connector(self, url: str):
-        if "lever" in url:
-            from app.core.connectors.lever_app import LeverApplicationConnector
-            return LeverApplicationConnector()
-        elif "greenhouse" in url:
-            from app.core.connectors.greenhouse_app import GreenhouseApplicationConnector
-            return GreenhouseApplicationConnector()
-        else:
-            from app.core.connectors.workable_app import WorkableApplicationConnector
-            return WorkableApplicationConnector()
-
-    async def approve_and_submit(self, user_id: str, application_id: str) -> str:
-        """
-        Entry point to authorize and trigger submission. 
-        Returns the run ID of the submission attempt.
-        """
-        # Idempotency / Authorization check
-        stmt = select(Application).join(Job).where(
-            Application.id == application_id,
-            Application.user_id == user_id
-        )
-        result = await self.db.execute(stmt)
-        app = result.scalar_one_or_none()
-        
-        if not app:
-            raise ValueError("Application not found or unauthorized.")
-            
-        if app.status in [ApplicationStatus.APPLIED, ApplicationStatus.SUBMITTING, ApplicationStatus.SUBMISSION_UNKNOWN]:
-            raise ValueError(f"Application already in non-submittable state: {app.status}")
-            
-        if app.status != ApplicationStatus.WAITING_FOR_REVIEW:
-            raise ValueError("Application must be in WAITING_FOR_REVIEW state to approve submission.")
-
-        # Pre-flight capability check
-        job = await self.db.get(Job, app.job_id)
-        source_connector = self.discovery._get_source(job.url)
-        caps = source_connector.capabilities()
-        if not caps.submission:
-            raise ValueError(f"Connector {source_connector.name()} reports submission=False.")
-            
-        # Create submission attempt run
-        run_id = f"sub_{uuid.uuid4().hex[:12]}"
-        run = ApplicationRun(
-            id=run_id,
-            user_id=app.user_id,
-            application_id=application_id,
-            status="submitting",
-            started_at=datetime.utcnow()
-        )
-        self.db.add(run)
-        app.status = ApplicationStatus.SUBMITTING
-        await self.db.commit()
-        
-        # In a real distributed system, we would enqueue a Celery/Arq job here.
-        # For MVP, we run it synchronously and fail-closed if timeout.
-        try:
-            await self._execute_submission(app, job, run)
-        except Exception as e:
-            err_msg = str(e).encode('ascii', 'ignore').decode('ascii')
-            logger.error("Submission failed", error=err_msg)
-            # Fail closed
-            app.status = ApplicationStatus.SUBMISSION_BLOCKED
-            run.status = "failed"
-            run.error = str(e)
-            run.completed_at = datetime.utcnow()
-            await self.db.commit()
-            
-        return run_id
-
-    async def _execute_submission(self, app: Application, job: Job, run: ApplicationRun):
-        connector = await self._get_connector(job.url)
-        
-        # Re-load the last prep run to get tailored data
-        stmt = select(ApplicationRun).where(
-            ApplicationRun.application_id == app.id,
-            ApplicationRun.status == "completed"
-        ).order_by(ApplicationRun.completed_at.desc()).limit(1)
-        prep_run = (await self.db.execute(stmt)).scalar_one_or_none()
-        
-        if not prep_run or not prep_run.state_data or "questions" not in prep_run.state_data:
-            raise ValueError("Stale or missing preparation state.")
-            
-        resolved_data = prep_run.state_data["questions"]
-        
-        # Verify no high risk questions remain unapproved
-        for q in resolved_data:
-            if q.get("requires_human", False):
-                raise ValueError(f"Unresolved high-risk question remains: {q.get('label')}")
-
-        mock_profile = {"identity": {"first_name": "Test"}, "experience": [], "education": []} # In real app, fetch CandidateProfile
-        
-        os.makedirs("data/storage/screenshots", exist_ok=True)
-        resume_path = app.cover_letter_path or "data/storage/mock_resume_test.pdf" # Mock for now
-        
 async def _pw_submission_task(connector, job_url, mock_profile, llm_client, resolved_data, resume_path, run_id):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -129,7 +31,6 @@ async def _pw_submission_task(connector, job_url, mock_profile, llm_client, reso
                 raise ValueError("Application form could not be verified in fresh browser.")
             
             # 5-8. Reconstruct answers & verify
-            # Map old prepared answers to new questions
             engine = QuestionEngine(mock_profile, llm_client)
             re_resolved = await engine.resolve(current_questions)
             
@@ -156,6 +57,7 @@ async def _pw_submission_task(connector, job_url, mock_profile, llm_client, reso
                     await connector.answer_question(page, q)
             
             # 9. Final pre-submit screenshot
+            os.makedirs("data/storage/screenshots", exist_ok=True)
             pre_screenshot = f"data/storage/screenshots/{run_id}_pre.png"
             await page.screenshot(path=pre_screenshot)
             
@@ -189,16 +91,154 @@ async def _pw_submission_task(connector, job_url, mock_profile, llm_client, reso
         finally:
             await browser.close()
 
-    async def _execute_submission(self, app: Application, job: Job, run: ApplicationRun):
-        connector = await self._get_connector(job.url)
-        
-        # Re-load the last prep run to get tailored data
-        stmt = select(ApplicationRun).where(
+
+class SubmissionService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.discovery = DiscoveryService(db)
+        self.llm_client = LLMClient()
+
+    async def _get_connector(self, url: str):
+        if "lever" in url:
+            from app.core.connectors.lever_app import LeverApplicationConnector
+            return LeverApplicationConnector()
+        elif "greenhouse" in url:
+            from app.core.connectors.greenhouse_app import GreenhouseApplicationConnector
+            return GreenhouseApplicationConnector()
+        elif "workable" in url:
+            from app.core.connectors.workable_app import WorkableApplicationConnector
+            return WorkableApplicationConnector()
+        raise ValueError(f"No connector handles URL: {url}")
+
+    async def approve_application(self, user_id: str, application_id: str) -> str:
+        """
+        Creates a single-use human approval record.
+        Idempotent: Re-approving an already approved application returns the existing approval ID.
+        """
+        # Load app
+        stmt = select(Application).where(
+            Application.id == application_id,
+            Application.user_id == user_id
+        )
+        app = (await self.db.execute(stmt)).scalar_one_or_none()
+        if not app:
+            raise ValueError("Application not found or unauthorized.")
+            
+        if app.status != ApplicationStatus.WAITING_FOR_REVIEW:
+            raise ValueError(f"Application must be in WAITING_FOR_REVIEW state. Current: {app.status}")
+            
+        # Get latest run
+        run_stmt = select(ApplicationRun).where(
             ApplicationRun.application_id == app.id,
             ApplicationRun.status == "completed"
         ).order_by(ApplicationRun.completed_at.desc()).limit(1)
-        prep_run = (await self.db.execute(stmt)).scalar_one_or_none()
+        prep_run = (await self.db.execute(run_stmt)).scalar_one_or_none()
         
+        if not prep_run:
+            raise ValueError("No preparation run found for this application.")
+            
+        # Check idempotency
+        approval_stmt = select(ApplicationApproval).where(
+            ApplicationApproval.application_id == app.id,
+            ApplicationApproval.used_at.is_(None),
+            ApplicationApproval.expires_at > datetime.utcnow()
+        )
+        existing_approval = (await self.db.execute(approval_stmt)).scalar_one_or_none()
+        if existing_approval:
+            return existing_approval.id
+            
+        # Create approval
+        approval = ApplicationApproval(
+            id=f"appr_{uuid.uuid4().hex[:12]}",
+            user_id=user_id,
+            application_id=app.id,
+            application_run_id=prep_run.id,
+            job_id=app.job_id,
+            candidate_profile_version=1, # FIXME: get real version from CandidateProfile logic
+            platform="workable", # FIXME: dynamic
+            expires_at=datetime.utcnow() + timedelta(hours=24)
+        )
+        self.db.add(approval)
+        await self.db.commit()
+        return approval.id
+
+    async def approve_and_submit(self, user_id: str, application_id: str) -> str:
+        """
+        Consumes an approval and triggers the submission workflow.
+        Returns the run ID.
+        """
+        # Load app
+        stmt = select(Application).where(
+            Application.id == application_id,
+            Application.user_id == user_id
+        )
+        app = (await self.db.execute(stmt)).scalar_one_or_none()
+        if not app:
+            raise ValueError("Application not found or unauthorized.")
+            
+        if app.status in [ApplicationStatus.SUBMITTING, ApplicationStatus.APPLIED, ApplicationStatus.SUBMISSION_UNKNOWN]:
+            raise ValueError(f"Application already in non-submittable state: {app.status}")
+            
+        if app.status != ApplicationStatus.WAITING_FOR_REVIEW:
+            raise ValueError("Application must be in WAITING_FOR_REVIEW state to approve submission.")
+            
+        # Check for approval
+        approval_stmt = select(ApplicationApproval).where(
+            ApplicationApproval.application_id == app.id,
+            ApplicationApproval.used_at.is_(None),
+            ApplicationApproval.expires_at > datetime.utcnow()
+        ).with_for_update()
+        
+        approval = (await self.db.execute(approval_stmt)).scalar_one_or_none()
+        if not approval:
+            raise ValueError("No valid unused human approval found for this application.")
+            
+        # Consume approval
+        approval.used_at = datetime.utcnow()
+        
+        # Check global LIVE_SUBMISSION flag
+        is_live = os.getenv("ENABLE_LIVE_SUBMISSION", "false").lower() == "true"
+        if not is_live:
+            raise ValueError("ENABLE_LIVE_SUBMISSION is false. Submission blocked.")
+
+        job = await self.db.get(Job, app.job_id)
+        source_connector = self.discovery._get_source(job.url)
+        caps = source_connector.capabilities()
+        if not caps.submission:
+            raise ValueError(f"Connector {source_connector.name()} reports submission=False.")
+            
+        # Create submission attempt run
+        run_id = f"sub_{uuid.uuid4().hex[:12]}"
+        run = ApplicationRun(
+            id=run_id,
+            user_id=app.user_id,
+            application_id=application_id,
+            status="submitting",
+            started_at=datetime.utcnow()
+        )
+        self.db.add(run)
+        app.status = ApplicationStatus.SUBMITTING
+        await self.db.commit()
+        
+        # Execute
+        try:
+            await self._execute_submission(app, job, run, approval.application_run_id)
+        except Exception as e:
+            err_msg = str(e).encode("ascii", "ignore").decode("ascii")
+            logger.error("Submission failed", error=err_msg)
+            app.status = ApplicationStatus.SUBMISSION_BLOCKED
+            run.status = "failed"
+            run.error = str(e)
+            run.completed_at = datetime.utcnow()
+            await self.db.commit()
+            
+        return run_id
+
+    async def _execute_submission(self, app: Application, job: Job, run: ApplicationRun, prep_run_id: str):
+        connector = await self._get_connector(job.url)
+        
+        # Load prep run
+        prep_run = await self.db.get(ApplicationRun, prep_run_id)
         if not prep_run or not prep_run.state_data or "questions" not in prep_run.state_data:
             raise ValueError("Stale or missing preparation state.")
             
@@ -209,11 +249,21 @@ async def _pw_submission_task(connector, job_url, mock_profile, llm_client, reso
             if q.get("requires_human", False):
                 raise ValueError(f"Unresolved high-risk question remains: {q.get('label')}")
 
-        mock_profile = {"identity": {"first_name": "Test"}, "experience": [], "education": []} # In real app, fetch CandidateProfile
+        from app.models.candidate_profile import CandidateProfile
+        cp = (await self.db.execute(select(CandidateProfile).where(CandidateProfile.user_id == app.user_id))).scalar_one_or_none()
+        mock_profile = {
+            "identity": cp.identity,
+            "location": cp.location,
+            "employment": cp.employment,
+            "education": cp.education,
+            "experience": cp.experience,
+            "skills": cp.skills,
+        } if cp else {"identity": {"first_name": "Test"}, "experience": [], "education": []}
         
-        os.makedirs("data/storage/screenshots", exist_ok=True)
-        resume_path = app.cover_letter_path or "data/storage/mock_resume_test.pdf" # Mock for now
-        
+        resume_path = app.cover_letter_path
+        if not resume_path or not os.path.exists(resume_path):
+            raise ValueError("Prepared CV does not exist.")
+            
         from app.core.pw_utils import run_playwright_in_thread
         res = await run_playwright_in_thread(_pw_submission_task, connector, job.url, mock_profile, self.llm_client, resolved_data, resume_path, run.id)
         
