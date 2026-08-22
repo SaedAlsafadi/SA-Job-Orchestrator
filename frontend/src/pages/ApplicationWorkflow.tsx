@@ -45,16 +45,24 @@ export function ApplicationWorkflow() {
     setLoading(false);
   };
 
-  const prepareApplication = async (jobId: string) => {
+    const prepareApplication = async (jobId: string) => {
     setLoading(true); setError(null);
     try {
-      // Mocking tailored data payload as we skip LLM generation for MVP UI demo
+      // 1. Perform AI Match
+      setStep(3); // PREPARING UI
+      const matchRes = await api.post(`/workflow/jobs/${jobId}/match`);
+      const matchResult = matchRes.data;
+      
+      // Update the local jobs list so the match score is reflected
+      setDiscoveredJobs(jobs => jobs.map(j => j.id === jobId ? { ...j, match_score: matchResult.score } : j));
+
+      // 2. Mock Tailoring & Prepare Application
+      // In a real flow, you'd call /tailor-resume here, but for now we pass the mock tailoring and use the match result
       const payload = {
         summary: "Expert Engineer", experiences: [], skills: ["Python"]
       };
       const res = await api.post(`/workflow/jobs/${jobId}/prepare-application`, payload);
       const newAppId = res.data.application_id;
-      setStep(3); // PREPARING
       
       // Real polling for WAITING_FOR_REVIEW state
       const pollInterval = setInterval(async () => {
@@ -64,7 +72,7 @@ export function ApplicationWorkflow() {
             clearInterval(pollInterval);
             
             // Reconstruct state from backend real state_data
-            const stateData = pollRes.data.state_data || {};
+            const stateData = pollRes.data.run?.state_data || {};
             
             // Map real state_data questions to prefilled, filled, unanswered arrays
             const prefilled_fields = (stateData.questions || []).filter((q: any) => q.prefilled);
@@ -77,7 +85,7 @@ export function ApplicationWorkflow() {
             }
             
             if (pollRes.data.status === "failed") {
-                setError("Application preparation failed.");
+                setError("Application preparation failed: " + (pollRes.data.run?.error || "Unknown error"));
                 setStep(1);
                 return;
             }
@@ -85,9 +93,9 @@ export function ApplicationWorkflow() {
             setAppState({
               id: newAppId,
               status: pollRes.data.status,
-              match_score: discoveredJobs.find((j: any) => j.id === jobId)?.match_score || pollRes.data.ats_score || 85,
-              job: discoveredJobs.find((j: any) => j.id === jobId),
-              screenshot: stateData.screenshot ? `http://localhost:8000/${stateData.screenshot}` : "/smoke_test.png", // Point to Uvicorn static or fallback
+              match_score: matchResult.score || 85,
+              job: discoveredJobs.find((j: any) => j.id === jobId) || { id: jobId, platform: "workable" },
+              screenshot: stateData.screenshot ? `http://localhost:8000/${stateData.screenshot}` : "/smoke_test.png",
               cv_present: stateData.cv_present || false,
               prefilled_fields: prefilled_fields.map((q: any) => ({ label: q.label, value: q.answer || q.current_value })),
               filled_fields: filled_fields.map((q: any) => ({ label: q.label, value: q.answer, confidence: q.confidence || 0.9 })),
@@ -96,15 +104,17 @@ export function ApplicationWorkflow() {
             });
             setStep(4);
           }
-        } catch (pollErr) {
-            console.error("Polling error:", pollErr);
+        } catch (e) {
+          console.error(e);
         }
-      }, 2000);
-
-    } catch (e: any) { setError(e.response?.data?.detail || e.message); }
+      }, 3000);
+      
+    } catch (e: any) {
+      setError(e.response?.data?.detail || e.message);
+      setStep(1);
+    }
     setLoading(false);
   };
-
   const handleAnswerChange = (id: string, value: string) => {
     setAppState((prev: any) => {
       const updated = prev.unanswered_questions.map((q: any) => q.id === id ? { ...q, answer: value } : q);
@@ -252,12 +262,11 @@ export function ApplicationWorkflow() {
                         <div style={{ color: "var(--failed)" }}>
                           <strong>{q.label}</strong> (ID: {q.id})
                         </div>
-                        <input 
-                          type="text" 
+                        <textarea 
                           placeholder="Your answer..." 
                           value={q.answer || ''}
                           onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                          style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border)", width: "100%", boxSizing: "border-box" }} 
+                          style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border)", width: "100%", boxSizing: "border-box", minHeight: "80px", resize: "vertical", fontFamily: "var(--font)", fontSize: "14px" }} 
                         />
                       </div>
                     ))}
