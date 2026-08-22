@@ -3,14 +3,28 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 def generate_evidence_id(prefix: str) -> str:
     """Generate a stable short ID for evidence tracking."""
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
-class Identity(BaseModel):
+class FlexibleModel(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_dict_values(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            flattened = {}
+            for k, v in data.items():
+                if isinstance(v, dict) and "value" in v:
+                    val = v.get("value")
+                    flattened[k] = val if val is not None else ""
+                else:
+                    flattened[k] = v
+            return flattened
+        return data
+
+class Identity(FlexibleModel):
     first_name: str = ""
     last_name: str = ""
     email: str = ""
@@ -20,32 +34,32 @@ class Identity(BaseModel):
     portfolio: str = ""
     professional_summary: str = ""
 
-class Location(BaseModel):
+class Location(FlexibleModel):
     country: str = ""
     city: str = ""
     preferred_locations: list[str] = Field(default_factory=list)
     willing_to_relocate: bool = False
     remote_preference: str = "hybrid" # remote, hybrid, onsite
 
-class Employment(BaseModel):
+class Employment(FlexibleModel):
     current_title: str = ""
     years_of_experience: int = 0
     notice_period: str = ""
 
-class WorkAuthorization(BaseModel):
+class WorkAuthorization(FlexibleModel):
     nationality: str = ""
     residency_country: str = ""
     work_authorization_status: str = ""
     iqama_transferable: bool = False
 
-class EducationEntry(BaseModel):
+class EducationEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("edu"))
     degree: str = ""
     institution: str = ""
     field_of_study: str = ""
     graduation_year: str = ""
 
-class ExperienceEntry(BaseModel):
+class ExperienceEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("exp"))
     company: str = ""
     title: str = ""
@@ -55,14 +69,35 @@ class ExperienceEntry(BaseModel):
     achievements: list[str] = Field(default_factory=list)
     technologies: list[str] = Field(default_factory=list)
 
-class SkillEntry(BaseModel):
+class SkillEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("skill"))
     name: str = ""
     proficiency: str = "intermediate"
     years: int = 0
     evidence: str = ""
 
-class ProjectEntry(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def parse_skill(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            return {"name": data}
+        if isinstance(data, dict):
+            if "value" in data and "name" not in data:
+                return {
+                    "name": data.get("value") or "",
+                    "evidence_id": data.get("evidence_id", generate_evidence_id("skill"))
+                }
+            flattened = {}
+            for k, v in data.items():
+                if isinstance(v, dict) and "value" in v:
+                    val = v.get("value")
+                    flattened[k] = val if val is not None else ""
+                else:
+                    flattened[k] = v
+            return flattened
+        return data
+
+class ProjectEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("proj"))
     name: str = ""
     description: str = ""
@@ -70,13 +105,13 @@ class ProjectEntry(BaseModel):
     achievements: list[str] = Field(default_factory=list)
     url: str = ""
 
-class CertificationEntry(BaseModel):
+class CertificationEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("cert"))
     name: str = ""
     issuer: str = ""
     date: str = ""
 
-class Preferences(BaseModel):
+class Preferences(FlexibleModel):
     target_roles: list[str] = Field(default_factory=list)
     target_countries: list[str] = Field(default_factory=list)
     target_cities: list[str] = Field(default_factory=list)
@@ -98,6 +133,22 @@ class CandidateProfileSchema(BaseModel):
     certifications: list[CertificationEntry] = Field(default_factory=list)
     languages: list[str] = Field(default_factory=list)
     preferences: Preferences = Field(default_factory=Preferences)
+
+    @field_validator("languages", mode="before")
+    @classmethod
+    def parse_languages(cls, v: Any) -> Any:
+        if isinstance(v, list):
+            out = []
+            for item in v:
+                if isinstance(item, str):
+                    if item.strip():
+                        out.append(item.strip())
+                elif isinstance(item, dict) and "value" in item:
+                    val = item.get("value")
+                    if val and str(val).strip():
+                        out.append(str(val).strip())
+            return out
+        return v
 
     def get_all_evidence_ids(self) -> set[str]:
         """Collect all generated evidence IDs for anti-hallucination validation."""
