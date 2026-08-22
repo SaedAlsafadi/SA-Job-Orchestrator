@@ -40,7 +40,7 @@ export function CandidateProfilePage() {
       const res = await api.get('/candidate-profile');
       setFormData(res.data);
       setDraftMode(res.data.status === "draft");
-        } catch (e: any) {
+    } catch (e: any) {
       if (e.response?.status === 404) {
         setFormData({
           identity: {}, location: {}, employment: {}, work_authorization: {},
@@ -48,10 +48,6 @@ export function CandidateProfilePage() {
         });
       } else {
         setError(e.response?.data?.detail || e.message || "Failed to load profile");
-      }
-    }, employment: {}, work_authorization: {},
-          education: [], experience: [], skills: [], projects: [], certifications: [], languages: [], preferences: {}
-        });
       }
     }
     setLoading(false);
