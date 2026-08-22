@@ -25,6 +25,7 @@ const buttonStyle: React.CSSProperties = {
 export function CandidateProfilePage() {
   const [formData, setFormData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [draftMode, setDraftMode] = useState(false);
@@ -36,13 +37,19 @@ export function CandidateProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const res = await api.get('/candidates/profile');
+      const res = await api.get('/candidate-profile');
       setFormData(res.data);
       setDraftMode(res.data.status === "draft");
-    } catch (e: any) {
+        } catch (e: any) {
       if (e.response?.status === 404) {
         setFormData({
           identity: {}, location: {}, employment: {}, work_authorization: {},
+          education: [], experience: [], skills: [], projects: [], certifications: [], languages: [], preferences: {}
+        });
+      } else {
+        setError(e.response?.data?.detail || e.message || "Failed to load profile");
+      }
+    }, employment: {}, work_authorization: {},
           education: [], experience: [], skills: [], projects: [], certifications: [], languages: [], preferences: {}
         });
       }
@@ -58,7 +65,7 @@ export function CandidateProfilePage() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await api.post('/candidates/import-resume', fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const res = await api.post('/candidate-profile/import-resume', fd, { headers: { "Content-Type": "multipart/form-data" } });
       setFormData(res.data);
       setDraftMode(true);
     } catch (err: any) {
@@ -71,9 +78,9 @@ export function CandidateProfilePage() {
     setIsSaving(true);
     try {
       if (draftMode) {
-        await api.post('/candidates/profile/verify', formData);
+        await api.post('/candidate-profile/verify', formData);
       } else {
-        await api.patch('/candidates/profile', formData);
+        await api.put('/candidate-profile', formData);
       }
       alert("Profile saved successfully!");
       setDraftMode(false);
@@ -97,7 +104,8 @@ export function CandidateProfilePage() {
     });
   };
 
-  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-2)" }}>Loading Profile...</div>;
+    if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--text-2)" }}>Loading Profile...</div>;
+  if (error) return <div style={{ padding: 40, textAlign: "center", color: "var(--failed)" }}>Error: {error}</div>;
   if (!formData) return null;
 
   return (
