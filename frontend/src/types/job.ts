@@ -1,4 +1,4 @@
-import type { PaginatedResponse } from './api';
+﻿import type { PaginatedResponse } from './api';
 
 /**
  * A single job listing from any platform.
@@ -41,11 +41,49 @@ export interface JobSearchRequest {
 export type JobListResponse = PaginatedResponse<Job>;
 
 /** Response from the job analysis endpoint. */
-export interface JobAnalysisResponse {
-  job_id: string;
-  match_score: number;
-  skill_match: number;
-  keyword_match: number;
-  missing_skills: string[];
-  suggestions: string[];
+export interface MatchEvidence {
+  evidence_id: string;
+  description: string;
 }
+
+export interface MatchFeatures {
+  skills_score: number;
+  experience_score: number;
+  role_alignment_score: number;
+  location_work_model_score: number;
+  education_language_score: number;
+  ats_score: number;
+}
+
+export interface EligibilityResult {
+  is_eligible: boolean;
+  status: string;
+  reasons: string[];
+}
+
+export interface MatchProvenance {
+  candidate_profile_version: number;
+  matching_algorithm_version: string;
+  model_provider: string;
+  model_name: string;
+  generated_at: string;
+  ats_method: string;
+}
+
+export interface CandidateMatchResult {
+  eligibility: EligibilityResult;
+  match_score?: number;
+  deterministic_score?: number;
+  ats_score?: number;
+  llm_score?: number;
+  feature_scores?: MatchFeatures;
+  strengths: MatchEvidence[];
+  gaps: string[];
+  critical_gaps: string[];
+  recommendation: string;
+  provenance: MatchProvenance;
+}
+
+/** Response from the job analysis endpoint. */
+export type JobAnalysisResponse = CandidateMatchResult;
+

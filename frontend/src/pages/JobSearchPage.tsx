@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import Icon from '@/components/ui/Icon';
@@ -55,8 +55,8 @@ export default function JobSearchPage() {
     generate.mutate(
       { base_resume_id: baseResumeId, job_id: drawerJob.id },
       {
-        onSuccess: () => notify(`Tailored résumé generated · ${drawerJob.title}`, 'success'),
-        onError: () => notify('Could not generate the résumé', 'error'),
+        onSuccess: () => notify(`Tailored rÃ©sumÃ© generated Â· ${drawerJob.title}`, 'success'),
+        onError: () => notify('Could not generate the rÃ©sumÃ©', 'error'),
       },
     );
   };
@@ -75,14 +75,14 @@ export default function JobSearchPage() {
       { query: query.trim(), location: location.trim() || undefined, platforms: [...platforms] },
       {
         onSuccess: (r) => notify(`Found ${r.total} matching roles`, 'success'),
-        onError: () => notify('Search failed — try again', 'error'),
+        onError: () => notify('Search failed â€” try again', 'error'),
       },
     );
   };
 
   const onAnalyze = (job: Job) =>
     analyze.mutate(job.id, {
-      onSuccess: (r) => notify(`Analyzed · ${Math.round(r.match_score * 100)} ATS match`, 'success'),
+      onSuccess: (r) => notify(`Analyzed Â· ${Math.round((r.match_score || 0) * 100)} ATS match`, 'success'),
       onError: () => notify('Could not analyze this job', 'error'),
     });
 
@@ -90,7 +90,7 @@ export default function JobSearchPage() {
     createApp.mutate(
       { job_id: job.id, apply_mode: 'review' },
       {
-        onSuccess: () => { notify(`Queued · ${job.title}`, 'success'); navigate('/applications'); },
+        onSuccess: () => { notify(`Queued Â· ${job.title}`, 'success'); navigate('/applications'); },
         onError: () => notify('Could not create the application', 'error'),
       },
     );
@@ -99,7 +99,7 @@ export default function JobSearchPage() {
     <div style={{ animation: 'aaUp .4s var(--ease) both' }}>
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ margin: 0, font: '800 24px/1.1 var(--font)', letterSpacing: '-.03em' }}>Jobs</h1>
-        <p style={{ margin: '6px 0 0', font: '500 13px/1.4 var(--font)', color: 'var(--text-3)' }}>Search across platforms and let the agent score every match against your résumé.</p>
+        <p style={{ margin: '6px 0 0', font: '500 13px/1.4 var(--font)', color: 'var(--text-3)' }}>Search across platforms and let the agent score every match against your rÃ©sumÃ©.</p>
       </div>
 
       {/* Search bar */}
@@ -132,7 +132,7 @@ export default function JobSearchPage() {
           disabled={search.isPending}
           style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 7, height: 40, padding: '0 18px', borderRadius: 'var(--r-md)', background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-ink)', font: '700 13px/1 var(--font)', cursor: 'pointer' }}
         >
-          {search.isPending ? 'Searching…' : 'Search'}
+          {search.isPending ? 'Searchingâ€¦' : 'Search'}
         </button>
       </form>
 
@@ -214,7 +214,7 @@ function ScoreRing({ score }: { score: number | null }) {
         <circle cx={20} cy={20} r={r} fill="none" stroke={color} strokeWidth={3.5} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} />
       </svg>
       <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', font: '700 11px/1 var(--mono)', color }}>
-        {score != null ? Math.round(score * 100) : '—'}
+        {score != null ? Math.round(score * 100) : 'â€”'}
       </span>
     </div>
   );
@@ -232,7 +232,7 @@ function JobCardView({ job, onOpen, onAnalyze, onApply, analyzing, applying }: {
       </div>
       <div>
         <button onClick={onOpen} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0, margin: 0, background: 'none', border: 0, cursor: 'pointer', font: '700 14px/1.3 var(--font)', color: 'var(--text)' }}>{job.title}</button>
-        <div style={{ font: '500 12px/1.3 var(--font)', color: 'var(--text-3)', marginTop: 3 }}>{job.company} · {job.location || (job.remote ? 'Remote' : '—')}</div>
+        <div style={{ font: '500 12px/1.3 var(--font)', color: 'var(--text-3)', marginTop: 3 }}>{job.company} Â· {job.location || (job.remote ? 'Remote' : 'â€”')}</div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {job.remote && <Tag>Remote</Tag>}
@@ -266,3 +266,4 @@ function btn(kind: 'primary' | 'ghost'): React.CSSProperties {
     color: primary ? 'var(--accent-ink)' : 'var(--text-2)',
   };
 }
+

@@ -36,7 +36,7 @@ class LLMSettings(BaseSettings):
     github_token: SecretStr = SecretStr("")
     preferred_provider: str = "gemini"
     fallback_providers: list[str] = ["groq", "openrouter"]
-    default_model: str = "gemini/gemini-3.5-flash"
+    default_model: str = "gemini/gemini-1.5-flash"
     temperature: float = 0.7
     max_tokens: int = 4096
     # AWS Bedrock: platform-authenticated via the standard AWS credential chain (env vars,
@@ -204,3 +204,4 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached application settings singleton."""
     return Settings()
+

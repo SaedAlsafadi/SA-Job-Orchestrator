@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 import tempfile
 import os
 from pathlib import Path
@@ -133,15 +133,18 @@ async def import_resume(
         5. For multi-item fields (like skills, languages), extract each entry individually.
         """
         
-        draft = await llm.generate_structured_data(
+        draft_response = await llm.complete_with_structured_output(
             prompt=f"Resume Text:\\n{parsed_doc.raw_text}",
-            schema=CandidateProfileDraft,
-            system_prompt=system_prompt,
-            temperature=0.1
+            output_schema=CandidateProfileDraft,
+            system_prompt=system_prompt
         )
         
-        return draft
+        return draft_response
         
     finally:
         if temp_path.exists():
             os.remove(temp_path)
+
+
+
+
