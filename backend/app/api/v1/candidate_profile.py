@@ -295,15 +295,40 @@ async def import_resume(
         
         # LLM Extraction — use simplified flat schema, then transform
         llm = LLMClient()
-        system_prompt = """You are an expert HR data extractor. Extract ALL candidate information from the resume text into the JSON schema provided.
+        system_prompt = """You are an expert resume parser. Read the resume text and extract ALL information into JSON.
 
-CRITICAL RULES:
-1. Extract every piece of information you can find — names, emails, phones, links, education, work history, skills, projects, certifications, and languages.
-2. For experience entries, include company name, job title, start_date, end_date, and a description of responsibilities/achievements.
-3. For education, include degree, institution, field_of_study, and graduation_year.
-4. List ALL skills mentioned anywhere in the resume.
-5. If information is not present in the resume, leave it as null.
-6. Do NOT invent or guess information that is not explicitly stated."""
+You MUST populate every field that has data in the resume. Here is an example output:
+
+{
+  "identity": {
+    "first_name": "John",
+    "last_name": "Smith",
+    "email": "john@example.com",
+    "phone": "+1 555 123 4567",
+    "linkedin": "linkedin.com/in/johnsmith",
+    "github": "github.com/johnsmith",
+    "portfolio": null,
+    "professional_summary": "Experienced software engineer with 5 years..."
+  },
+  "location": {"country": "Saudi Arabia", "city": "Riyadh"},
+  "education": [
+    {"degree": "BSc Computer Science", "institution": "MIT", "field_of_study": "Computer Science", "graduation_year": "2019"}
+  ],
+  "experience": [
+    {"company": "TechCorp", "title": "Senior Engineer", "start_date": "2021", "end_date": "Present", "description": "Led backend development using Python/FastAPI. Designed microservices on AWS."}
+  ],
+  "skills": ["Python", "TypeScript", "FastAPI", "React", "AWS", "Docker"],
+  "projects": [],
+  "certifications": [],
+  "languages": ["English", "Arabic"]
+}
+
+RULES:
+- Extract the person's first_name and last_name from the top of the resume.
+- The professional_summary should be a 2-3 sentence overview from the resume.
+- List EVERY skill mentioned anywhere in the resume in the skills array.
+- For experience: extract company, title, dates, and combine bullet points into the description.
+- Set null for fields NOT found in the resume. Do NOT invent data."""
         
         try:
             llm_result = await llm.complete_with_structured_output(
@@ -324,6 +349,12 @@ CRITICAL RULES:
                 draft.identity.linkedin = _wrap(contact["linkedin"], 0.99)
             if contact.get("github") and not draft.identity.github.value:
                 draft.identity.github = _wrap(contact["github"], 0.99)
+
+            # Supplement skills from parser if LLM missed them
+            llm_skill_names = {(s.value or "").lower() for s in draft.skills}
+            for parser_skill in parsed_doc.skills:
+                if parser_skill.lower() not in llm_skill_names:
+                    draft.skills.append(_wrap(parser_skill, 0.70))
 
             return draft
 
