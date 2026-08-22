@@ -51,34 +51,51 @@ export default function JobDrawer({ job, analysis, analyzing, baseResumeId, gene
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', font: '500 12.5px/1 var(--font)' }}>Analyzing match…</div>
           ) : analysis ? (
             <>
+                            {analysis.eligibility && !analysis.eligibility.is_eligible && (
+                <div style={{ background: 'var(--rejected-soft)', border: '1px solid var(--rejected)', borderRadius: 'var(--r-lg)', padding: 16, marginBottom: 16 }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: 'var(--rejected)' }}>INELIGIBLE</h4>
+                  <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-2)', fontSize: '13px' }}>
+                    {analysis.eligibility.reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+              {analysis.recommendation && analysis.eligibility?.is_eligible && (
+                <div style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)' }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-2)' }}>AI Recommendation</span>
+                  <span style={{ fontWeight: 800, fontSize: 14, color: analysis.recommendation === 'apply' ? 'var(--approved)' : analysis.recommendation === 'review' ? 'var(--review)' : 'var(--rejected)', textTransform: 'uppercase' }}>{analysis.recommendation}</span>
+                </div>
+              )}
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
                 <Ring pct={match ?? 0} />
                 <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  <Bar label="Skill match" v={atsPercent(analysis.skill_match)} />
-                  <Bar label="Keyword match" v={atsPercent(analysis.keyword_match)} />
+                  <Bar label="Skills" v={atsPercent(analysis.feature_scores?.skills_score || 0)} />
+                  <Bar label="Experience" v={atsPercent(analysis.feature_scores?.experience_score || 0)} />
+                  <Bar label="Role Alignment" v={atsPercent(analysis.feature_scores?.role_alignment_score || 0)} />
+                  <Bar label="ATS Keywords" v={atsPercent(analysis.feature_scores?.ats_score || 0)} />
                 </div>
               </div>
-              {analysis.missing_skills.length > 0 && (
-                <Section title="Missing keywords">
+              {analysis.gaps && analysis.gaps.length > 0 && (
+                <Section title="Gaps">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                    {analysis.missing_skills.map((m) => (
+                    {analysis.gaps.map((m: string) => (
                       <span key={m} style={{ padding: '5px 10px', borderRadius: 7, background: 'var(--rejected-soft)', color: 'var(--rejected)', font: '600 12px/1 var(--font)' }}>{m}</span>
                     ))}
                   </div>
                 </Section>
               )}
-              {analysis.suggestions.length > 0 && (
-                <Section title="Suggestions">
+              {analysis.strengths && analysis.strengths.length > 0 && (
+                <Section title="Strengths">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {analysis.suggestions.map((s) => (
-                      <div key={s} style={{ display: 'flex', gap: 10, padding: '11px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                    {analysis.strengths.map((s: any) => (
+                      <div key={s.evidence_id} style={{ display: 'flex', gap: 10, padding: '11px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
                         <span style={{ flex: '0 0 auto', color: 'var(--accent)', marginTop: 1 }}><Icon name="sparkle" size={14} /></span>
-                        <span style={{ font: '500 12px/1.45 var(--font)', color: 'var(--text-2)' }}>{s}</span>
+                        <span style={{ font: '500 12px/1.45 var(--font)', color: 'var(--text-2)' }}>{s.description} <br/><small style={{color:'var(--text-4)'}}>Evidence: {s.evidence_id}</small></span>
                       </div>
                     ))}
                   </div>
                 </Section>
               )}
+              
             </>
           ) : (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', font: '500 12.5px/1 var(--font)' }}>No match analysis yet.</div>
