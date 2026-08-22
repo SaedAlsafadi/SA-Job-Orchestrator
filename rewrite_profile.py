@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+new_component = """import React, { useState, useEffect, useRef } from "react";
 import api from "@/services/api";
 
 const inputStyle: React.CSSProperties = {
@@ -58,7 +58,7 @@ export function CandidateProfilePage() {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await api.post('/candidates/import-resume', fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const res = await api.post('/candidates/upload', fd, { headers: { "Content-Type": "multipart/form-data" } });
       setFormData(res.data);
       setDraftMode(true);
     } catch (err: any) {
@@ -201,3 +201,9 @@ export function CandidateProfilePage() {
     </div>
   );
 }
+"""
+
+with open("frontend/src/pages/CandidateProfilePage.tsx", "w", encoding="utf-8") as f:
+    f.write(new_component)
+
+print("CandidateProfilePage.tsx updated successfully!")
