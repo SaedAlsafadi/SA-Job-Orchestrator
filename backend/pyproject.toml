@@ -26,6 +26,7 @@ dependencies = [
     # Browser automation
     "browser-use>=0.1.40",
     "playwright>=1.44.0",
+    "playwright-stealth>=2.0.3",
     "langchain-openai>=0.1.0",
     "langchain-anthropic>=0.1.0",
     "langchain-google-genai>=1.0.0",

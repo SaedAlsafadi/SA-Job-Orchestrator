@@ -1,4 +1,4 @@
-﻿"""Candidate-Job Matching Service combining deterministic signals and LLM evaluation."""
+"""Candidate-Job Matching Service combining deterministic signals and LLM evaluation."""
 
 import json
 from datetime import datetime, UTC
@@ -194,8 +194,8 @@ class CandidateJobMatcher:
                 output_schema=LLMMatchResult,
                 purpose="job_analysis"
             )
-            prov.model_provider = self.llm_client.settings.preferred_provider
-            prov.model_name = getattr(self.llm_client.settings, f"{prov.model_provider}_model", "unknown")
+            prov.model_provider = self.llm_client._llm.preferred_provider
+            prov.model_name = getattr(self.llm_client._llm, f"{prov.model_provider}_model", "unknown")
         except Exception as e:
             logger.warning("LLM Match Failed", error=str(e))
             
@@ -216,7 +216,11 @@ class CandidateJobMatcher:
             llm_score = llm_result.score
 
         # Combine deterministic base and cap LLM contribution <= 20% by using deterministic score
-        final_score = int(final_deterministic)
+        if llm_score is not None:
+            # Blend the LLM score and deterministic score
+            final_score = int(llm_score * 0.7 + final_deterministic * 0.3)
+        else:
+            final_score = int(final_deterministic)
         
         return CandidateMatchResult(
             eligibility=eligibility,

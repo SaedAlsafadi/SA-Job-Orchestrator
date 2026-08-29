@@ -141,6 +141,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    import os
+    from fastapi.staticfiles import StaticFiles
+    os.makedirs("data/storage/screenshots", exist_ok=True)
+    app.mount("/data/storage", StaticFiles(directory="data/storage"), name="data")
+
     # Prometheus metrics: open in non-prod; in production require a bearer token
     # (fail-closed if METRICS_TOKEN is unset) so it isn't a public data leak.
     @app.get("/metrics", include_in_schema=False)
