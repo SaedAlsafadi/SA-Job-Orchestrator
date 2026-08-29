@@ -67,6 +67,24 @@ async def submit_application(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+class ApproveResponse(BaseModel):
+    status: str
+    approval_id: str
+
+@router.post("/applications/{application_id}/approve", response_model=ApproveResponse)
+async def approve_application(
+    application_id: str,
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_tenant_db)
+):
+    from app.services.submission_service import SubmissionService
+    service = SubmissionService(db)
+    try:
+        approval_id = await service.approve_application(user.id, application_id)
+        return {"status": "approved", "approval_id": approval_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 class JobResponse(BaseModel):
     id: str
     title: str

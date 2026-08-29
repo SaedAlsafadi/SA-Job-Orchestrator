@@ -105,7 +105,7 @@ class ApplicationApproval(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base
     __tablename__ = "application_approvals"
     __table_args__ = (
         Index("ix_app_approval_run", "application_run_id"),
-        Index("uq_app_approval_single_use", "application_id", unique=True),
+        Index("idx_app_approval_application", "application_id"),
     )
 
     application_id: Mapped[str] = mapped_column(String(32), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False)

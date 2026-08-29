@@ -9,8 +9,23 @@ logger = structlog.get_logger(__name__)
 
 async def _pw_task(connector, engine, job_url, resume_path, run_id):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        browser = await p.chromium.launch(
+            headless=False,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                '--no-sandbox',
+                '--window-size=1280,1024'
+            ]
+        )
+        context = await browser.new_context(
+            viewport={'width': 1280, 'height': 1024}
+        )
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        page = await context.new_page()
+        from playwright_stealth import Stealth
+        stealth = Stealth()
+        await stealth.apply_stealth_async(page)
         
         await connector.open_application(job_url, page)
         
@@ -18,23 +33,22 @@ async def _pw_task(connector, engine, job_url, resume_path, run_id):
         resolved = await engine.resolve(questions)
         
         cv_present = await connector.detect_cv_presence(page)
-        
+        if cv_present:
+            logger.info("CV is already present on the platform, skipping automatic upload.")
+        elif resume_path:
+            await connector.upload_resume(page, resume_path)
+            
         for q in resolved:
             if q.prefilled or q.requires_human:
                 continue
                 
-            if q.input_type == "file" and "resume" in q.question_id.lower():
-                if cv_present:
-                    logger.info("CV is already present on the platform, skipping automatic upload.")
-                elif resume_path:
-                    await connector.upload_resume(page, resume_path)
-            else:
+            if q.answer:
                 await connector.answer_question(page, q)
         
         # Take screenshot
         screenshot_path = f"data/storage/screenshots/{run_id}.png"
         os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
-        await page.screenshot(path=screenshot_path)
+        await page.screenshot(path=screenshot_path, full_page=True)
         
         state = await connector.capture_state(page)
         state["screenshot"] = screenshot_path

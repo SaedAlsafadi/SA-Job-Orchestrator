@@ -149,6 +149,31 @@ export function ApplicationWorkflow() {
     setLoading(false);
   };
 
+  useEffect(() => {
+    let submitPoll: any;
+    if (appState && appState.status === "submitting") {
+      submitPoll = setInterval(async () => {
+        try {
+          const res = await api.get(`/workflow/applications/${appState.id}`);
+          if (res.data.status !== "submitting") {
+            clearInterval(submitPoll);
+            setAppState((prev: any) => ({ ...prev, status: res.data.status }));
+            if (res.data.status === "applied") {
+              alert("Application successfully submitted!");
+            } else if (res.data.status === "submission_unknown") {
+              setError("Submission status unknown. The bot clicked submit, but could not verify the success message. Check the post-submission screenshot.");
+            } else if (res.data.status === "failed" || res.data.status === "submission_blocked") {
+              setError("Submission failed: " + (res.data.run?.error || "Unknown error"));
+            }
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(submitPoll);
+  }, [appState?.status, appState?.id]);
+
   const submitApplication = async () => {
     if (!appState || !appState.id) return;
     
@@ -160,6 +185,7 @@ export function ApplicationWorkflow() {
     
     setLoading(true); setError(null);
     try {
+      await api.post(`/workflow/applications/${appState.id}/approve`);
       await api.post(`/workflow/applications/${appState.id}/submit`);
       setAppState({ ...appState, status: "submitting" });
       alert("Submission started! Transitioning to Submitting state.");
@@ -225,8 +251,14 @@ export function ApplicationWorkflow() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
               <h3 style={{ margin: 0, color: "var(--review)" }}>Review Required</h3>
-              <div style={{ background: "var(--surface-2)", padding: "4px 12px", borderRadius: "var(--r-sm)", fontWeight: 600, color: "var(--accent)" }}>
-                Match: {appState.match_score}%
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {appState.status === "submitting" && <span style={{ color: "var(--accent)" }}>Submitting...</span>}
+                {appState.status === "applied" && <span style={{ color: "var(--success)" }}>âœ“ Successfully Applied!</span>}
+                {appState.status === "submission_unknown" && <span style={{ color: "var(--warning)" }}>âš  Status Unknown</span>}
+                {(appState.status === "failed" || appState.status === "submission_blocked") && <span style={{ color: "var(--failed)" }}>âœ˜ Submission Failed</span>}
+                <div style={{ background: "var(--surface-2)", padding: "4px 12px", borderRadius: "var(--r-sm)", fontWeight: 600, color: "var(--accent)" }}>
+                  Match: {appState.match_score}%
+                </div>
               </div>
             </div>
             
@@ -243,14 +275,14 @@ export function ApplicationWorkflow() {
                 <h4 style={{ margin: "0 0 12px 0", color: "var(--text-2)", fontSize: "12px", textTransform: "uppercase" }}>Platform already had</h4>
                 <div style={{ background: "var(--surface-2)", padding: 12, borderRadius: "var(--r-sm)", fontSize: "13px", marginBottom: 16 }}>
                   {appState.prefilled_fields.map((f: any, i: number) => (
-                    <div key={i} style={{ marginBottom: 4 }}><strong>{f.label}:</strong> {f.value}</div>
+                    <div key={i} style={{ marginBottom: 4, wordBreak: "break-word" }}><strong>{f.label}:</strong> {f.value}</div>
                   ))}
                 </div>
 
                 <h4 style={{ margin: "0 0 12px 0", color: "var(--text-2)", fontSize: "12px", textTransform: "uppercase" }}>We added</h4>
                 <div style={{ background: "var(--surface-2)", padding: 12, borderRadius: "var(--r-sm)", fontSize: "13px", marginBottom: 16 }}>
                   {appState.filled_fields.map((f: any, i: number) => (
-                    <div key={i} style={{ marginBottom: 4 }}><strong>{f.label}:</strong> {f.value} <span style={{ color: "var(--accent)", fontSize: "11px" }}>(Conf: {f.confidence})</span></div>
+                    <div key={i} style={{ marginBottom: 4, wordBreak: "break-word" }}><strong>{f.label}:</strong> {f.value} <span style={{ color: "var(--accent)", fontSize: "11px" }}>(Conf: {f.confidence})</span></div>
                   ))}
                 </div>
                 
@@ -259,7 +291,7 @@ export function ApplicationWorkflow() {
                   <div>
                     {appState.unanswered_questions.map((q: any) => (
                       <div key={q.id} style={{ background: "var(--failed-soft)", padding: 12, borderRadius: "var(--r-sm)", fontSize: "13px", marginBottom: 8, display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ color: "var(--failed)" }}>
+                        <div style={{ color: "var(--failed)", wordBreak: "break-word" }}>
                           <strong>{q.label}</strong> (ID: {q.id})
                         </div>
                         <textarea 
@@ -290,7 +322,7 @@ export function ApplicationWorkflow() {
             </div>
 
             <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid var(--border)", display: "flex", gap: 12, justifyContent: "flex-end" }}>
-              <button style={{...buttonStyle, background: "var(--surface-2)", color: "var(--text)"}}>Cancel</button>
+              <button onClick={() => { setStep(1); setAppState(null); }} style={{...buttonStyle, background: "var(--surface-2)", color: "var(--text)"}}>Cancel</button>
               {capabilities && appState.job.platform && capabilities[appState.job.platform]?.submission ? (
                  <button style={buttonStyle} onClick={submitApplication} disabled={loading}>
                    {loading ? "Submitting..." : "Submit Application"}
