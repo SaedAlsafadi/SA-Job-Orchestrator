@@ -23,6 +23,18 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
     platform_job_id: Mapped[str] = mapped_column(String(200), nullable=False)
 
+    # Monitoring tracking
+    canonical_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Provenance and ingestion metadata
+    source_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source_reference: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_source_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Job details
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     company: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -61,6 +73,14 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
 
     # Relationships
     applications: Mapped[list["Application"]] = relationship(  # noqa: F821
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    routes: Mapped[list["ApplicationRoute"]] = relationship(  # noqa: F821
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
+    discovery_events: Mapped[list["DiscoveryEvent"]] = relationship(  # noqa: F821
         back_populates="job",
         cascade="all, delete-orphan",
     )

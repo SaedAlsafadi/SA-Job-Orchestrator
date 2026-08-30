@@ -330,13 +330,53 @@ async def purge_deleted_accounts(ctx: dict[str, Any]) -> None:
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
     from app.observability.sentry import init_sentry
+    from sqlalchemy import select
+    from datetime import datetime, UTC, timedelta
 
-    init_sentry("worker")  # no-op unless SENTRY_DSN is set
-    logger.info("worker.startup")
+    async with async_session_factory() as session:
+        stmt = select(MonitoringSchedule).where(MonitoringSchedule.is_active == True)
+        result = await session.execute(stmt)
+        schedules = result.scalars().all()
+        
+        service = MonitoringService(session)
+        now = datetime.now(UTC)
+        
+        for schedule in schedules:
+            interval = timedelta(minutes=schedule.interval_minutes)
+            if not schedule.last_checked_at or now - schedule.last_checked_at >= interval:
+                try:
+                    await service.run_monitoring_cycle(schedule.id, dry_run=False)
+                except Exception as e:
+                    logger.exception(f"Cron monitoring failed for schedule {schedule.id}")
 
 
 async def _on_shutdown(ctx: dict[str, Any]) -> None:
     logger.info("worker.shutdown")
+
+
+async def run_monitoring_cron(ctx: dict):
+    """Cron job that iterates through active monitoring schedules and spawns a cycle."""
+    from app.db.session import async_session_factory
+    from app.services.monitoring.monitoring_service import MonitoringService
+    from app.models.monitoring import MonitoringSchedule
+    from sqlalchemy import select
+    from datetime import datetime, UTC, timedelta
+
+    async with async_session_factory() as session:
+        stmt = select(MonitoringSchedule).where(MonitoringSchedule.is_active == True)
+        result = await session.execute(stmt)
+        schedules = result.scalars().all()
+        
+        service = MonitoringService(session)
+        now = datetime.now(UTC)
+        
+        for schedule in schedules:
+            interval = timedelta(minutes=schedule.interval_minutes)
+            if not schedule.last_checked_at or now - schedule.last_checked_at >= interval:
+                try:
+                    await service.run_monitoring_cycle(schedule.id, dry_run=False)
+                except Exception as e:
+                    logger.exception(f"Cron monitoring failed for schedule {schedule.id}")
 
 
 class WorkerSettings:
@@ -347,6 +387,7 @@ class WorkerSettings:
     cron_jobs: ClassVar = [
         cron(monitor_system_health, minute={0, 15, 30, 45}),
         cron(purge_deleted_accounts, hour={3}, minute={30}),  # daily 03:30
+        cron(run_monitoring_cron, minute=set(range(0, 60, 5))),
     ]
     max_jobs = get_settings().browser.max_parallel
     job_timeout = 600

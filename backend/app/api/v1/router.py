@@ -43,6 +43,12 @@ v1_router.include_router(
     dependencies=_auth,
 )
 
+from app.api.v1.opportunities import router as opportunities_router
+
+v1_router.include_router(
+    opportunities_router, prefix="/opportunities", tags=["Opportunities"], dependencies=_auth
+)
+
 # Admin/health routes require a superuser.
 v1_router.include_router(
     admin_router, prefix="/admin", tags=["Admin"], dependencies=[Depends(require_superuser)]

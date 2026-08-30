@@ -19,6 +19,11 @@ from app.core.exceptions import RecordNotFoundError
 from app.core.job_discovery.exa_search import ExaJobSearch
 from app.models.job import Job
 from app.models.resume import Resume
+from app.models.candidate_profile import CandidateProfile
+from app.schemas.candidate_profile import CandidateProfileSchema
+from app.services.matching import CandidateJobMatcher
+from app.core.llm.client import LLMClient
+import asyncio
 from app.observability.metrics import job_searches_total, jobs_found_total
 from app.schemas.job import (
     JobAnalysisResponse,
@@ -188,6 +193,41 @@ async def search_jobs(
 
     if all_jobs:
         try:
+            # ------------------------------------------------------------------
+            # Phase 12 LLM Candidate Evaluation
+            # ------------------------------------------------------------------
+            candidate_model = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user_id))).scalar_one_or_none()
+            if candidate_model:
+                candidate = CandidateProfileSchema.model_validate(candidate_model, from_attributes=True)
+                llm = LLMClient()
+                matcher = CandidateJobMatcher(llm)
+
+                async def _evaluate_job(j: Job) -> None:
+                    if j.match_score is None:
+                        try:
+                            res = await matcher.match_candidate(candidate, j)
+                            j.match_score = res.match_score or 0
+                            
+                            is_eligible = False
+                            if hasattr(res, "eligibility") and hasattr(res.eligibility, "is_eligible"):
+                                is_eligible = res.eligibility.is_eligible
+                            elif hasattr(res, "is_eligible"):
+                                is_eligible = res.is_eligible
+                                
+                            j.gcc_eligibility = {"is_eligible": is_eligible}
+                            if res.strengths or res.gaps:
+                                j.raw_data = {
+                                    "strengths": [s.model_dump() if hasattr(s, "model_dump") else s.dict() if hasattr(s, "dict") else dict(s) for s in (res.strengths or [])],
+                                    "gaps": res.gaps or [],
+                                    "critical_gaps": res.critical_gaps or [],
+                                    "recommendation": res.recommendation or "",
+                                }
+                        except Exception as eval_exc:
+                            logger.error("job_search.evaluation_failed", job_id=j.platform_job_id, error=str(eval_exc))
+                
+                # Evaluate concurrently
+                await asyncio.gather(*(_evaluate_job(j) for j in all_jobs))
+                
             await db.commit()
             for job in all_jobs:
                 await db.refresh(job)

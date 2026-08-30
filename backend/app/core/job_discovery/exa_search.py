@@ -98,18 +98,14 @@ class ExaJobSearch:
         search_query = self._build_query(query, location, job_type)
 
         try:
-            loop = asyncio.get_running_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: self._get_client().search_and_contents(
-                    search_query,
-                    type="auto",
-                    use_autoprompt=True,
-                    num_results=num_results,
-                    start_published_date=self._date_filter(days_back),
-                    text=True,
-                    highlights=True,
-                ),
+            results = await asyncio.to_thread(
+                self._get_client().search_and_contents,
+                search_query,
+                type="auto",
+                num_results=num_results,
+                start_published_date=self._date_filter(days_back),
+                text=True,
+                highlights=True,
             )
 
             listings = self._parse_results(results)
