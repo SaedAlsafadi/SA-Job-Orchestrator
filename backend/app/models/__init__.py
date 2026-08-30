@@ -12,11 +12,17 @@ from app.models.harness import (
     SystemIssue,
 )
 from app.models.job import Job
+from app.models.application_route import ApplicationRoute
 from app.models.llm_usage import LLMUsage
+from app.models.company_watch import CompanyWatch
+from app.models.search_profile import SearchProfile
+from app.models.discovery_run import DiscoveryRun
+from app.models.discovery_event import DiscoveryEvent
 from app.models.password_reset_token import PasswordResetToken
 from app.models.platform_session import PlatformSession
 from app.models.refresh_token import RefreshToken
 from app.models.resume import Resume
+from app.models.system_lock import SystemLock
 from app.models.user import User
 from app.models.user_credential import UserCredential
 from app.models.user_llm_config import UserLLMConfig
@@ -24,8 +30,12 @@ from app.models.user_settings import UserSettings
 
 __all__ = [
     "Application",
+    "ApplicationRoute",
     "Base",
     "CandidateProfile",
+    "CompanyWatch",
+    "DiscoveryEvent",
+    "DiscoveryRun",
     "DomainSkill",
     "Job",
     "LLMUsage",
@@ -36,8 +46,10 @@ __all__ = [
     "RunDiagnosis",
     "RunTrajectory",
     "RunVerdict",
+    "SearchProfile",
     "SkillFeedback",
     "SystemIssue",
+    "SystemLock",
     "TenantMixin",
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
