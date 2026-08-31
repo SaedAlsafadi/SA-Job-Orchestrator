@@ -93,10 +93,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await init_redis_pool(settings.redis_url)
     await init_arq_pool()
+    
+    from app.services.telegram.bot import start_telegram_bot, stop_telegram_bot
+    await start_telegram_bot()
 
     yield
 
     # Shutdown
+    await stop_telegram_bot()
     await close_arq_pool()
     await close_redis_pool()
     await engine.dispose()
