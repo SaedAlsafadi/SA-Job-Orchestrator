@@ -44,9 +44,13 @@ v1_router.include_router(
 )
 
 from app.api.v1.opportunities import router as opportunities_router
+from app.api.v1.telegram import router as telegram_router
 
 v1_router.include_router(
     opportunities_router, prefix="/opportunities", tags=["Opportunities"], dependencies=_auth
+)
+v1_router.include_router(
+    telegram_router, prefix="/telegram", tags=["Telegram"], dependencies=_auth
 )
 
 # Admin/health routes require a superuser.

@@ -95,6 +95,15 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
             )
             await db.execute(stmt2)
             await db.commit()
+            
+            # Send Telegram Notification
+            from sqlalchemy.orm import selectinload
+            from sqlalchemy import select
+            app_obj = (await db.execute(select(Application).options(selectinload(Application.job)).where(Application.id == app_id))).scalar_one_or_none()
+            if app_obj and app_obj.job:
+                from app.services.telegram.notifier import TelegramNotifier
+                notifier = TelegramNotifier(db)
+                await notifier.notify_application_ready(app_obj.user_id, app_obj, app_obj.job)
                 
         except Exception as e:
             logger.error("Preparation failed", error=str(e))

@@ -379,11 +379,42 @@ async def run_monitoring_cron(ctx: dict):
                     logger.exception(f"Cron monitoring failed for schedule {schedule.id}")
 
 
+
+async def prepare_application_run(ctx: dict, application_id: str):
+    from app.db.session import async_session_factory
+    from sqlalchemy import select
+    from app.models.application import Application
+    from app.models.job import Job
+    from app.models.candidate_profile import CandidateProfile
+    from app.schemas.candidate_profile import CandidateProfileSchema
+    from app.services.application_runner import run_application_preparation
+    
+    async with async_session_factory() as db:
+        app = (await db.execute(select(Application).where(Application.id == application_id))).scalar_one_or_none()
+        if not app: return
+        job = (await db.execute(select(Job).where(Job.id == app.job_id))).scalar_one_or_none()
+        if not job: return
+        candidate = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == app.user_id))).scalar_one_or_none()
+        profile_data = CandidateProfileSchema.model_validate(candidate, from_attributes=True).model_dump() if candidate else {}
+        
+        # We need a dummy run_id for now, or create one.
+        # DiscoveryOrchestrator creates an ApplicationRun already! We should pass it or query it.
+        from app.models.application import ApplicationRun
+        run = (await db.execute(select(ApplicationRun).where(ApplicationRun.application_id == app.id).order_by(ApplicationRun.created_at.desc()).limit(1))).scalar_one_or_none()
+        if not run: return
+        
+        # We need resume path. Assuming basic extraction
+        resume_path = None # Provide dummy path for now or from resume
+        
+        # Wait, the application preparation logic inside application_runner requires a valid DB session factory.
+        await run_application_preparation(run.id, app.id, job.url or '', async_session_factory, profile_data, resume_path or '')
+
+
 class WorkerSettings:
     """Arq worker configuration."""
 
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
-    functions: ClassVar = [apply_to_job, review_application_run]
+    functions: ClassVar = [apply_to_job, review_application_run, prepare_application_run]
     cron_jobs: ClassVar = [
         cron(monitor_system_health, minute={0, 15, 30, 45}),
         cron(purge_deleted_accounts, hour={3}, minute={30}),  # daily 03:30

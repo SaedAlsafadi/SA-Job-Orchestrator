@@ -67,8 +67,7 @@ class BrowserAgent:
             from browser_use import Agent, Browser, BrowserConfig
         except ImportError as exc:
             raise BrowserError(
-                "browser-use package not installed. "
-                "Install with: pip install browser-use"
+                f"browser-use package not installed or failed to import. Error: {exc}"
             ) from exc
 
         browser_config = BrowserConfig(

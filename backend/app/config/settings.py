@@ -179,6 +179,13 @@ class Settings(BaseSettings):
     storage: StorageSettings = StorageSettings()
     email: EmailSettings = EmailSettings()
 
+    # Telegram Integration
+    telegram_enabled: bool = False
+    telegram_polling: bool = True
+    telegram_bot_token: SecretStr | None = None
+    telegram_proxy: str | None = None
+    frontend_url: str = "http://localhost:3000"
+
     # Job discovery
     exa_api_key: SecretStr = SecretStr("")
 

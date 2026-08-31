@@ -2,12 +2,77 @@ import { useEffect, useState } from 'react';
 
 import Icon from '@/components/ui/Icon';
 import { useSettings, useUpdateSettings, useLLMProviders } from '@/hooks/useSettings';
+import { getTelegramStatus, getTelegramLinkToken, disconnectTelegram, testTelegramNotification } from '@/services/telegram';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/store/useAppStore';
 import type { Settings } from '@/types/settings';
 
 const card: React.CSSProperties = {
   background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-1)', padding: 18,
 };
+const buttonStyle = (bg: string, color: string, border: string): React.CSSProperties => ({
+  background: bg, color, border, padding: '6px 12px', borderRadius: 'var(--r-md)', font: '600 12.5px/1 var(--font)', cursor: 'pointer'
+});
+
+function TelegramSettings() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ['telegramStatus'], queryFn: getTelegramStatus });
+  const [tokenData, setTokenData] = useState<{token: string, bot_url: string} | null>(null);
+
+  const getLink = async () => {
+    try {
+      const res = await getTelegramLinkToken();
+      setTokenData(res);
+    } catch(e) {
+      console.error("Failed to get Telegram token:", e);
+    }
+  };
+
+  const disconnect = async () => {
+    try {
+      await disconnectTelegram();
+      qc.invalidateQueries({ queryKey: ['telegramStatus'] });
+    } catch(e) {}
+  };
+
+  const testNotif = async () => {
+    try { await testTelegramNotification(); } catch(e) {}
+  };
+
+  if (isLoading) return <div style={{...card, marginBottom: 14}}><p>Loading Telegram status...</p></div>;
+
+  return (
+    <section style={{ ...card, marginBottom: 14 }}>
+      <SectionTitle icon="smartphone" title="Telegram Integration" sub="Get mobile notifications and send jobs to AutoApply." />
+      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <p style={{ margin: 0, font: '500 13px/1.4 var(--font)', color: 'var(--text-1)' }}>
+          Status: <strong style={{ color: data?.status === 'CONNECTED' ? 'var(--primary)' : 'var(--text-3)' }}>{data?.status}</strong>
+        </p>
+        
+        {data?.status === 'CONNECTED' ? (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={testNotif} style={buttonStyle('var(--surface)', 'var(--text-1)', '1px solid var(--border)')}>Test Notification</button>
+            <button onClick={disconnect} style={buttonStyle('var(--failed-bg)', 'var(--failed)', 'none')}>Disconnect</button>
+          </div>
+        ) : (
+          <div>
+            {!tokenData ? (
+              <button onClick={getLink} style={buttonStyle('var(--primary)', 'white', 'none')}>Connect Telegram</button>
+            ) : (
+              <a href={tokenData.bot_url} target="_blank" rel="noreferrer" style={{ ...buttonStyle('var(--primary)', 'white', 'none'), display: 'inline-block', textDecoration: 'none' }}>Open Telegram Bot</a>
+            )}
+            {tokenData && (
+              <p style={{ margin: '8px 0 0 0', font: '400 12px/1.4 var(--font)', color: 'var(--text-2)' }}>
+                Click the button above to open Telegram and start the bot to complete linking.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 const PLATFORMS = ['linkedin', 'indeed', 'glassdoor', 'exa'];
 const controlStyle: React.CSSProperties = {
   height: 36, padding: '0 11px', borderRadius: 'var(--r-md)', background: 'var(--surface-3)',
@@ -87,7 +152,8 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Platforms */}
+        <TelegramSettings />
+        {/* Platforms */}
       <section style={{ ...card, marginBottom: 14 }}>
         <SectionTitle icon="briefcase" title="Platforms" sub="Where the agent searches for roles." />
         <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>

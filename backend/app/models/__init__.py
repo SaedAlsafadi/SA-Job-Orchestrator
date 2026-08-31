@@ -27,6 +27,12 @@ from app.models.user import User
 from app.models.user_credential import UserCredential
 from app.models.user_llm_config import UserLLMConfig
 from app.models.user_settings import UserSettings
+from app.models.telegram_connection import (
+    TelegramConnection,
+    TelegramLinkToken,
+    TelegramCallbackReference,
+    NotificationLog,
+)
 
 __all__ = [
     "Application",
@@ -58,4 +64,8 @@ __all__ = [
     "UserLLMConfig",
     "UserSettings",
     "pg_enum",
+    "TelegramConnection",
+    "TelegramLinkToken",
+    "TelegramCallbackReference",
+    "NotificationLog",
 ]
