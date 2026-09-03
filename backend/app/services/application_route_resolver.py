@@ -151,6 +151,18 @@ class ApplicationRouteResolver:
                 is_preferred=True,
                 resolved_at=datetime.now(UTC)
             )
+        elif "bayt.com" in url_lower:
+            return ApplicationRoute(
+                job_id=job.id,
+                route_type="BAYT",
+                url=url,
+                confidence=1.0,
+                resolution_reason="Deterministic Bayt URL match",
+                requires_human=True,  # Bayt applications require manual intervention
+                is_preferred=False,
+                resolved_at=datetime.now(UTC)
+            )
+        
         return None
 
     def _extract_email_route(self, text: str, raw_payload: dict, job: Job) -> ApplicationRoute | None:

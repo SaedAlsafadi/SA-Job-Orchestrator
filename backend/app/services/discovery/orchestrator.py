@@ -17,6 +17,7 @@ from app.models.candidate_profile import CandidateProfile
 from app.services.discovery.query_planner import QueryPlanner
 from app.core.job_discovery.providers.exa_provider import ExaDiscoveryProvider
 from app.core.job_discovery.providers.ats_providers import WorkableProvider, GreenhouseProvider, LeverProvider
+from app.core.job_discovery.providers.bayt_provider import BaytDiscoveryProvider
 from app.services.monitoring.utils import compute_content_hash, get_canonical_url
 from app.services.application_route_resolver import ApplicationRouteResolver
 from app.services.matching import CandidateJobMatcher
@@ -33,7 +34,8 @@ class DiscoveryOrchestrator:
             "exa": ExaDiscoveryProvider(),
             "workable": WorkableProvider(),
             "greenhouse": GreenhouseProvider(),
-            "lever": LeverProvider()
+            "lever": LeverProvider(),
+            "bayt": BaytDiscoveryProvider()
         }
         
     async def get_candidate_profile(self, user_id: str) -> Optional[CandidateProfileSchema]:

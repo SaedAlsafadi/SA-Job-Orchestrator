@@ -66,6 +66,7 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
             from app.core.connectors.workable_app import WorkableApplicationConnector
             from app.core.connectors.greenhouse_app import GreenhouseApplicationConnector
             from app.core.connectors.lever_app import LeverApplicationConnector
+            from app.core.connectors.bayt_app import BaytApplicationConnector
             from app.services.question_engine import QuestionEngine
             from app.core.llm.client import LLMClient
             from sqlalchemy import update
@@ -76,6 +77,8 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
                 connector = LeverApplicationConnector()
             elif "greenhouse" in job_url:
                 connector = GreenhouseApplicationConnector()
+            elif "bayt.com" in job_url:
+                connector = BaytApplicationConnector()
             else:
                 connector = WorkableApplicationConnector()
                 
