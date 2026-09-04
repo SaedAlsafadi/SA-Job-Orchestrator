@@ -22,6 +22,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.platform_session import PlatformSession
 from app.models.refresh_token import RefreshToken
 from app.models.resume import Resume
+from app.models.tailoring import CVTailoringSession, CVTailoringChange
 from app.models.system_lock import SystemLock
 from app.models.user import User
 from app.models.user_credential import UserCredential
@@ -49,6 +50,8 @@ __all__ = [
     "PlatformSession",
     "RefreshToken",
     "Resume",
+    "CVTailoringSession",
+    "CVTailoringChange",
     "RunDiagnosis",
     "RunTrajectory",
     "RunVerdict",
@@ -69,3 +72,4 @@ __all__ = [
     "TelegramCallbackReference",
     "NotificationLog",
 ]
+

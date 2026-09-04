@@ -33,6 +33,8 @@ export default function JobSearchPage() {
   const analyze = useAnalyzeJob();
   const createApp = useCreateApplication();
   const generate = useGenerateResume();
+  const navigate = useNavigate();
+  const [startingSession, setStartingSession] = useState(false);
 
   const [drawerJob, setDrawerJob] = useState<Job | null>(null);
   const [analysis, setAnalysis] = useState<JobAnalysisResponse | null>(null);
@@ -50,15 +52,17 @@ export default function JobSearchPage() {
     });
   };
 
-  const onGenerateTailored = () => {
+  const onGenerateTailored = async () => {
     if (!drawerJob || !baseResumeId) return;
-    generate.mutate(
-      { base_resume_id: baseResumeId, job_id: drawerJob.id },
-      {
-        onSuccess: () => notify(`Tailored résumé generated · ${drawerJob.title}`, 'success'),
-        onError: () => notify('Could not generate the résumé', 'error'),
-      },
-    );
+    try {
+      setStartingSession(true);
+      const session = await tailoringService.startSession(drawerJob.id, baseResumeId);
+      navigate('/cv-tailoring/' + session.id);
+    } catch (err: any) {
+      notify('Failed to start tailoring session: ' + (err.response?.data?.detail || err.message), 'error');
+    } finally {
+      setStartingSession(false);
+    }
   };
 
   const togglePlatform = (key: string) =>
@@ -191,7 +195,7 @@ export default function JobSearchPage() {
           analysis={analysis}
           analyzing={analyze.isPending}
           baseResumeId={baseResumeId}
-          generating={generate.isPending}
+          generating={startingSession}
           onClose={() => setDrawerJob(null)}
           onGenerate={onGenerateTailored}
         />
@@ -267,6 +271,7 @@ function btn(kind: 'primary' | 'ghost'): React.CSSProperties {
     color: primary ? 'var(--accent-ink)' : 'var(--text-2)',
   };
 }
+
 
 
 

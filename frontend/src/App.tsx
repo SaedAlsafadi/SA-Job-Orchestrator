@@ -6,6 +6,7 @@ import OfflineBanner from '@/components/ui/OfflineBanner';
 import DashboardPage from '@/pages/DashboardPage';
 import JobSearchPage from '@/pages/JobSearchPage';
 import ApplicationsPage from '@/pages/ApplicationsPage';
+import { CVTailoringWorkbench } from './pages/CVTailoringWorkbench';
 import AppDetailPage from '@/pages/AppDetailPage';
 import ResumesPage from '@/pages/ResumesPage';
 import SettingsPage from '@/pages/SettingsPage';
@@ -48,6 +49,7 @@ function App() {
           <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/applications/:id" element={<AppDetailPage />} />
           <Route path="/resumes" element={<ResumesPage />} />
+          <Route path="/cv-tailoring/:sessionId" element={<CVTailoringWorkbench />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/admin" element={<RequireSuperuser><AdminPage /></RequireSuperuser>} />
@@ -61,3 +63,8 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
