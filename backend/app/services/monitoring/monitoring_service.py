@@ -15,6 +15,7 @@ from app.services.discovery_service import DiscoveryService
 from app.services.eligibility import evaluate_eligibility
 from app.services.matching import CandidateJobMatcher
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter
 from app.schemas.candidate_profile import CandidateProfileSchema
 from app.models.candidate_profile import CandidateProfile
 from app.services.monitoring.locking import acquire_monitoring_lock, MonitoringLockError
@@ -25,7 +26,7 @@ class MonitoringService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.discovery = DiscoveryService(db)
-        self.llm_client = LLMClient()
+        self.llm_client = LLMTaskRouter(LLMClient())
         self.matching = CandidateJobMatcher(self.llm_client)
 
     async def get_candidate_profile(self, user_id: str) -> CandidateProfileSchema | None:
@@ -223,3 +224,4 @@ class MonitoringService:
             "stats": stats,
             "error": run_record.error
         }
+

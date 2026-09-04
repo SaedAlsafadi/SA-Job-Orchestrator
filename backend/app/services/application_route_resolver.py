@@ -85,8 +85,10 @@ class ApplicationRouteResolver:
         """Use LLM to semantically infer the application route when ambiguous."""
         try:
             from app.core.llm.client import LLMClient
-            client = LLMClient()
+            from app.core.llm.router import LLMTaskRouter, LLMTask
+            client = LLMTaskRouter(LLMClient())
             response = await client.complete(
+                task=LLMTask.ROUTE_RESOLUTION,
                 system_prompt=ROUTE_EXTRACTION_PROMPT,
                 prompt=f"Job Opportunity Text:\n\n{text}",
                 temperature=0.0
@@ -198,3 +200,4 @@ class ApplicationRouteResolver:
             )
             
         return None
+

@@ -11,6 +11,7 @@ from app.services.workflow_service import WorkflowService
 from app.services.discovery_service import DiscoveryService
 from app.services.matching import CandidateMatchResult
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter
 from app.core.llm.prompts.resume_tailor import TailoredResumeData
 from app.models.candidate_profile import CandidateProfile
 from app.models.application import Application, ApplicationRun
@@ -20,7 +21,7 @@ from app.services.question_engine import QuestionEngine
 router = APIRouter()
 
 def get_workflow_service(db: AsyncSession = Depends(get_tenant_db)) -> WorkflowService:
-    return WorkflowService(db, LLMClient())
+    return WorkflowService(db, LLMTaskRouter(LLMClient()))
 
 def get_discovery_service(db: AsyncSession = Depends(get_tenant_db)) -> DiscoveryService:
     return DiscoveryService(db)
@@ -279,3 +280,4 @@ async def update_application_questions(
         await db.commit()
         
     return {"status": "success", "message": "Questions updated"}
+

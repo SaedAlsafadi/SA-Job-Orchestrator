@@ -196,7 +196,8 @@ class DiscoveryOrchestrator:
         # Note: If there are many, we might want to limit LLM calls, but for now we evaluate eligible ones.
         matched_jobs = []
         from app.core.llm.client import LLMClient
-        matching_service = CandidateJobMatcher(LLMClient())
+        from app.core.llm.router import LLMTaskRouter
+        matching_service = CandidateJobMatcher(LLMTaskRouter(LLMClient()))
         
         for chash, norm in candidates_for_llm:
             if not candidate_data:
@@ -368,4 +369,5 @@ class DiscoveryOrchestrator:
             
         await self.db.commit()
         return job
+
 

@@ -19,6 +19,7 @@ from app.core.documents.docx_renderer import DOCXRenderer
 from app.core.documents.pdf_renderer import PDFRenderer
 from app.core.exceptions import GenerationError
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.core.llm.prompts.cover_letter import (
     CoverLetterTemplate,
     render_prompt,
@@ -64,7 +65,7 @@ class DocumentGenerator:
 
     def __init__(
         self,
-        llm_client: LLMClient | None = None,
+        llm_client: LLMTaskRouter | None = None,
         output_dir: Path = OUTPUT_DIR,
         templates_dir: Path = Path("templates"),
     ) -> None:
@@ -300,6 +301,7 @@ class DocumentGenerator:
         prompt = render_resume_tailor_prompt(resume_data, job_description)
         try:
             result = await self._llm.complete_with_structured_output(
+                task=LLMTask.CV_TAILOR,
                 prompt=prompt,
                 output_schema=TailoredResumeData,
                 system_prompt=RESUME_TAILOR_SYSTEM_PROMPT,
@@ -327,7 +329,8 @@ class DocumentGenerator:
             template, job_description, resume_text, company_info,
         )
         response = await self._llm.complete(
-            prompt=prompt, purpose="cover_letter",
+            task=LLMTask.COVER_LETTER,
+            prompt=prompt, 
         )
         return response.content
 
@@ -397,3 +400,4 @@ def _text_to_html(text: str) -> str:
     """Convert plain text with double-newline paragraphs to HTML."""
     paragraphs = text.split("\n\n")
     return "".join(f"<p>{p.strip()}</p>" for p in paragraphs if p.strip())
+

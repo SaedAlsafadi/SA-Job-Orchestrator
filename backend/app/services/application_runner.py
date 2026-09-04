@@ -69,6 +69,7 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
             from app.core.connectors.bayt_app import BaytApplicationConnector
             from app.services.question_engine import QuestionEngine
             from app.core.llm.client import LLMClient
+            from app.core.llm.router import LLMTaskRouter
             from sqlalchemy import update
             from app.models.application import ApplicationRun, Application
             from app.core.pw_utils import run_playwright_in_thread
@@ -82,7 +83,7 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
             else:
                 connector = WorkableApplicationConnector()
                 
-            engine = QuestionEngine(profile_data, LLMClient())
+            engine = QuestionEngine(profile_data, LLMTaskRouter(LLMClient()))
             
             state = await run_playwright_in_thread(_pw_task, connector, engine, job_url, resume_path, run_id)
             
@@ -124,3 +125,4 @@ async def run_application_preparation(run_id: str, app_id: str, job_url: str, db
             )
             await db.execute(stmt2)
             await db.commit()
+

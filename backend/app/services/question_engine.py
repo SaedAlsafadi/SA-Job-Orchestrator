@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 from app.core.connectors.base import ApplicationQuestion, QuestionCategory
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter, LLMTask
 from pydantic import BaseModel
 import structlog
 import json
@@ -13,9 +14,9 @@ class CategoryDAnswer(BaseModel):
     evidence_ids: List[str]
 
 class QuestionEngine:
-    def __init__(self, profile: Dict[str, Any], llm_client: LLMClient):
+    def __init__(self, profile: Dict[str, Any], llm_router: LLMTaskRouter):
         self.profile = profile
-        self.llm_client = llm_client
+        self.llm_router = llm_router
         # Extract all valid evidence IDs from profile
         self.valid_evidence_ids = set()
         for exp in self.profile.get("experience", []):
@@ -97,7 +98,8 @@ If you cannot answer the question definitively from the evidence, set confidence
 You MUST provide the exact evidence_ids from the Candidate Data that support your answer.
 """
         try:
-            res = await self.llm_client.complete_with_structured_output(
+            res = await self.llm_router.complete_with_structured_output(
+                task=LLMTask.APPLICATION_ANSWERS,
                 prompt=system_prompt,
                 output_schema=CategoryDAnswer
             )
@@ -128,3 +130,4 @@ You MUST provide the exact evidence_ids from the Candidate Data that support you
             q.category = QuestionCategory.E_UNKNOWN_HIGH_RISK
             q.requires_human = True
             q.confidence = 0.0
+

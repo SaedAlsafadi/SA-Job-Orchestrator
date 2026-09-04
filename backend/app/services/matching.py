@@ -6,6 +6,7 @@ import structlog
 from pydantic import BaseModel, Field
 
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.schemas.candidate_profile import CandidateProfileSchema
 from app.models.job import Job
 from app.services.eligibility import evaluate_eligibility, EligibilityResult
@@ -56,8 +57,8 @@ class CandidateMatchResult(BaseModel):
     provenance: MatchProvenance
 
 class CandidateJobMatcher:
-    def __init__(self, llm_client: LLMClient):
-        self.llm_client = llm_client
+    def __init__(self, llm_router: LLMTaskRouter):
+        self.llm_router = llm_router
         
     def _compute_deterministic_features(self, candidate: CandidateProfileSchema, job: Job, ats_method: str) -> tuple[MatchFeatures, float]:
         features = MatchFeatures()
@@ -188,7 +189,8 @@ class CandidateJobMatcher:
         
         llm_result = None
         try:
-            llm_result = await self.llm_client.complete_with_structured_output(
+            llm_result = await self.llm_router.complete_with_structured_output(
+                task=LLMTask.MATCH_DEEP,
                 prompt=prompt,
                 system_prompt=system_prompt,
                 output_schema=LLMMatchResult,
@@ -235,6 +237,7 @@ class CandidateJobMatcher:
             recommendation=recommendation,
             provenance=prov
         )
+
 
 
 
