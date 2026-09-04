@@ -104,3 +104,34 @@ class SkillStatus(StrEnum):
 
     ACTIVE = "active"
     RETIRED = "retired"
+
+class TailoringStatus(StrEnum):
+    """Lifecycle of a CV tailoring session."""
+    DRAFT = "draft"
+    REVIEWING = "reviewing"
+    APPROVED = "approved"
+    RENDERING = "rendering"
+    VERIFIED = "verified"
+    FAILED = "failed"
+
+class ChangeType(StrEnum):
+    """Type of proposed CV change."""
+    ADD = "add"
+    MODIFY = "modify"
+    REMOVE = "remove"
+
+class ReviewerStatus(StrEnum):
+    """User decision on a proposed change."""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+class ReviewSeverity(StrEnum):
+    """AI Review severity level."""
+    SAFE = "safe"
+    WARNING = "warning"
+    BLOCKED = "blocked"
+
+
+
+
