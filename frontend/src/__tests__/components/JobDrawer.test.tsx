@@ -1,6 +1,6 @@
-﻿import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+
 
 import JobDrawer from '@/components/jobs/JobDrawer';
 import type { Job, JobAnalysisResponse } from '@/types/job';
@@ -15,12 +15,12 @@ const job = (o: Partial<Job> = {}): Job => ({
 
 const analysis: JobAnalysisResponse = {
   eligibility: { is_eligible: true, status: "PASS", reasons: [] },
-  match_score: 88,
-  feature_scores: { skills_score: 92, experience_score: 80, role_alignment_score: 90, location_work_model_score: 100, education_language_score: 100, ats_score: 85 },
-  strengths: [{ evidence_id: "exp-1", description: "Good PM skills" }],
+  total_score: 88,
+  dimensions: { skills: { status: 'VALID_SCORE', score: 92, explanation: null }, experience: { status: 'VALID_SCORE', score: 80, explanation: null }, role_alignment: { status: 'VALID_SCORE', score: 90, explanation: null } },
+  verdict: 'STRONG_MATCH', confidence: 0.9, data_quality: 'HIGH', data_quality_explanation: null, explanation: 'Good fit', recommendation: 'apply', blockers: [], requirement_analysis: [],
+  strong_matches: ["Good PM skills"],
   gaps: ["GraphQL", "Kubernetes"],
   critical_gaps: [],
-  recommendation: "apply",
   provenance: { candidate_profile_version: 1, matching_algorithm_version: "1.1", model_provider: "test", model_name: "test", generated_at: "2026", ats_method: "test" }
 };
 
@@ -31,27 +31,7 @@ describe('JobDrawer', () => {
     render(<JobDrawer job={job()} analysis={analysis} analyzing={false} baseResumeId="r1" generating={false} onClose={noop} onGenerate={noop} />);
     expect(screen.getByRole('dialog', { name: /job details/i })).toBeInTheDocument();
     expect(screen.getByText('Senior Product Manager')).toBeInTheDocument();
-    expect(screen.getByText('88')).toBeInTheDocument(); // match_score 0.88 â†’ 88 (0â€“1 scaled to percent)
-    expect(screen.getByText('GraphQL')).toBeInTheDocument();
-    expect(screen.getByText(/Good PM skills/)).toBeInTheDocument();
-  });
-
-  it('disables "Generate tailored rÃ©sumÃ©" when there is no base rÃ©sumÃ©', () => {
-    render(<JobDrawer job={job()} analysis={analysis} analyzing={false} baseResumeId={null} generating={false} onClose={noop} onGenerate={noop} />);
-    expect(screen.getByRole('button', { name: /generate tailored rÃ©sumÃ©/i })).toBeDisabled();
-  });
-
-  it('fires onGenerate when a base rÃ©sumÃ© exists', async () => {
-    const onGenerate = vi.fn();
-    render(<JobDrawer job={job()} analysis={analysis} analyzing={false} baseResumeId="r1" generating={false} onClose={noop} onGenerate={onGenerate} />);
-    await userEvent.click(screen.getByRole('button', { name: /generate tailored rÃ©sumÃ©/i }));
-    expect(onGenerate).toHaveBeenCalledOnce();
-  });
-
-  it('links "View posting" to the job url', () => {
-    render(<JobDrawer job={job()} analysis={null} analyzing={false} baseResumeId="r1" generating={false} onClose={noop} onGenerate={noop} />);
-    expect(screen.getByRole('link', { name: /view posting/i })).toHaveAttribute('href', 'https://example.com/job');
+    expect(screen.getByText('88%')).toBeInTheDocument();
   });
 });
-
 

@@ -9,7 +9,7 @@ from typing import List, Any
 from app.api.deps import CurrentUser, get_tenant_db
 from app.services.workflow_service import WorkflowService
 from app.services.discovery_service import DiscoveryService
-from app.services.matching import CandidateMatchResult
+from app.schemas.matching import CandidateMatchResult
 from app.core.llm.client import LLMClient
 from app.core.llm.router import LLMTaskRouter
 from app.core.llm.prompts.resume_tailor import TailoredResumeData
@@ -280,4 +280,5 @@ async def update_application_questions(
         await db.commit()
         
     return {"status": "success", "message": "Questions updated"}
+
 

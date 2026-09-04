@@ -54,7 +54,7 @@ export function ApplicationWorkflow() {
       const matchResult = matchRes.data;
       
       // Update the local jobs list so the match score is reflected
-      setDiscoveredJobs(jobs => jobs.map(j => j.id === jobId ? { ...j, match_score: matchResult.score } : j));
+      setDiscoveredJobs(jobs => jobs.map(j => j.id === jobId ? { ...j, match_score: matchResult.total_score } : j));
 
       // 2. Mock Tailoring & Prepare Application
       // In a real flow, you'd call /tailor-resume here, but for now we pass the mock tailoring and use the match result
@@ -93,7 +93,7 @@ export function ApplicationWorkflow() {
             setAppState({
               id: newAppId,
               status: pollRes.data.status,
-              match_score: matchResult.score || 85,
+              match_score: matchResult.total_score || 85,
               job: discoveredJobs.find((j: any) => j.id === jobId) || { id: jobId, platform: "workable" },
               screenshot: stateData.screenshot ? `http://localhost:8000/${stateData.screenshot}` : "/smoke_test.png",
               cv_present: stateData.cv_present || false,
@@ -257,7 +257,7 @@ export function ApplicationWorkflow() {
                 {appState.status === "submission_unknown" && <span style={{ color: "var(--warning)" }}>âš  Status Unknown</span>}
                 {(appState.status === "failed" || appState.status === "submission_blocked") && <span style={{ color: "var(--failed)" }}>âœ˜ Submission Failed</span>}
                 <div style={{ background: "var(--surface-2)", padding: "4px 12px", borderRadius: "var(--r-sm)", fontWeight: 600, color: "var(--accent)" }}>
-                  Match: {appState.match_score}%
+                  Match: {appState.total_score}%
                 </div>
               </div>
             </div>
@@ -337,3 +337,4 @@ export function ApplicationWorkflow() {
     </div>
   );
 }
+

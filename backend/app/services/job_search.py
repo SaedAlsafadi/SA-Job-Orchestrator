@@ -26,8 +26,9 @@ from app.core.llm.client import LLMClient
 from app.core.llm.router import LLMTaskRouter
 import asyncio
 from app.observability.metrics import job_searches_total, jobs_found_total
+from app.schemas.matching import CandidateMatchResult
 from app.schemas.job import (
-    JobAnalysisResponse,
+    
     JobListingResponse,
     JobListResponse,
     JobSearchRequest,
@@ -207,7 +208,7 @@ async def search_jobs(
                     if j.match_score is None:
                         try:
                             res = await matcher.match_candidate(candidate, j)
-                            j.match_score = res.match_score or 0
+                            j.match_score = res.total_score or 0
                             
                             is_eligible = False
                             if hasattr(res, "eligibility") and hasattr(res.eligibility, "is_eligible"):
@@ -380,129 +381,30 @@ async def analyze_job(
     db: AsyncSession,
     job_id: str,
     resume_id: str | None = None,
-) -> JobAnalysisResponse:
-    """Analyze job-candidate match using ATS scoring.
+) -> CandidateMatchResult:
+    from app.models.candidate_profile import CandidateProfile
+    from app.schemas.candidate_profile import CandidateProfileSchema
+    from app.core.llm.factory import build_llm_router_for_user
+    from app.services.matching import CandidateJobMatcher
+    from app.schemas.matching import CandidateMatchResult
+    from sqlalchemy import select
 
-    If a resume_id is provided, loads the resume and runs multi-factor
-    ATS scoring (skills, keywords, experience, education). Falls back to
-    placeholder scores when spaCy is not available or no resume is given.
-
-    Args:
-        db: Async database session.
-        job_id: UUID of the job to analyze.
-        resume_id: Optional UUID of the resume to score against.
-
-    Returns:
-        Job analysis with match scores and suggestions.
-
-    Raises:
-        RecordNotFoundError: If job does not exist.
-    """
     job = await get_job(db, job_id)
-    logger.info("job_analysis_requested", job_id=job_id, title=job.title)
+    
+    candidate = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == job.user_id))).scalar_one_or_none()
+    if not candidate:
+        raise ValueError("No candidate profile found")
 
-    # If no resume provided, return placeholder scores
-    if not resume_id:
-        return JobAnalysisResponse(
-            job_id=job.id,
-            match_score=0.0,
-            skill_match=0.0,
-            keyword_match=0.0,
-            missing_skills=[],
-            suggestions=[
-                "Provide a resume_id to get accurate ATS scoring.",
-            ],
-        )
+    schema = CandidateProfileSchema.model_validate(candidate)
+    router = await build_llm_router_for_user(db, job.user_id)
+    matcher = CandidateJobMatcher(router)
+    
+    result = await matcher.match_candidate(schema, job)
+    
+    # Save score to DB
+    job.match_score = result.total_score
+    await db.commit()
+    
+    return result
 
-    # Load resume
-    resume_result = await db.execute(
-        select(Resume).where(Resume.id == resume_id),
-    )
-    resume = resume_result.scalar_one_or_none()
-    if resume is None:
-        raise RecordNotFoundError("Resume", resume_id)
-
-    resume_text = resume.content_text or ""
-    if not resume_text:
-        return JobAnalysisResponse(
-            job_id=job.id,
-            match_score=0.0,
-            skill_match=0.0,
-            keyword_match=0.0,
-            missing_skills=[],
-            suggestions=[
-                "Resume has no extracted text. Re-upload for analysis.",
-            ],
-        )
-
-    # Attempt ATS scoring with spaCy
-    try:
-        import spacy
-
-        nlp = spacy.load("en_core_web_sm")
-        from app.core.ats.experience_analyzer import ExperienceAnalyzer
-        from app.core.ats.keyword_analyzer import KeywordAnalyzer
-        from app.core.ats.scorer import ResumeScorer
-        from app.core.ats.skill_matcher import SkillMatcher
-
-        skill_matcher = SkillMatcher(nlp)
-        keyword_analyzer = KeywordAnalyzer(nlp)
-        experience_analyzer = ExperienceAnalyzer(nlp)
-
-        scorer = ResumeScorer(
-            skill_matcher=skill_matcher,
-            keyword_analyzer=keyword_analyzer,
-            experience_analyzer=experience_analyzer,
-        )
-
-        job_description = job.description or ""
-        job_metadata: dict[str, Any] = {}
-        if job.skills_required and isinstance(job.skills_required, dict):
-            job_metadata["required_skills"] = job.skills_required.get(
-                "required", job.skills_required.get("skills", []),
-            )
-            job_metadata["preferred_skills"] = job.skills_required.get(
-                "preferred", [],
-            )
-
-        # Extract skills from resume text for candidate profile
-        detected_skills = list(skill_matcher.extract_skills(resume_text))
-        candidate_profile: dict[str, Any] = {
-            "skills": detected_skills,
-            "experience": [],
-            "education": [],
-        }
-
-        details = scorer.score_resume(
-            resume_text=resume_text,
-            job_description=job_description,
-            candidate_profile=candidate_profile,
-            job_metadata=job_metadata,
-        )
-
-        return JobAnalysisResponse(
-            job_id=job.id,
-            match_score=details.overall_score,
-            skill_match=details.skill_score,
-            keyword_match=details.keyword_score,
-            missing_skills=details.missing_required_skills,
-            suggestions=details.improvement_suggestions,
-        )
-
-    except (ImportError, OSError) as exc:
-        logger.warning(
-            "job_analysis.spacy_unavailable",
-            error=str(exc),
-        )
-        return JobAnalysisResponse(
-            job_id=job.id,
-            match_score=0.0,
-            skill_match=0.0,
-            keyword_match=0.0,
-            missing_skills=[],
-            suggestions=[
-                "spaCy NLP model not available. Install with: "
-                "python -m spacy download en_core_web_sm",
-            ],
-        )
 

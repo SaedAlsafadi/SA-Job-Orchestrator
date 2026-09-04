@@ -14,7 +14,8 @@ from app.models.resume import Resume
 from app.models.application import Application
 from app.models.enums import ApplicationStatus, ResumeType
 from app.schemas.candidate_profile import CandidateProfileSchema
-from app.services.matching import CandidateJobMatcher, CandidateMatchResult
+from app.services.matching import CandidateJobMatcher
+from app.schemas.matching import CandidateMatchResult
 from app.core.llm.client import LLMClient
 from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.core.documents.pdf_renderer import PlaywrightPDFRenderer
@@ -169,4 +170,5 @@ class WorkflowService:
         self.db.add(app)
         await self.db.commit()
         return app
+
 
