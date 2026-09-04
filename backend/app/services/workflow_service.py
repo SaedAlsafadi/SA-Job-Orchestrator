@@ -16,15 +16,16 @@ from app.models.enums import ApplicationStatus, ResumeType
 from app.schemas.candidate_profile import CandidateProfileSchema
 from app.services.matching import CandidateJobMatcher, CandidateMatchResult
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.core.documents.pdf_renderer import PlaywrightPDFRenderer
 from app.core.llm.prompts.resume_tailor import TailoredResumeData
 
 
 class WorkflowService:
-    def __init__(self, db: AsyncSession, llm_client: LLMClient):
+    def __init__(self, db: AsyncSession, llm_router: LLMTaskRouter):
         self.db = db
-        self.llm_client = llm_client
-        self.matcher = CandidateJobMatcher(llm_client)
+        self.llm_router = llm_router
+        self.matcher = CandidateJobMatcher(llm_router)
         self.pdf_renderer = PlaywrightPDFRenderer()
 
     async def analyze_job(self, job_description: str, title: str, company: str, user_id: str) -> Job:
@@ -91,7 +92,8 @@ class WorkflowService:
         prompt = f"CANDIDATE:\n{json.dumps(candidate_model.experience)}\n\nJOB:\n{job.description}"
         
         try:
-            tailored_data = await self.llm_client.complete_with_structured_output(
+            tailored_data = await self.llm_router.complete_with_structured_output(
+                task=LLMTask.CV_TAILOR,
                 prompt=prompt,
                 system_prompt=system_prompt,
                 output_schema=TailoredResumeData,
@@ -167,3 +169,4 @@ class WorkflowService:
         self.db.add(app)
         await self.db.commit()
         return app
+

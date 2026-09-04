@@ -18,6 +18,7 @@ from app.schemas.candidate_profile import (
 )
 from app.core.documents.parser import DocumentParser
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter, LLMTask
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -294,7 +295,7 @@ async def import_resume(
         parsed_doc = await parser.parse(temp_path)
         
         # LLM Extraction — use simplified flat schema, then transform
-        llm = LLMClient()
+        llm = LLMTaskRouter(LLMClient())
         system_prompt = """You are an expert resume parser. Read the resume text and extract ALL information into JSON.
 
 You MUST populate every field that has data in the resume. Here is an example output:
@@ -332,6 +333,7 @@ RULES:
         
         try:
             llm_result = await llm.complete_with_structured_output(
+                task=LLMTask.METADATA_EXTRACTION,
                 prompt=f"Resume Text:\n{parsed_doc.raw_text}",
                 output_schema=_LLMExtraction,
                 system_prompt=system_prompt
@@ -365,3 +367,4 @@ RULES:
     finally:
         if temp_path.exists():
             os.remove(temp_path)
+

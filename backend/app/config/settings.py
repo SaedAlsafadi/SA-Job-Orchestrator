@@ -34,9 +34,16 @@ class LLMSettings(BaseSettings):
     gemini_api_key: SecretStr = SecretStr("")
     openrouter_api_key: SecretStr = SecretStr("")
     github_token: SecretStr = SecretStr("")
-    preferred_provider: str = "gemini"
-    fallback_providers: list[str] = ["groq", "openrouter"]
-    default_model: str = "gemini/gemini-1.5-flash"
+    preferred_provider: str = "openrouter"
+    fallback_providers: list[str] = []
+    
+    # Task Routing Models
+    light_model: str = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+    heavy_model: str = "openrouter/deepseek/deepseek-v4-flash-0731"
+    
+    # Legacy default, mapped to light_model to avoid accidental heavy billing
+    default_model: str = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+    
     temperature: float = 0.7
     max_tokens: int = 4096
     # AWS Bedrock: platform-authenticated via the standard AWS credential chain (env vars,

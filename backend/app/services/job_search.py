@@ -23,6 +23,7 @@ from app.models.candidate_profile import CandidateProfile
 from app.schemas.candidate_profile import CandidateProfileSchema
 from app.services.matching import CandidateJobMatcher
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter
 import asyncio
 from app.observability.metrics import job_searches_total, jobs_found_total
 from app.schemas.job import (
@@ -199,7 +200,7 @@ async def search_jobs(
             candidate_model = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user_id))).scalar_one_or_none()
             if candidate_model:
                 candidate = CandidateProfileSchema.model_validate(candidate_model, from_attributes=True)
-                llm = LLMClient()
+                llm = LLMTaskRouter(LLMClient())
                 matcher = CandidateJobMatcher(llm)
 
                 async def _evaluate_job(j: Job) -> None:
@@ -504,3 +505,4 @@ async def analyze_job(
                 "python -m spacy download en_core_web_sm",
             ],
         )
+

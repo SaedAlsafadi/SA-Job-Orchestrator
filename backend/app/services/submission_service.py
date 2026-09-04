@@ -12,6 +12,7 @@ from app.models.job import Job
 from app.services.discovery_service import DiscoveryService
 from app.services.question_engine import QuestionEngine
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter
 from playwright.async_api import async_playwright
 
 logger = structlog.get_logger(__name__)
@@ -118,7 +119,7 @@ class SubmissionService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.discovery = DiscoveryService(db)
-        self.llm_client = LLMClient()
+        self.llm_client = LLMTaskRouter(LLMClient())
 
     async def _get_connector(self, url: str):
         if "lever" in url:
@@ -307,3 +308,4 @@ class SubmissionService:
             "confirmation": res["conf_msg"]
         }
         await self.db.commit()
+

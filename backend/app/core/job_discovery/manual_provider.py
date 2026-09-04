@@ -6,6 +6,7 @@ from datetime import datetime, UTC
 
 from app.core.job_discovery.opportunity_source import UserFedOpportunitySource
 from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.core.llm.prompts.opportunity_extraction import OPPORTUNITY_EXTRACTION_PROMPT
 
 class ManualProvider(UserFedOpportunitySource):
@@ -17,8 +18,9 @@ class ManualProvider(UserFedOpportunitySource):
 
     async def ingest(self, input_text: str, **kwargs) -> Dict[str, Any]:
         """Use LLM to extract JSON from unstructured text."""
-        client = LLMClient()
+        client = LLMTaskRouter(LLMClient())
         response = await client.complete(
+            task=LLMTask.JOB_NORMALIZATION,
             system_prompt=OPPORTUNITY_EXTRACTION_PROMPT,
             prompt=f"Raw text:\n\n{input_text}",
             temperature=0.0
@@ -72,3 +74,4 @@ class ManualProvider(UserFedOpportunitySource):
             "raw_text": raw_data.get("_raw_text", ""),
             "received_at": datetime.fromisoformat(raw_data.get("_received_at")) if raw_data.get("_received_at") else datetime.now(UTC)
         }
+

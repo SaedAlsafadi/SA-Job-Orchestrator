@@ -105,14 +105,18 @@ class LLMClient:
 
     def _get_model_chain(self, model: str | None) -> list[str]:
         """Return the ordered list of models to try (primary + fallbacks)."""
-        # BYO-key: use only the user's preferred model (their key won't work cross-provider).
+        # Explicit model provided by task router: do not fallback to unrelated models
+        if model is not None:
+            return [model]
+            
+        # BYO-key: use only the user's preferred model
         if self._credentials is not None:
-            return [model or self._credentials.default_model]
-        primary = model or self._llm.default_model
-        # Bedrock is platform-authenticated (AWS creds) — cross-provider fallbacks like
-        # ``groq/anthropic.claude-...`` would be nonsense, so route Bedrock straight through.
+            return [self._credentials.default_model]
+            
+        primary = self._llm.default_model
         if primary.startswith("bedrock/"):
             return [primary]
+            
         fallbacks = [
             f"{provider}/{primary.split('/')[-1]}"
             for provider in self._llm.fallback_providers

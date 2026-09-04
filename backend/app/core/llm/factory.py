@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.llm.client import LLMClient, ResolvedLLMCredentials
+from app.core.llm.router import LLMTaskRouter
 from app.core.secrets import CredentialStore
 from app.models.user_llm_config import UserLLMConfig
 
@@ -37,3 +38,9 @@ async def build_llm_client_for_user(
         ),
         user_id=user_id,
     )
+
+
+async def build_llm_router_for_user(db: AsyncSession, user_id: str, credential_store: CredentialStore | None = None) -> LLMTaskRouter:
+    client = await build_llm_client_for_user(db, user_id, credential_store)
+    return LLMTaskRouter(client)
+
