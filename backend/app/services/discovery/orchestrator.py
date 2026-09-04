@@ -224,7 +224,7 @@ class DiscoveryOrchestrator:
                     skip(chash, "failed eligibility check: " + ", ".join(eval_result.eligibility.reasons))
                     continue
                     
-                score = eval_result.match_score or 0
+                score = eval_result.total_score or 0
                 if score >= profile.minimum_match_score:
                     matched_jobs.append((chash, norm, score, eval_result))
                     stats["shortlisted"] += 1
@@ -369,5 +369,6 @@ class DiscoveryOrchestrator:
             
         await self.db.commit()
         return job
+
 
 

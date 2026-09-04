@@ -1,9 +1,5 @@
 ﻿import type { PaginatedResponse } from './api';
 
-/**
- * A single job listing from any platform.
- * Corresponds to the backend `JobListingResponse` Pydantic schema.
- */
 export interface Job {
   id: string;
   platform: string;
@@ -25,10 +21,8 @@ export interface Job {
   updated_at: string;
 }
 
-/** Alias matching the backend schema name `JobListingResponse`. */
 export type JobListingResponse = Job;
 
-/** Request body for multi-platform job search. */
 export interface JobSearchRequest {
   query: string;
   location?: string;
@@ -37,23 +31,7 @@ export interface JobSearchRequest {
   limit?: number;
 }
 
-/** Paginated list of job listings. */
 export type JobListResponse = PaginatedResponse<Job>;
-
-/** Response from the job analysis endpoint. */
-export interface MatchEvidence {
-  evidence_id: string;
-  description: string;
-}
-
-export interface MatchFeatures {
-  skills_score: number;
-  experience_score: number;
-  role_alignment_score: number;
-  location_work_model_score: number;
-  education_language_score: number;
-  ats_score: number;
-}
 
 export interface EligibilityResult {
   is_eligible: boolean;
@@ -70,20 +48,52 @@ export interface MatchProvenance {
   ats_method: string;
 }
 
+export type RequirementStatus = "MATCH" | "PARTIAL" | "GAP" | "UNKNOWN";
+export type RequirementImportance = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+
+export interface RequirementAnalysis {
+  requirement_id: string;
+  original_text: string;
+  normalized_requirement: string;
+  category: string;
+  importance: RequirementImportance;
+  status: RequirementStatus;
+  evidence_ids: string[];
+  explanation: string;
+}
+
+export type DimensionStatus = "VALID_SCORE" | "UNKNOWN" | "INSUFFICIENT_DATA" | "NOT_APPLICABLE";
+
+export interface DimensionScore {
+  status: DimensionStatus;
+  score: number | null;
+  explanation: string | null;
+}
+
+export type MatchVerdict = "STRONG_MATCH" | "GOOD_MATCH" | "PARTIAL_MATCH" | "WEAK_MATCH" | "INSUFFICIENT_DATA";
+
+export interface MatchDimensions {
+  skills: DimensionScore;
+  experience: DimensionScore;
+  role_alignment: DimensionScore;
+}
+
 export interface CandidateMatchResult {
   eligibility: EligibilityResult;
-  match_score?: number;
-  deterministic_score?: number;
-  ats_score?: number;
-  llm_score?: number;
-  feature_scores?: MatchFeatures;
-  strengths: MatchEvidence[];
+  total_score: number | null;
+  verdict: MatchVerdict;
+  confidence: number;
+  data_quality: string;
+  data_quality_explanation: string | null;
+  explanation: string;
+  recommendation: string;
+  dimensions: MatchDimensions;
+  strong_matches: string[];
   gaps: string[];
   critical_gaps: string[];
-  recommendation: string;
+  blockers: string[];
+  requirement_analysis: RequirementAnalysis[];
   provenance: MatchProvenance;
 }
 
-/** Response from the job analysis endpoint. */
 export type JobAnalysisResponse = CandidateMatchResult;
-

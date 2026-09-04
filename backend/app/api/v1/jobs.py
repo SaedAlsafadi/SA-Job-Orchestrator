@@ -7,12 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser, get_tenant_db
 from app.config.constants import DEFAULT_PAGE_SIZE
 from app.core.ratelimit import rate_limit
-from app.schemas.job import (
-    JobAnalysisResponse,
-    JobListingResponse,
-    JobListResponse,
-    JobSearchRequest,
-)
+from app.schemas.job import JobListingResponse, JobListResponse, JobSearchRequest
+from app.schemas.matching import CandidateMatchResult
 from app.services import job_search as job_service
 
 logger = structlog.get_logger(__name__)
@@ -59,13 +55,13 @@ async def get_job(
 
 
 @router.post(
-    "/{job_id}/analyze", response_model=JobAnalysisResponse, summary="Analyze job-candidate match"
+    "/{job_id}/analyze", response_model=CandidateMatchResult, summary="Analyze job-candidate match"
 )
 async def analyze_job(
     job_id: str,
     resume_id: str | None = Query(default=None),
     db: AsyncSession = Depends(get_tenant_db),
-) -> JobAnalysisResponse:
+) -> CandidateMatchResult:
     """Analyze how well the candidate matches a job listing."""
     return await job_service.analyze_job(db, job_id, resume_id=resume_id)
 
@@ -77,3 +73,7 @@ async def delete_job(
 ) -> None:
     """Delete one of the current user's job listings and its applications."""
     await job_service.delete_job(db, job_id)
+
+
+
+

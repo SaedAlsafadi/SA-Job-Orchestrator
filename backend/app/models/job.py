@@ -33,6 +33,9 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     source_reference: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_source_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    is_normalized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    extraction_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    data_quality_flags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Job details
@@ -87,3 +90,4 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Job(id={self.id}, title='{self.title}', company='{self.company}')>"
+

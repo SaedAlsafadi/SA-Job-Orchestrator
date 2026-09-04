@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
 
 def generate_evidence_id(prefix: str) -> str:
     """Generate a stable short ID for evidence tracking."""
@@ -121,6 +121,8 @@ class Preferences(FlexibleModel):
     excluded_companies: list[str] = Field(default_factory=list)
 
 class CandidateProfileSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     """The master schema for validating a candidate profile."""
     identity: Identity = Field(default_factory=Identity)
     location: Location = Field(default_factory=Location)
@@ -229,4 +231,5 @@ class CandidateProfileDraft(BaseModel):
     projects: list[DraftProjectEntry] = Field(default_factory=list)
     certifications: list[DraftCertificationEntry] = Field(default_factory=list)
     languages: list[DraftValue[str]] = Field(default_factory=list)
+
 

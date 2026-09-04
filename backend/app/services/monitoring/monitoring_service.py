@@ -14,6 +14,7 @@ from app.models.enums import ApplicationStatus
 from app.services.discovery_service import DiscoveryService
 from app.services.eligibility import evaluate_eligibility
 from app.services.matching import CandidateJobMatcher
+from app.schemas.matching import CandidateMatchResult
 from app.core.llm.client import LLMClient
 from app.core.llm.router import LLMTaskRouter
 from app.schemas.candidate_profile import CandidateProfileSchema
@@ -224,4 +225,5 @@ class MonitoringService:
             "stats": stats,
             "error": run_record.error
         }
+
 

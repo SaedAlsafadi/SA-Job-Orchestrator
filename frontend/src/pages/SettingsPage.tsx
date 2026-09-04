@@ -193,7 +193,7 @@ export default function SettingsPage() {
   );
 }
 
-function SectionTitle({ icon, title, sub }: { icon: 'cpu' | 'briefcase' | 'key'; title: string; sub: string }) {
+function SectionTitle({ icon, title, sub }: { icon: 'cpu' | 'briefcase' | 'key' | 'smartphone'; title: string; sub: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
       <span style={{ display: 'grid', placeItems: 'center', width: 32, height: 32, borderRadius: 9, background: 'var(--accent-soft)', color: 'var(--accent)' }}><Icon name={icon} size={16} /></span>
@@ -213,3 +213,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
+
+

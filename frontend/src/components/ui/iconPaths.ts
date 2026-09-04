@@ -2,6 +2,8 @@
  *  Kept in its own module so Icon.tsx only exports the component (react-refresh clean). */
 
 export const ICON_PATHS = {
+  spinner: ['M12 2v4', 'M12 18v4', 'M4.93 4.93l2.83 2.83', 'M16.24 16.24l2.83 2.83', 'M2 12h4', 'M18 12h4', 'M4.93 19.07l2.83-2.83', 'M16.24 7.76l2.83-2.83'],
+  smartphone: ['M5 2h14a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z', 'M12 18h.01'],
   grid: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M14 14h6v6h-6z', 'M4 14h6v6H4z'],
   briefcase: ['M3.5 8.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z', 'M8.5 6.5v-1a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1', 'M3.5 12.5h17'],
   inbox: ['M21 12.5h-5l-1.5 2.5h-5L8 12.5H3', 'M6 5.5h12l3 6.5v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z'],
@@ -51,3 +53,4 @@ export const ICON_PATHS = {
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
+

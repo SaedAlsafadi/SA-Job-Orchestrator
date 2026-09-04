@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
+import React from 'react';
 
 import Icon from '@/components/ui/Icon';
-import { atsColor, atsPercent } from '@/lib/status';
-import type { Job, JobAnalysisResponse } from '@/types/job';
+import type { Job, JobAnalysisResponse, MatchVerdict } from '@/types/job';
 
 const PLAT_COLOR: Record<string, string> = {
   linkedin: 'var(--approved)', indeed: 'var(--interview)', glassdoor: 'var(--applied)', exa: 'var(--accent)',
@@ -18,12 +18,30 @@ interface JobDrawerProps {
   onGenerate: () => void;
 }
 
-/** Right-side job-detail drawer with the match breakdown + tailor action (design §JOB DRAWER). */
+const VERDICT_LABELS: Record<MatchVerdict, { label: string, color: string }> = {
+  STRONG_MATCH: { label: 'STRONG MATCH', color: 'var(--approved)' },
+  GOOD_MATCH: { label: 'GOOD MATCH', color: 'var(--accent)' },
+  PARTIAL_MATCH: { label: 'PARTIAL MATCH', color: 'var(--interview)' },
+  WEAK_MATCH: { label: 'WEAK MATCH', color: 'var(--rejected)' },
+  INSUFFICIENT_DATA: { label: 'INSUFFICIENT DATA', color: 'var(--text-3)' },
+};
+
+function Tag({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
+  return (
+    <span onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--border)', font: '500 11px/1.2 var(--font)', color: 'var(--text-2)' }}>
+      {children}
+    </span>
+  );
+}
+
 export default function JobDrawer({ job, analysis, analyzing, baseResumeId, generating, onClose, onGenerate }: JobDrawerProps) {
+  const [showDetailed, setShowDetailed] = React.useState(false);
   const paras = job.description.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
-  const match = analysis ? atsPercent(analysis.match_score) : job.match_score != null ? atsPercent(job.match_score) : null;
   const canGenerate = Boolean(baseResumeId) && !generating;
-  const generateHint = !baseResumeId ? 'Upload a résumé first' : undefined;
+  const generateHint = !baseResumeId ? 'Upload a resume first' : undefined;
+
+  const scoreDisplay = analysis?.total_score != null ? `${analysis.total_score}%` : 'Not enough information';
+  const verdictInfo = analysis ? VERDICT_LABELS[analysis.verdict] : null;
 
   return (
     <>
@@ -34,7 +52,7 @@ export default function JobDrawer({ job, analysis, analyzing, baseResumeId, gene
             <div style={{ font: '800 18px/1.2 var(--font)', letterSpacing: '-.02em' }}>{job.title}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, font: '500 12.5px/1 var(--font)', color: 'var(--text-3)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-2)' }}><Icon name="building" size={13} /> {job.company}</span>
-              <span style={{ color: 'var(--text-4)' }}>·</span>
+              <span style={{ color: 'var(--text-4)' }}>•</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Icon name="mappin" size={13} /> {job.location || (job.remote ? 'Remote' : '—')}</span>
             </div>
             <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 10 }}>
@@ -49,130 +67,126 @@ export default function JobDrawer({ job, analysis, analyzing, baseResumeId, gene
         <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {analyzing ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', font: '500 12.5px/1 var(--font)' }}>Analyzing match…</div>
-          ) : analysis ? (
+          ) : analysis && verdictInfo ? (
             <>
-                            {analysis.eligibility && !analysis.eligibility.is_eligible && (
-                <div style={{ background: 'var(--rejected-soft)', border: '1px solid var(--rejected)', borderRadius: 'var(--r-lg)', padding: 16, marginBottom: 16 }}>
-                  <h4 style={{ margin: '0 0 8px 0', color: 'var(--rejected)' }}>INELIGIBLE</h4>
+              {analysis.blockers && analysis.blockers.length > 0 && (
+                <div style={{ background: 'var(--rejected-soft)', border: '1px solid var(--rejected)', borderRadius: 'var(--r-lg)', padding: 16 }}>
+                  <h4 style={{ margin: '0 0 8px 0', color: 'var(--rejected)', display: 'flex', gap: 8, alignItems: 'center' }}><Icon name="alert" size={16} /> Potential blockers</h4>
                   <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-2)', fontSize: '13px' }}>
-                    {analysis.eligibility.reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                    {analysis.blockers.map((r: string, i: number) => <li key={i}>{r}</li>)}
                   </ul>
                 </div>
               )}
-              {analysis.recommendation && analysis.eligibility?.is_eligible && (
-                <div style={{ padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)' }}>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-2)' }}>AI Recommendation</span>
-                  <span style={{ fontWeight: 800, fontSize: 14, color: analysis.recommendation === 'apply' ? 'var(--approved)' : analysis.recommendation === 'review' ? 'var(--review)' : 'var(--rejected)', textTransform: 'uppercase' }}>{analysis.recommendation}</span>
+
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 18, color: verdictInfo.color }}>{verdictInfo.label}</h3>
+                    <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4 }}>{scoreDisplay}</div>
+                  </div>
+                  {analysis.data_quality !== 'HIGH' && (
+                    <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-3)', maxWidth: 150 }}>
+                      <span style={{ fontWeight: 600 }}>Source quality: {analysis.data_quality}</span>
+                      <div style={{ marginTop: 2 }}>{analysis.data_quality_explanation}</div>
+                    </div>
+                  )}
                 </div>
-              )}
-              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
-                <Ring pct={match ?? 0} />
-                <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  <Bar label="Skills" v={atsPercent(analysis.feature_scores?.skills_score || 0)} />
-                  <Bar label="Experience" v={atsPercent(analysis.feature_scores?.experience_score || 0)} />
-                  <Bar label="Role Alignment" v={atsPercent(analysis.feature_scores?.role_alignment_score || 0)} />
-                  <Bar label="ATS Keywords" v={atsPercent(analysis.feature_scores?.ats_score || 0)} />
+                
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: 13, color: 'var(--text-2)' }}>Why this is a {verdictInfo.label.toLowerCase()}</h4>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--text-2)' }}>{analysis.explanation}</p>
                 </div>
               </div>
-              {analysis.gaps && analysis.gaps.length > 0 && (
-                <Section title="Gaps">
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                    {analysis.gaps.map((m: string) => (
-                      <span key={m} style={{ padding: '5px 10px', borderRadius: 7, background: 'var(--rejected-soft)', color: 'var(--rejected)', font: '600 12px/1 var(--font)' }}>{m}</span>
-                    ))}
-                  </div>
-                </Section>
+
+              {analysis.strong_matches?.length > 0 && (
+                <div>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: 14, color: 'var(--text-1)' }}>Strong matches</h4>
+                  <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-2)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {analysis.strong_matches.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
               )}
-              {analysis.strengths && analysis.strengths.length > 0 && (
-                <Section title="Strengths">
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {analysis.strengths.map((s: any) => (
-                      <div key={s.evidence_id} style={{ display: 'flex', gap: 10, padding: '11px 12px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-                        <span style={{ flex: '0 0 auto', color: 'var(--accent)', marginTop: 1 }}><Icon name="sparkle" size={14} /></span>
-                        <span style={{ font: '500 12px/1.45 var(--font)', color: 'var(--text-2)' }}>{s.description} <br/><small style={{color:'var(--text-4)'}}>Evidence: {s.evidence_id}</small></span>
+
+              {(analysis.gaps?.length > 0 || analysis.critical_gaps?.length > 0) && (
+                <div>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: 14, color: 'var(--text-1)' }}>Gaps</h4>
+                  <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-2)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {analysis.critical_gaps?.map((g, i) => <li key={`c-${i}`} style={{color: 'var(--rejected)'}}><strong>Critical:</strong> {g}</li>)}
+                    {analysis.gaps?.map((g, i) => <li key={`g-${i}`}>△ {g}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h4 style={{ margin: 0, fontSize: 14, color: 'var(--text-1)' }}>Requirements</h4>
+                  <button 
+                    onClick={() => setShowDetailed(!showDetailed)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, padding: 0 }}
+                  >
+                    {showDetailed ? 'Hide detailed analysis' : 'View detailed analysis'}
+                  </button>
+                </div>
+                
+                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                  {analysis.requirement_analysis.filter(r => r.status === 'MATCH').length} of {analysis.requirement_analysis.length} supported
+                </div>
+
+                {showDetailed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                    {analysis.requirement_analysis.map(req => (
+                      <div key={req.requirement_id} style={{ padding: 12, borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <strong style={{ fontSize: 13, color: req.status === 'MATCH' ? 'var(--approved)' : req.status === 'PARTIAL' ? 'var(--interview)' : req.status === 'GAP' ? 'var(--rejected)' : 'var(--text-3)' }}>
+                            {req.status === 'MATCH' ? '✓ ' : req.status === 'PARTIAL' ? '— ' : req.status === 'GAP' ? '△ ' : '? '}
+                            {req.normalized_requirement}
+                          </strong>
+                          <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{req.importance}</span>
+                        </div>
+                        <p style={{ margin: '4px 0', fontSize: 12, color: 'var(--text-2)' }}>{req.explanation}</p>
+                        {req.evidence_ids?.length > 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
+                            <strong>Evidence:</strong> {req.evidence_ids.join(', ')}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </Section>
-              )}
-              
+                )}
+              </div>
             </>
           ) : (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', font: '500 12.5px/1 var(--font)' }}>No match analysis yet.</div>
           )}
-          {paras.length > 0 && (
-            <Section title="Description">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {paras.map((p, i) => <p key={i} style={{ margin: 0, font: '500 12.5px/1.6 var(--font)', color: 'var(--text-2)' }}>{p}</p>)}
-              </div>
-            </Section>
-          )}
+
+          <div>
+            <h3 style={{ margin: '0 0 12px 0', font: '600 14.5px/1.2 var(--font)', color: 'var(--text-1)' }}>Description</h3>
+            <div style={{ font: '400 13px/1.65 var(--font)', color: 'var(--text-2)' }}>
+              {paras.map((p, i) => <p key={i} style={{ margin: '0 0 1em 0' }}>{p}</p>)}
+            </div>
+          </div>
         </div>
 
-        <div style={{ flex: '0 0 auto', display: 'flex', gap: 9, padding: '16px 22px', borderTop: '1px solid var(--border)' }}>
-          <button
-            onClick={() => { if (!canGenerate) return; onGenerate(); }}
-            aria-disabled={!canGenerate}
-            aria-describedby={generateHint ? 'drawer-generate-hint' : undefined}
-            title={generateHint}
-            style={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 'var(--r-md)', background: canGenerate ? 'var(--accent)' : 'var(--surface-2)', border: canGenerate ? '0' : '1px solid var(--border)', color: canGenerate ? 'var(--accent-ink)' : 'var(--text-4)', font: '700 13px/1 var(--font)', cursor: canGenerate ? 'pointer' : 'not-allowed' }}>
-            <Icon name="sparkle" size={14} /> {generating ? 'Generating…' : 'Generate tailored résumé'}
-          </button>
-          {generateHint && (
-            <span id="drawer-generate-hint" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
-              {generateHint}
-            </span>
-          )}
-          <a href={job.url} target="_blank" rel="noreferrer" style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 7, height: 44, padding: '0 16px', borderRadius: 'var(--r-md)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-2)', font: '700 13px/1 var(--font)', textDecoration: 'none' }}>
-            <Icon name="ext" size={14} /> View posting
+        <div style={{ flex: '0 0 auto', padding: '16px 22px', borderTop: '1px solid var(--border)', display: 'flex', gap: 12, background: 'var(--surface)' }}>
+          <a href={job.url} target="_blank" rel="noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px', height: 40, borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', font: '500 13.5px/1 var(--font)', textDecoration: 'none' }}>
+            <Icon name="ext" size={15} /> Original Post
           </a>
+          {analysis && analysis.recommendation !== 'skip' && (
+            <button
+              onClick={onGenerate}
+              disabled={!canGenerate}
+              title={generateHint}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px', height: 40, borderRadius: 'var(--r-md)', border: 'none', background: 'var(--accent)', color: '#fff', font: '600 13.5px/1 var(--font)', cursor: canGenerate ? 'pointer' : 'not-allowed', opacity: canGenerate ? 1 : 0.6 }}
+            >
+              {generating ? <span className="spin" style={{display: 'flex'}}><Icon name="spinner" size={16} /></span> : <Icon name="sparkle" size={16} />}
+              {generating ? 'Tailoring...' : 'Tailor Resume'}
+            </button>
+          )}
         </div>
       </aside>
     </>
   );
 }
 
-function Ring({ pct }: { pct: number }) {
-  const r = 34;
-  const c = 2 * Math.PI * r;
-  const color = atsColor(pct);
-  return (
-    <div style={{ position: 'relative', width: 76, height: 76, flex: '0 0 auto' }}>
-      <svg viewBox="0 0 76 76" style={{ width: 76, height: 76, transform: 'rotate(-90deg)' }}>
-        <circle cx={38} cy={38} r={r} fill="none" stroke="var(--surface-3)" strokeWidth={6} />
-        <circle cx={38} cy={38} r={r} fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} />
-      </svg>
-      <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ font: '800 20px/1 var(--mono)', color }}>{pct}</span>
-        <span style={{ font: '600 8px/1 var(--mono)', color: 'var(--text-4)', marginTop: 2 }}>MATCH</span>
-      </span>
-    </div>
-  );
-}
 
-function Bar({ label, v }: { label: string; v: number }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-        <span style={{ font: '600 11px/1 var(--font)', color: 'var(--text-2)' }}>{label}</span>
-        <span style={{ font: '700 11px/1 var(--mono)', color: 'var(--text)' }}>{v}</span>
-      </div>
-      <div style={{ height: 5, borderRadius: 3, background: 'var(--surface-3)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${v}%`, background: atsColor(v), borderRadius: 3 }} />
-      </div>
-    </div>
-  );
-}
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div>
-      <div style={{ font: '700 12.5px/1 var(--font)', marginBottom: 9 }}>{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function Tag({ children }: { children: ReactNode }) {
-  return <span style={{ padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--border)', font: '600 11px/1 var(--font)', color: 'var(--text-3)' }}>{children}</span>;
-}
