@@ -14,6 +14,7 @@ export interface Resume {
   ats_score: number | null;
   created_at: string;
   updated_at: string;
+  content_text?: string | null;
 }
 
 /** Alias matching the backend schema name `ResumeResponse`. */

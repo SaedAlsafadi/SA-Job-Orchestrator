@@ -6,9 +6,11 @@ export type Density = 'comfortable' | 'compact';
 
 interface UiState {
   theme: Theme;
+  language: string;
   density: Density;
   sidebarCollapsed: boolean;
   paletteOpen: boolean;
+  setLanguage: (lang: string) => void;
   toggleTheme: () => void;
   toggleDensity: () => void;
   toggleSidebar: () => void;
@@ -21,6 +23,7 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       theme: 'dark',
+      language: 'en',
       density: 'comfortable',
       sidebarCollapsed: false,
       paletteOpen: false,
@@ -30,8 +33,9 @@ export const useUiStore = create<UiState>()(
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebar: (v) => set({ sidebarCollapsed: v }),
       setPaletteOpen: (v) => set({ paletteOpen: v }),
+      setLanguage: (lang) => set({ language: lang }),
     }),
-    { name: 'autoapply-ui', partialize: (s) => ({ theme: s.theme, density: s.density, sidebarCollapsed: s.sidebarCollapsed }) },
+    { name: 'autoapply-ui', partialize: (s) => ({ theme: s.theme, density: s.density, sidebarCollapsed: s.sidebarCollapsed, language: s.language }) },
   ),
 );
 
@@ -52,3 +56,4 @@ if (typeof document !== 'undefined') {
   sync();
   useUiStore.subscribe(sync);
 }
+

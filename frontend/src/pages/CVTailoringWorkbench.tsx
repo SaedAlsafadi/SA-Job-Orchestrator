@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tailoringService, CVTailoringSession, CVTailoringChange } from '../services/tailoringService';
-import { jobService } from '../services/jobService';
-import { resumeService } from '../services/resumeService';
-import { Job, Resume } from '../types';
+import { getJob } from '../services/jobService';
+import { getResume } from '../services/resumeService';
+import type { Job } from '../types/job';
+import type { Resume } from '../types/resume';
 import { ChangeCard } from '../components/tailoring/ChangeCard';
 import { ResumePreview } from '../components/tailoring/ResumePreview';
+import { useTranslation } from 'react-i18next';
 
 export const CVTailoringWorkbench: React.FC = () => {
     const { sessionId } = useParams<{ sessionId: string }>();
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const [session, setSession] = useState<CVTailoringSession | null>(null);
     const [job, setJob] = useState<Job | null>(null);
@@ -35,8 +38,8 @@ export const CVTailoringWorkbench: React.FC = () => {
             setSession(s);
             
             const [j, r] = await Promise.all([
-                jobService.getJob(s.job_id),
-                resumeService.getResume(s.base_resume_id)
+                getJob(s.job_id),
+                getResume(s.base_resume_id)
             ]);
             setJob(j);
             setBaseResume(r);
@@ -215,9 +218,9 @@ export const CVTailoringWorkbench: React.FC = () => {
                 
                 <div className="p-4 border-t bg-gray-50">
                     <div className="text-xs mb-2 text-gray-600">
-                        Accepted: {session.changes.filter(c => c.user_decision === 'accepted').length} | 
-                        Rejected: {session.changes.filter(c => c.user_decision === 'rejected').length} | 
-                        Pending: {pendingCount}
+                        {t('accepted')}: {session.changes.filter(c => c.user_decision === 'accepted').length} | 
+                        {t('rejected')}: {session.changes.filter(c => c.user_decision === 'rejected').length} | 
+                        {t('pending')}: {pendingCount}
                     </div>
                     
                     {session.status === 'verified' ? (
@@ -239,11 +242,15 @@ export const CVTailoringWorkbench: React.FC = () => {
                         </button>
                     )}
                     
-                    {pendingCount > 0 && <p className="text-xs text-red-500 mt-2">Must resolve all pending changes to finalize.</p>}
+                    {pendingCount > 0 && <p className="text-xs text-red-500 mt-2">{t('must_resolve_all')}</p>}
                 </div>
             </div>
         </div>
     );
 };
+
+
+
+
 
 

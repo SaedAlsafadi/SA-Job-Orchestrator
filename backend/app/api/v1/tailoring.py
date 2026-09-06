@@ -1,5 +1,5 @@
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/tailoring", tags=["tailoring"])
 async def api_start_tailoring(
     req: CVTailoringStartRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    accept_language: str = Header(default="en")
 ):
     llm_router = await build_llm_router_for_user(db, user.id)
     try:
@@ -122,12 +123,14 @@ async def api_revise_change(
     session_id: str,
     req: CVTailoringReviseRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    accept_language: str = Header(default="en")
 ):
     llm_router = await build_llm_router_for_user(db, user.id)
     try:
-        new_change = await revise_change(db, user.id, session_id, req.change_id, req.instructions, llm_router)
+        new_change = await revise_change(db, user.id, session_id, req.change_id, req.instructions, llm_router, accept_language.split(',')[0].split('-')[0])
         return new_change
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
 

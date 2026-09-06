@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Icon from '@/components/ui/Icon';
 import { useUiStore } from '@/store/useUiStore';
 import { useDashboardStats } from '@/hooks/useAnalytics';
+import { useTranslation } from 'react-i18next';
 
 const CRUMB: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -15,12 +16,14 @@ const CRUMB: Record<string, string> = {
 };
 
 export default function Header() {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const { data: stats } = useDashboardStats();
   const current = CRUMB[pathname] ?? 'AutoApply AI';
   const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform ?? '');
+  const { i18n } = useTranslation();
 
   return (
     <header
@@ -42,7 +45,7 @@ export default function Header() {
       </button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-        <span style={{ font: '600 12.5px/1 var(--font)', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Workspace</span>
+        <span style={{ font: '600 12.5px/1 var(--font)', color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('workspace')}</span>
         <span style={{ color: 'var(--text-4)', display: 'grid', placeItems: 'center' }}><Icon name="chevR" size={13} /></span>
         <span style={{ font: '700 14px/1 var(--font)', color: 'var(--text)', whiteSpace: 'nowrap', letterSpacing: '-.015em' }}>{current}</span>
       </div>
@@ -68,6 +71,13 @@ export default function Header() {
         </span>
       </button>
 
+      <div className="flex items-center gap-4">
+        {/* Language Switcher */}
+        <div className="flex bg-gray-800 rounded text-sm font-medium overflow-hidden border border-gray-700">
+          <button onClick={() => { i18n.changeLanguage('ar'); useUiStore.getState().setLanguage('ar'); }} style={{ cursor: 'pointer', padding: '4px', fontWeight: i18n.language === 'ar' ? 'bold' : 'normal', background: i18n.language === 'ar' ? '#fff' : 'transparent', color: i18n.language === 'ar' ? '#000' : '#fff' }}>عربي</button>
+          <button onClick={() => { i18n.changeLanguage('en'); useUiStore.getState().setLanguage('en'); }} style={{ cursor: 'pointer', padding: '4px', fontWeight: i18n.language === 'en' ? 'bold' : 'normal', background: i18n.language === 'en' ? '#fff' : 'transparent', color: i18n.language === 'en' ? '#000' : '#fff' }}>EN</button>
+        </div>
+      </div>
       {stats && (
         <div
           title="Month-to-date LLM cost"
@@ -81,3 +91,6 @@ export default function Header() {
     </header>
   );
 }
+
+
+

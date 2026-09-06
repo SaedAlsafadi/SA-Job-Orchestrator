@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import Icon, { type IconName } from '@/components/ui/Icon';
@@ -8,11 +9,11 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { statusMeta, atsColor, atsPercent, isApprovable, relativeTime } from '@/lib/status';
 import type { Application } from '@/types/application';
 
-function greeting(): string {
+function greeting(t: any): string {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return t('good_morning');
+  if (h < 18) return t('good_afternoon');
+  return t('good_evening');
 }
 
 function firstName(name?: string | null, email?: string): string {
@@ -25,6 +26,7 @@ const card: React.CSSProperties = {
 };
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const notify = useAppStore((s) => s.showNotification);
@@ -57,7 +59,7 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 22 }}>
         <div>
           <h1 style={{ margin: 0, font: '800 25px/1.1 var(--font)', letterSpacing: '-.03em' }}>
-            {greeting()}, {firstName(user?.full_name, user?.email)}
+            {greeting(t)}, {firstName(user?.full_name, user?.email)}
           </h1>
           <p style={{ margin: '7px 0 0', font: '500 13.5px/1.4 var(--font)', color: 'var(--text-3)' }}>
             Your agent applied to <span style={{ color: 'var(--applied)', fontWeight: 700 }}>{fmt(stats?.applications_applied)} {stats?.applications_applied === 1 ? 'role' : 'roles'}</span> and flagged{' '}
@@ -126,7 +128,7 @@ export default function DashboardPage() {
       <div style={{ ...card, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ font: '700 14px/1 var(--font)', letterSpacing: '-.01em' }}>Application pipeline</span>
+            <span style={{ font: '700 14px/1 var(--font)', letterSpacing: '-.01em' }}>{t('application_pipeline')}</span>
             <span style={{ font: '600 11px/1 var(--mono)', color: 'var(--text-4)' }}>{apps ? apps.total : ''}</span>
           </div>
           <button
@@ -188,7 +190,7 @@ export default function DashboardPage() {
                       <td style={{ padding: '0 16px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 22, padding: '0 9px', borderRadius: 999, background: sm.soft, color: sm.color, font: '700 11px/1 var(--font)' }}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: sm.color }} />
-                          {sm.label}
+                          {t('status_' + a.status)}
                         </span>
                       </td>
                       <td style={{ padding: '0 16px', textAlign: 'center' }}>

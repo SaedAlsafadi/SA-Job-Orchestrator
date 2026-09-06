@@ -22,6 +22,7 @@ async def start_tailoring_session(
     base_resume_id: str,
     router: LLMTaskRouter,
     candidate_profile_version: str | None = None,
+    language: str = "en",
 ) -> CVTailoringSession:
     """Start a new CV tailoring session."""
     
@@ -49,9 +50,11 @@ async def start_tailoring_session(
     await db.flush()
     
     # 2. AI Pass 1: Tailor
-    system_prompt_tailor = """
+    system_prompt_tailor = f"""
 You are a CV Tailoring engine. Your job is to propose discrete changes to a candidate's CV to better match the given job.
 DO NOT INVENT FACTS. Each change MUST be supported by candidate evidence.
+
+ALL proposed texts and reasons MUST be written in {language}.
 """
     
     prompt_tailor = f"JOB:\n{job.title} - {job.description}\n\nCV:\n{resume.content_text}\n"
@@ -246,7 +249,8 @@ async def revise_change(
     session_id: str,
     change_id: str,
     instruction: str,
-    router: LLMTaskRouter
+    router: LLMTaskRouter,
+    language: str = "en",
 ) -> CVTailoringChange:
     """Revise a specific change with instructions."""
     # Fetch session and change
@@ -273,13 +277,15 @@ async def revise_change(
         raise ValueError("Source documents missing")
         
     # 1. AI Pass 1: Revise Tailor
-    system_prompt_revise = """
+    system_prompt_revise = f"""
 You are a CV Tailoring engine revising a specific proposal.
 USER INSTRUCTION: {instruction}
 
 You must output exactly ONE proposed change that updates or replaces the previous proposal.
 DO NOT INVENT FACTS.
-""".replace("{instruction}", instruction)
+
+ALL proposed texts and reasons MUST be written in {language}.
+"""
     
     prompt_revise = f"JOB:\n{job.description}\n\nORIGINAL CV:\n{base_resume.content_text}\n\nPREVIOUS PROPOSAL:\nTarget: {change.target_reference}\nOriginal Text: {change.original_text}\nProposed Text: {change.proposed_text}\nReason: {change.reason}"
     

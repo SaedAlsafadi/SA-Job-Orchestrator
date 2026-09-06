@@ -34,7 +34,7 @@ class CandidateJobMatcher:
             "ats_score": 0.0
         }
 
-    async def match_candidate(self, candidate: CandidateProfileSchema, job: Job) -> CandidateMatchResult:
+    async def match_candidate(self, candidate: CandidateProfileSchema, job: Job, language: str = "en") -> CandidateMatchResult:
         """Evaluate candidate suitability for a job using Explainable Match Intelligence V2."""
         
         # 0. Normalization
@@ -64,6 +64,7 @@ class CandidateJobMatcher:
             "3. For requirement analysis, use exact evidence_ids from the Candidate Profile JSON. DO NOT invent evidence_ids.\n"
             "4. Your explanation should be a concise 2-4 sentences explaining why the match is good/bad/uncertain, grounded strictly in evidence.\n"
             "5. The total score (0-100) should ONLY reflect confidence in the match; if data is severely missing, leave score as null/none.\n"
+            f"6. Your text explanations, requirements analysis, strengths, gaps, and recommendations MUST be written in {language}.\n"
         )
         
         candidate_json = candidate.model_dump(exclude={"preferences", "identity"})
@@ -144,4 +145,5 @@ class CandidateJobMatcher:
             requirement_analysis=llm_result.requirement_analysis,
             provenance=prov
         )
+
 

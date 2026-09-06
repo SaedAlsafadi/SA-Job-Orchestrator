@@ -1,5 +1,5 @@
 import api from './api';
-import { Resume } from '../types';
+import type { Resume } from '../types/resume';
 
 export interface CVTailoringChange {
     change_id: string;
@@ -56,5 +56,7 @@ export const tailoringService = {
         return response.data;
     }
 };
+
+
 
 

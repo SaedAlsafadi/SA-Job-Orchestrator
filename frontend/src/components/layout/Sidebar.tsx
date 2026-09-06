@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
@@ -16,14 +17,14 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'grid' },
-  { to: '/profile', label: 'Candidate Profile', icon: 'user' },
-  { to: '/workflow', label: 'Prepare Application', icon: 'activity' },
-  { to: '/jobs', label: 'Jobs', icon: 'briefcase' },
-  { to: '/applications', label: 'Applications', icon: 'inbox' },
-  { to: '/resumes', label: 'Résumés', icon: 'file' },
-  { to: '/analytics', label: 'Insights', icon: 'chart' },
-  { to: '/settings', label: 'Settings', icon: 'sliders' },
+  { to: '/dashboard', label: 'dashboard', icon: 'grid' },
+  { to: '/profile', label: 'candidate_profile', icon: 'user' },
+  { to: '/workflow', label: 'prepare_application', icon: 'activity' },
+  { to: '/jobs', label: 'jobs', icon: 'briefcase' },
+  { to: '/applications', label: 'applications', icon: 'inbox' },
+  { to: '/resumes', label: 'resumes', icon: 'file' },
+  { to: '/analytics', label: 'insights', icon: 'chart' },
+  { to: '/settings', label: 'settings', icon: 'sliders' },
 ];
 
 function initials(name?: string | null, email?: string): string {
@@ -35,6 +36,7 @@ function initials(name?: string | null, email?: string): string {
 }
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const theme = useUiStore((s) => s.theme);
@@ -102,8 +104,8 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            title={item.label}
-            aria-label={item.label}
+            title={t(item.label)}
+            aria-label={t(item.label)}
             style={({ isActive }) => ({
               position: 'relative',
               display: 'flex',
@@ -131,7 +133,7 @@ export default function Sidebar() {
                 </span>
                 {expanded && (
                   <span style={{ flex: '1 1 auto', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {item.label}
+                    {t(item.label)}
                   </span>
                 )}
               </>
