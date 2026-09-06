@@ -23,8 +23,15 @@ import { RequireSuperuser } from '@/components/auth/RequireSuperuser';
 import { PublicOnly } from '@/components/auth/PublicOnly';
 import { CandidateProfilePage } from '@/pages/CandidateProfilePage';
 import { ApplicationWorkflow } from '@/pages/ApplicationWorkflow';
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 function App() {
+  const { i18n } = useTranslation();
+  useEffect(() => {
+    document.documentElement.dir = i18n.dir();
+    document.documentElement.lang = i18n.language;
+  }, [i18n.language]);
   return (
     <>
       <OfflineBanner />
@@ -63,6 +70,7 @@ function App() {
 }
 
 export default App;
+
 
 
 

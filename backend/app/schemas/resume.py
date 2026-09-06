@@ -67,6 +67,7 @@ class ResumeResponse(BaseModel):
     ats_score: float | None = None
     created_at: datetime
     updated_at: datetime
+    content_text: str | None = None
 
     @model_validator(mode="before")
     @classmethod

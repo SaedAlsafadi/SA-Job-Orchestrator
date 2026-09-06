@@ -8,6 +8,7 @@ import '@/store/useUiStore'; // side effect: applies theme/density to <html>
 import App from './App';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { AuthProvider } from '@/context/AuthProvider';
+import './i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,3 +38,4 @@ ReactDOM.createRoot(rootElement).render(
     </ErrorBoundary>
   </React.StrictMode>,
 );
+

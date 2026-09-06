@@ -1,7 +1,7 @@
 """Job listing API routes."""
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_tenant_db
@@ -60,10 +60,12 @@ async def get_job(
 async def analyze_job(
     job_id: str,
     resume_id: str | None = Query(default=None),
+    accept_language: str = Header(default="en"),
     db: AsyncSession = Depends(get_tenant_db),
 ) -> CandidateMatchResult:
     """Analyze how well the candidate matches a job listing."""
-    return await job_service.analyze_job(db, job_id, resume_id=resume_id)
+    lang = accept_language.split(',')[0].split('-')[0]
+    return await job_service.analyze_job(db, job_id, resume_id=resume_id, language=lang)
 
 
 @router.delete("/{job_id}", status_code=204, summary="Delete a job")
@@ -73,6 +75,7 @@ async def delete_job(
 ) -> None:
     """Delete one of the current user's job listings and its applications."""
     await job_service.delete_job(db, job_id)
+
 
 
 

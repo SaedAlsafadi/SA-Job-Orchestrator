@@ -399,12 +399,13 @@ async def analyze_job(
     router = await build_llm_router_for_user(db, job.user_id)
     matcher = CandidateJobMatcher(router)
     
-    result = await matcher.match_candidate(schema, job)
+    result = await matcher.match_candidate(schema, job, language=language)
     
     # Save score to DB
     job.match_score = result.total_score
     await db.commit()
     
     return result
+
 
 

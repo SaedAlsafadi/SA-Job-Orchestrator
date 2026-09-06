@@ -72,3 +72,10 @@ export async function downloadResumeFile(
     URL.revokeObjectURL(url);
   }
 }
+
+/** Get a single resume by ID. */
+export async function getResume(resumeId: string): Promise<Resume> {
+  const { data } = await api.get<Resume>(`/resumes/${resumeId}`);
+  return data;
+}
+

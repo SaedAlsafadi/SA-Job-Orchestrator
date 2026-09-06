@@ -1,3 +1,4 @@
+import { tailoringService } from '../services/tailoringService';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -33,7 +34,6 @@ export default function JobSearchPage() {
   const analyze = useAnalyzeJob();
   const createApp = useCreateApplication();
   const generate = useGenerateResume();
-  const navigate = useNavigate();
   const [startingSession, setStartingSession] = useState(false);
 
   const [drawerJob, setDrawerJob] = useState<Job | null>(null);
@@ -271,6 +271,8 @@ function btn(kind: 'primary' | 'ghost'): React.CSSProperties {
     color: primary ? 'var(--accent-ink)' : 'var(--text-2)',
   };
 }
+
+
 
 
 

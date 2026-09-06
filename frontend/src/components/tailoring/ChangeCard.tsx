@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DiffViewer } from './DiffViewer';
 import { CVTailoringChange } from '../../services/tailoringService';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
     change: CVTailoringChange;
@@ -12,6 +13,7 @@ interface Props {
 export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevise }) => {
     const [isRevising, setIsRevising] = useState(false);
     const [instruction, setInstruction] = useState('');
+    const { t } = useTranslation();
 
     const handleReviseSubmit = () => {
         if (instruction.trim()) {
@@ -31,11 +33,11 @@ export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevi
                 <span className="font-bold uppercase text-xs text-gray-500">{change.change_type}</span>
                 
                 <div className="flex gap-2">
-                    {change.review_severity === 'warning' && <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-bold text-xs">WARNING</span>}
-                    {change.review_severity === 'blocked' && <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-xs">BLOCKED</span>}
+                    {change.review_severity === 'warning' && <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-bold text-xs">{t('warning')}</span>}
+                    {change.review_severity === 'blocked' && <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-xs">{t('blocked')}</span>}
                     {change.user_decision !== 'pending' && (
                         <span className={'px-2 py-0.5 rounded font-bold text-xs ' + (change.user_decision === 'accepted' ? 'text-green-700 bg-green-200' : 'text-red-700 bg-red-200')}>
-                            {change.user_decision.toUpperCase()}
+                            {t(change.user_decision).toUpperCase()}
                         </span>
                     )}
                 </div>
@@ -44,12 +46,12 @@ export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevi
             <DiffViewer change={change} />
             
             <div className="mt-3 text-sm text-gray-700">
-                <strong>Reason:</strong> {change.reason}
+                <strong>{t('reason')}</strong> {change.reason}
             </div>
             
             {change.review_severity !== 'safe' && (
                 <div className={'mt-2 text-xs p-2 rounded ' + (change.review_severity === 'blocked' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800')}>
-                    <strong>AI Review:</strong> {change.review_reason}
+                    <strong>{t('ai_review')}</strong> {change.review_reason}
                 </div>
             )}
             
@@ -104,4 +106,5 @@ export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevi
         </div>
     );
 };
+
 

@@ -1,4 +1,4 @@
-﻿import structlog
+import structlog
 from app.models.job import Job
 from app.core.llm.router import LLMTaskRouter, LLMTask
 from pydantic import BaseModel, Field
@@ -19,7 +19,8 @@ async def normalize_job_data(job: Job, router: LLMTaskRouter) -> Job:
         
     system_prompt = (
         "You are a data quality engine. Clean this raw job posting.\n"
-        "Remove aggregator boilerplate, duplicate headings, and unrelated text.\n"
+        "Remove aggregator boilerplate, duplicate headings, and unrelated text.\n" 
+        "If the posting is in Arabic or mixed, map job titles and core requirements to canonical English concepts for matching, but PRESERVE the original Arabic text in the description.\n"
         "Output strict JSON."
     )
     
@@ -52,3 +53,4 @@ async def normalize_job_data(job: Job, router: LLMTaskRouter) -> Job:
         job.is_normalized = True # mark as processed even if failed to avoid infinite retries
         
     return job
+

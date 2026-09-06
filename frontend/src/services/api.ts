@@ -1,6 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import type { ApiError } from '@/types/api';
 import { useAuthStore } from '@/store/useAuthStore';
+import i18n from '@/i18n';
 
 /** Pre-configured Axios instance pointing at the backend API. */
 const api = axios.create({
@@ -20,6 +21,7 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
+  config.headers['Accept-Language'] = i18n.language || 'en';
   return config;
 });
 
@@ -98,3 +100,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+
