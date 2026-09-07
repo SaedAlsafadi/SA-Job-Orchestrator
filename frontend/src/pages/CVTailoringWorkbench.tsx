@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tailoringService, CVTailoringSession, CVTailoringChange } from '../services/tailoringService';
+import { tailoringService, CVTailoringSession } from '../services/tailoringService';
 import { getJob } from '../services/jobService';
 import { getResume } from '../services/resumeService';
 import type { Job } from '../types/job';
@@ -54,7 +54,6 @@ export const CVTailoringWorkbench: React.FC = () => {
         if (!session) return;
         
         // Optimistic UI updates are banned. Wait for backend.
-        const originalChanges = [...session.changes];
         
         try {
             // But we do need to show a loading state for this card? 
@@ -137,7 +136,6 @@ export const CVTailoringWorkbench: React.FC = () => {
     });
 
     const pendingCount = session.changes.filter(c => c.user_decision === 'pending').length;
-    const blockedCount = session.changes.filter(c => c.user_decision === 'pending' && c.review_severity === 'blocked').length;
     const canFinalize = pendingCount === 0 && session.changes.every(c => !(c.user_decision === 'accepted' && c.review_severity === 'blocked'));
 
     return (

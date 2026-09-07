@@ -27,6 +27,11 @@ class ApplicationRoute(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     requires_human: Mapped[bool] = mapped_column(Boolean, default=False)
     is_preferred: Mapped[bool] = mapped_column(Boolean, default=False)
     resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    
+    # Override tracking
+    user_overridden: Mapped[bool] = mapped_column(Boolean, default=False)
+    overridden_by_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     job: Mapped["Job"] = relationship(back_populates="routes") # noqa: F821

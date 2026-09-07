@@ -44,6 +44,14 @@ class JobStatus(StrEnum):
     APPLIED = "applied"
     HIDDEN = "hidden"
 
+    # Processing states
+    RECEIVED = "received"
+    PROCESSING = "processing"
+    READY = "ready"
+    NEEDS_REVIEW = "needs_review"
+    FAILED = "failed"
+    DUPLICATE = "duplicate"
+
 
 class ApplyMode(StrEnum):
     """How an application is dispatched."""

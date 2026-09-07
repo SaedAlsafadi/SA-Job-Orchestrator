@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser, get_tenant_db
 from app.config.constants import DEFAULT_PAGE_SIZE
 from app.core.ratelimit import rate_limit
-from app.schemas.job import JobListingResponse, JobListResponse, JobSearchRequest
+from app.schemas.job import JobListingResponse, JobDetailResponse, JobListResponse, JobSearchRequest
 from app.schemas.matching import CandidateMatchResult
 from app.services import job_search as job_service
 
@@ -38,20 +38,21 @@ async def list_jobs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=100),
     status: str | None = Query(default=None),
+    source_type: str | None = Query(default=None),
     db: AsyncSession = Depends(get_tenant_db),
 ) -> JobListResponse:
     """List the current user's stored job listings with optional status filter."""
-    return await job_service.list_jobs(db, page, page_size, status)
+    return await job_service.list_jobs(db, page, page_size, status, source_type)
 
 
-@router.get("/{job_id}", response_model=JobListingResponse, summary="Get a single job")
+@router.get("/{job_id}", response_model=JobDetailResponse, summary="Get a single job")
 async def get_job(
     job_id: str,
     db: AsyncSession = Depends(get_tenant_db),
-) -> JobListingResponse:
+) -> JobDetailResponse:
     """Get one of the current user's job listings by ID. Returns 404 if not found."""
     job = await job_service.get_job(db, job_id)
-    return JobListingResponse.model_validate(job)
+    return JobDetailResponse.model_validate(job)
 
 
 @router.post(

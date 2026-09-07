@@ -6,7 +6,7 @@ import Icon from '@/components/ui/Icon';
 import JobDrawer from '@/components/jobs/JobDrawer';
 import { useJobs, useSearchJobs, useAnalyzeJob } from '@/hooks/useJobs';
 import { useCreateApplication } from '@/hooks/useApplications';
-import { useResumes, useGenerateResume } from '@/hooks/useResumes';
+import { useResumes } from '@/hooks/useResumes';
 import { useAppStore } from '@/store/useAppStore';
 import { atsColor, relativeTime } from '@/lib/status';
 import type { Job, JobAnalysisResponse } from '@/types/job';
@@ -33,12 +33,9 @@ export default function JobSearchPage() {
   const search = useSearchJobs();
   const analyze = useAnalyzeJob();
   const createApp = useCreateApplication();
-  const generate = useGenerateResume();
   const [startingSession, setStartingSession] = useState(false);
-
   const [drawerJob, setDrawerJob] = useState<Job | null>(null);
   const [analysis, setAnalysis] = useState<JobAnalysisResponse | null>(null);
-
   const jobs = data?.items ?? [];
   const resumes = resumeData?.items ?? [];
   const baseResumeId = resumes.find((r) => r.type === 'base')?.id ?? resumes[0]?.id ?? null;

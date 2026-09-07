@@ -410,11 +410,101 @@ async def prepare_application_run(ctx: dict, application_id: str):
         await run_application_preparation(run.id, app.id, job.url or '', async_session_factory, profile_data, resume_path or '')
 
 
+async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
+    from app.db.session import async_session_factory
+    from sqlalchemy import select
+    from app.models.job import Job
+    from app.models.enums import JobStatus
+    from datetime import datetime, UTC
+    
+    async with async_session_factory() as db:
+        job = (await db.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
+        if not job:
+            return
+            
+        try:
+            # 1. Choose Provider
+            if job.source_type == "url":
+                from app.core.job_discovery.url_provider import UrlProvider
+                provider = UrlProvider()
+                input_data = job.raw_text  # Will be the URL
+            else:
+                from app.core.job_discovery.manual_provider import ManualProvider
+                provider = ManualProvider()
+                input_data = job.raw_text
+                
+            # 2. Extract & Normalize
+            raw_data = await provider.ingest(input_data)
+            normalized = provider.normalize(raw_data)
+            
+            # 3. Update Job
+            job.title = normalized.get("title", "Unknown")
+            job.company = normalized.get("company", "Unknown")
+            job.description = normalized.get("description", "")
+            job.location = normalized.get("location", "")
+            job.url = normalized.get("url", "")
+            job.application_url = normalized.get("application_url", "")
+            job.requirements = normalized.get("requirements", "")
+            job.salary_range = normalized.get("salary_range")
+            job.remote = normalized.get("remote", False)
+            job.employment_type = normalized.get("employment_type")
+            job.raw_source_payload = raw_data
+            job.is_normalized = True
+            
+            from app.services.monitoring.utils import compute_content_hash
+            job.content_hash = compute_content_hash(normalized)
+            job.platform_job_id = job.content_hash
+            
+            # 4. Resolve Route
+            from app.services.application_route_resolver import ApplicationRouteResolver
+            resolver = ApplicationRouteResolver()
+            routes = await resolver.resolve(job)
+            for route in routes:
+                db.add(route)
+                
+            await db.commit()
+            
+            # 5. Matching & Eligibility (Phase 15 logic)
+            from app.services.job_search import analyze_job
+            try:
+                match_result = await analyze_job(db, job.id)
+                # Ensure the job's match result is stored in raw_data so the frontend can read it!
+                if job.raw_data is None:
+                    job.raw_data = {}
+                raw_data_copy = dict(job.raw_data)
+                raw_data_copy["match_result"] = match_result.model_dump()
+                job.raw_data = raw_data_copy
+                
+                # Copy to Job fields if needed
+                job.match_score = match_result.total_score
+            except Exception as match_err:
+                # If matching fails, we still want to save the normalized job
+                if job.raw_data is None:
+                    job.raw_data = {}
+                raw_data_copy = dict(job.raw_data)
+                raw_data_copy["match_error"] = str(match_err)
+                job.raw_data = raw_data_copy
+                
+            job.status = JobStatus.READY
+            await db.commit()
+            
+        except Exception as e:
+            job.status = JobStatus.FAILED
+            if job.raw_data is None:
+                job.raw_data = {}
+            # SQLAlchemy JSON arrays/dicts need to be reassigned to trigger mutation
+            raw_data_copy = dict(job.raw_data)
+            raw_data_copy["error"] = str(e)
+            job.raw_data = raw_data_copy
+            await db.commit()
+            raise e
+
+
 class WorkerSettings:
     """Arq worker configuration."""
 
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
-    functions: ClassVar = [apply_to_job, review_application_run, prepare_application_run]
+    functions: ClassVar = [apply_to_job, review_application_run, prepare_application_run, process_opportunity]
     cron_jobs: ClassVar = [
         cron(monitor_system_health, minute={0, 15, 30, 45}),
         cron(purge_deleted_accounts, hour={3}, minute={30}),  # daily 03:30

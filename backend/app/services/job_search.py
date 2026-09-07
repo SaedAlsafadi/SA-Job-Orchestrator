@@ -300,6 +300,7 @@ async def list_jobs(
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
     status: str | None = None,
+    source_type: str | None = None,
 ) -> JobListResponse:
     """List jobs with pagination and optional status filter.
 
@@ -317,6 +318,10 @@ async def list_jobs(
 
     query = select(Job)
     count_query = select(func.count(Job.id))
+
+    if source_type:
+        query = query.where(Job.source_type == source_type)
+        count_query = count_query.where(Job.source_type == source_type)
 
     if status:
         query = query.where(Job.status == status)
@@ -354,7 +359,8 @@ async def get_job(db: AsyncSession, job_id: str) -> Job:
     Raises:
         RecordNotFoundError: If job does not exist.
     """
-    result = await db.execute(select(Job).where(Job.id == job_id))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(select(Job).options(selectinload(Job.routes)).where(Job.id == job_id))
     job = result.scalar_one_or_none()
     if job is None:
         raise RecordNotFoundError("Job", job_id)
@@ -381,6 +387,7 @@ async def analyze_job(
     db: AsyncSession,
     job_id: str,
     resume_id: str | None = None,
+    language: str = "en",
 ) -> CandidateMatchResult:
     from app.models.candidate_profile import CandidateProfile
     from app.schemas.candidate_profile import CandidateProfileSchema

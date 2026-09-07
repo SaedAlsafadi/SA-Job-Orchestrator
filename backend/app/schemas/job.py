@@ -37,8 +37,19 @@ class JobListingResponse(BaseModel):
     match_score: float | None = None
     skills_required: dict | None = None
     status: str
+    
+    # Phase 18 fields
+    source_type: str | None = None
+    raw_data: dict | None = None
+    data_quality_flags: dict | None = None
+    detected_language: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class JobDetailResponse(JobListingResponse):
+    """Single job detail response — includes eagerly-loaded routes."""
+    routes: list[Any] | None = None
 
 
 class JobListResponse(BaseModel):

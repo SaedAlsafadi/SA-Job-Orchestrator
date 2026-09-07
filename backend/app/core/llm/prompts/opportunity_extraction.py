@@ -19,6 +19,7 @@ Extract the following fields:
 - "application_url": A direct URL to apply, if present (string).
 - "application_email": An email address to send the CV to, if present (string).
 - "application_instructions": Specific instructions (e.g., "Send CV with subject 'SWE Role'") (string).
+- "detected_language": "ARABIC", "ENGLISH", "MIXED", or "UNKNOWN" based on the text content (string).
 
 IMPORTANT:
 - Return ONLY raw JSON without any markdown formatting (no ```json).

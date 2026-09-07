@@ -1,15 +1,14 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CVTailoringWorkbench } from '../../../pages/CVTailoringWorkbench';
 import { tailoringService } from '../../../services/tailoringService';
-import { jobService } from '../../../services/jobService';
-import { resumeService } from '../../../services/resumeService';
+import { getJob } from '../../../services/jobService';
+import { getResume } from '../../../services/resumeService';
 
 vi.mock('../../../services/tailoringService', () => ({ tailoringService: { getSession: vi.fn(), submitDecisions: vi.fn(), finalizeSession: vi.fn(), reviseChange: vi.fn() } }));
-vi.mock('../../../services/jobService', () => ({ jobService: { getJob: vi.fn() } }));
-vi.mock('../../../services/resumeService', () => ({ resumeService: { getResume: vi.fn() } }));
+vi.mock('../../../services/jobService', () => ({ getJob: vi.fn() }));
+vi.mock('../../../services/resumeService', () => ({ getResume: vi.fn() }));
 
 const mockSession = {
     id: 'sess-123',
