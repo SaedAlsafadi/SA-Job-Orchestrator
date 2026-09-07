@@ -67,6 +67,7 @@ class ManualProvider(UserFedOpportunitySource):
             "salary_range": raw_data.get("salary_range"),
             "remote": raw_data.get("remote") or False,
             "employment_type": raw_data.get("employment_type"),
+            "detected_language": raw_data.get("detected_language") or "UNKNOWN",
             "url": raw_data.get("application_url") or "", # Fallback URL
             "application_url": raw_data.get("application_url"),
             # We also pass through the raw data so the RouteResolver can use instructions/email
