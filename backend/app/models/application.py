@@ -115,6 +115,13 @@ class ApplicationApproval(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base
     candidate_profile_version: Mapped[int] = mapped_column(nullable=False)
     platform: Mapped[str] = mapped_column(String(100), nullable=False)
     
+    # Phase 19: package binding. When set, this approval authorizes ONLY the exact
+    # package version identified by (package_id, package_hash). A changed component
+    # produces a new package hash, which this approval can never match.
+    package_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    package_version: Mapped[int | None] = mapped_column(nullable=True)
+    package_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     

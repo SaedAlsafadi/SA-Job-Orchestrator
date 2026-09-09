@@ -57,7 +57,12 @@ DO NOT INVENT FACTS. Each change MUST be supported by candidate evidence.
 ALL proposed texts and reasons MUST be written in {language}.
 """
     
-    prompt_tailor = f"JOB:\n{job.title} - {job.description}\n\nCV:\n{resume.content_text}\n"
+    from app.services.resume_text import normalize_resume_text
+
+    prompt_tailor = (
+        f"JOB:\n{job.title} - {job.description}\n\n"
+        f"CV:\n{normalize_resume_text(resume.content_text or '')}\n"
+    )
     
     try:
         tailor_result = await router.complete_with_structured_output(
@@ -105,7 +110,7 @@ Otherwise mark SAFE.
                 "reason": c.reason
             } for c in changes_list])
             
-            prompt_review = f"BASE CV:\n{resume.content_text}\n\nPROPOSED CHANGES:\n{changes_json}"
+            prompt_review = f"BASE CV:\n{normalize_resume_text(resume.content_text or '')}\n\nPROPOSED CHANGES:\n{changes_json}"
             
             review_result = await router.complete_with_structured_output(
                 task=LLMTask.CV_REVIEW,
@@ -131,6 +136,7 @@ Otherwise mark SAFE.
 
 from app.services.tailoring_merge import merge_tailoring_changes
 from app.services.resume import _build_resume_data_from_text, persist_generated_document
+from app.services.resume_text import normalize_resume_text
 from app.core.documents.generator import DocumentGenerator
 from app.services.pdf_verifier import verify_pdf_document
 from app.core.llm.prompts.resume_tailor import TailoredResumeData
@@ -191,7 +197,32 @@ async def finalize_session(
     )
     
     if doc_res.pdf_path:
-        verification = verify_pdf_document(doc_res.pdf_path, expected_name=new_doc.name)
+        # Phase 19.5 integrity verification: sections present in the BASE doc
+        # must survive; accepted changes must appear; rejected ones must not.
+        base_sections = [
+            label
+            for label, attr in (
+                ("Experience", "experience"), ("Projects", "projects"),
+                ("Skills", "skills"), ("Education", "education"),
+                ("Certifications", "certifications"),
+                ("Professional Summary", "summary"),
+            )
+            if getattr(base_doc, attr)
+        ]
+        accepted_texts = [c.proposed_text or "" for c in accepted]
+        rejected_texts = [
+            c.proposed_text or ""
+            for c in session.changes
+            if c.user_decision == ReviewerStatus.REJECTED
+        ]
+        verification = verify_pdf_document(
+            doc_res.pdf_path,
+            expected_name=new_doc.name,
+            expected_sections=base_sections,
+            required_texts=accepted_texts,
+            forbidden_texts=rejected_texts,
+            base_text=normalize_resume_text(base_resume.content_text or ""),
+        )
         if not verification.is_valid:
             session.status = TailoringStatus.FAILED
             await db.commit()
@@ -287,7 +318,15 @@ DO NOT INVENT FACTS.
 ALL proposed texts and reasons MUST be written in {language}.
 """
     
-    prompt_revise = f"JOB:\n{job.description}\n\nORIGINAL CV:\n{base_resume.content_text}\n\nPREVIOUS PROPOSAL:\nTarget: {change.target_reference}\nOriginal Text: {change.original_text}\nProposed Text: {change.proposed_text}\nReason: {change.reason}"
+    from app.services.resume_text import normalize_resume_text
+
+    prompt_revise = (
+        f"JOB:\n{job.description}\n\n"
+        f"ORIGINAL CV:\n{normalize_resume_text(base_resume.content_text or '')}\n\n"
+        f"PREVIOUS PROPOSAL:\nTarget: {change.target_reference}\n"
+        f"Original Text: {change.original_text}\n"
+        f"Proposed Text: {change.proposed_text}\nReason: {change.reason}"
+    )
     
     try:
         tailor_result = await router.complete_with_structured_output(
@@ -335,7 +374,7 @@ Otherwise mark SAFE.
             "reason": new_db_change.reason
         }])
         
-        prompt_review = f"BASE CV:\n{base_resume.content_text}\n\nPROPOSED CHANGES:\n{changes_json}"
+        prompt_review = f"BASE CV:\n{normalize_resume_text(base_resume.content_text or '')}\n\nPROPOSED CHANGES:\n{changes_json}"
         
         review_result = await router.complete_with_structured_output(
             task=LLMTask.CV_REVIEW,

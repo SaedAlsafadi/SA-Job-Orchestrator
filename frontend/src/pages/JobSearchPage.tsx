@@ -91,7 +91,10 @@ export default function JobSearchPage() {
     createApp.mutate(
       { job_id: job.id, apply_mode: 'review' },
       {
-        onSuccess: () => { notify(`Queued · ${job.title}`, 'success'); navigate('/applications'); },
+        onSuccess: (application) => {
+          notify(`Ready to review · ${job.title}`, 'success');
+          navigate(`/applications/${application.id}`);
+        },
         onError: () => notify('Could not create the application', 'error'),
       },
     );
@@ -248,7 +251,7 @@ function JobCardView({ job, onOpen, onAnalyze, onApply, analyzing, applying }: {
           </button>
         )}
         <button onClick={onApply} disabled={applying} style={btn('primary')}>
-          <Icon name="check" size={13} sw={2.2} /> Apply
+          <Icon name="check" size={13} sw={2.2} /> Prepare Application
         </button>
       </div>
     </div>

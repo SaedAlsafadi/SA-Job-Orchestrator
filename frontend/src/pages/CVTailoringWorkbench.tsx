@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { tailoringService, CVTailoringSession } from '../services/tailoringService';
 import { getJob } from '../services/jobService';
 import { getResume } from '../services/resumeService';
+import { createApplication, listApplications } from '../services/applicationService';
 import type { Job } from '../types/job';
 import type { Resume } from '../types/resume';
 import { ChangeCard } from '../components/tailoring/ChangeCard';
@@ -24,6 +25,7 @@ export const CVTailoringWorkbench: React.FC = () => {
     const [filter, setFilter] = useState<'ALL' | 'ADDED' | 'MODIFIED' | 'REMOVED' | 'WARNING' | 'BLOCKED'>('ALL');
     const [finalResume, setFinalResume] = useState<Resume | null>(null);
     const [verifying, setVerifying] = useState(false);
+    const [preparing, setPreparing] = useState(false);
 
     useEffect(() => {
         if (sessionId) {
@@ -37,12 +39,14 @@ export const CVTailoringWorkbench: React.FC = () => {
             const s = await tailoringService.getSession(id);
             setSession(s);
             
-            const [j, r] = await Promise.all([
+            const [j, r, completedResume] = await Promise.all([
                 getJob(s.job_id),
-                getResume(s.base_resume_id)
+                getResume(s.base_resume_id),
+                s.final_resume_id ? getResume(s.final_resume_id) : Promise.resolve(null),
             ]);
             setJob(j);
             setBaseResume(r);
+            setFinalResume(completedResume);
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to load tailoring session');
         } finally {
@@ -106,6 +110,36 @@ export const CVTailoringWorkbench: React.FC = () => {
             setError(err.response?.data?.detail || 'Failed to finalize resume');
         } finally {
             setVerifying(false);
+        }
+    };
+
+    const handlePrepareApplication = async () => {
+        if (!session || !finalResume) return;
+        setPreparing(true);
+        setError(null);
+        try {
+            const application = await createApplication({
+                job_id: session.job_id,
+                resume_id: finalResume.id,
+                apply_mode: 'review',
+            });
+            navigate(`/applications/${application.id}`);
+        } catch (err: any) {
+            // Re-open an existing active application for the same job when the
+            // unique-active constraint prevents a duplicate.
+            try {
+                const existing = await listApplications(1, 50);
+                const application = existing.items.find((item) => item.job_id === session.job_id);
+                if (application) {
+                    navigate(`/applications/${application.id}`);
+                    return;
+                }
+            } catch {
+                /* fall through to the original error */
+            }
+            setError(err.response?.data?.detail || err.message || 'Failed to prepare application');
+        } finally {
+            setPreparing(false);
         }
     };
 
@@ -222,12 +256,19 @@ export const CVTailoringWorkbench: React.FC = () => {
                     </div>
                     
                     {session.status === 'verified' ? (
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2">
                             <button 
-                                className="flex-1 bg-green-600 text-white py-2 rounded font-bold"
+                                className="w-full bg-green-600 text-white py-2 rounded font-bold"
                                 onClick={() => window.open('/api/v1/resumes/' + finalResume?.id + '/pdf', '_blank')}
                             >
                                 Download PDF
+                            </button>
+                            <button
+                                disabled={!finalResume || preparing}
+                                className="w-full bg-blue-600 text-white py-2 rounded font-bold disabled:opacity-50"
+                                onClick={handlePrepareApplication}
+                            >
+                                {preparing ? 'Preparing...' : 'Prepare Application'}
                             </button>
                         </div>
                     ) : (

@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import api from "@/services/api";
 import { TelegramSelector } from "@/components/opportunities/TelegramSelector";
 import { MatchIntelligenceView } from "@/components/matching/MatchIntelligenceView";
+import { PackageReview } from "@/components/applications/PackageReview";
+import { listResumes } from "@/services/resumeService";
+import { tailoringService } from "@/services/tailoringService";
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
   padding: "10px 16px", cursor: "pointer", fontWeight: 600, fontSize: "14px",
@@ -39,6 +42,8 @@ export function ApplicationWorkflow() {
   
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobData, setJobData] = useState<any>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [startingTailoring, setStartingTailoring] = useState(false);
   
   // Polling logic when job is processing
   useEffect(() => {
@@ -92,8 +97,70 @@ export function ApplicationWorkflow() {
     }
   };
 
-  const startTailoring = () => {
-    navigate(`/cv-tailoring/new?jobId=${jobId}`);
+  const startTailoring = async () => {
+    if (!jobId) return;
+    setError(null);
+    setStartingTailoring(true);
+    try {
+      const { items } = await listResumes();
+      const baseResume = items.find((resume) => resume.type === "base") ?? items[0];
+      if (!baseResume) {
+        setError("Upload a base resume before tailoring your CV.");
+        return;
+      }
+      const session = await tailoringService.startSession(jobId, baseResume.id);
+      navigate(`/cv-tailoring/${session.id}`);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || "Failed to start CV tailoring");
+    } finally {
+      setStartingTailoring(false);
+    }
+  };
+
+  // Phase 19.5: auto-detect an existing application for this job so the
+  // package review is reachable after tailoring (or on return visits) without
+  // the user knowing any internal IDs.
+  useEffect(() => {
+    if (!jobId || applicationId) return;
+    api
+      .get("/applications/", { params: { page_size: 50 } })
+      .then((res) => {
+        const match = (res.data.items || []).find((a: any) => a.job_id === jobId);
+        if (match) setApplicationId(match.id);
+      })
+      .catch(() => undefined);
+  }, [jobId, jobData, applicationId]);
+
+  // Phase 19: create the application record (REVIEW mode) and open the package review.
+  const prepareApplication = async () => {
+    if (!jobId) return;
+    setError(null);
+    try {
+      const resumes = await listResumes().catch(() => ({ items: [], total: 0 }));
+      const tailored = resumes.items
+        .filter((resume) => resume.job_id === jobId && resume.type === "tailored")
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      const res = await api.post("/applications/", {
+        job_id: jobId,
+        resume_id: tailored?.id,
+        apply_mode: "review",
+      });
+      setApplicationId(res.data.id);
+    } catch (err: any) {
+      // An active application for this job may already exist (unique-active
+      // constraint) - detect and open its package review instead of failing.
+      try {
+        const list = await api.get("/applications/", { params: { page_size: 50 } });
+        const match = (list.data.items || []).find((a: any) => a.job_id === jobId);
+        if (match) {
+          setApplicationId(match.id);
+          return;
+        }
+      } catch {
+        /* fall through to the original error */
+      }
+      setError(err.response?.data?.detail || err.message);
+    }
   };
 
   if (jobData) {
@@ -163,9 +230,30 @@ export function ApplicationWorkflow() {
                <MatchIntelligenceView result={jobData.raw_data?.match_result || { score: jobData.match_score }} />
             )}
             
-            <div style={{ textAlign: "right", marginTop: 24 }}>
-              <button onClick={startTailoring} style={buttonStyle}>Create Tailored CV</button>
+            <div style={{ textAlign: "right", marginTop: 24, display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button disabled={startingTailoring} onClick={startTailoring} style={buttonStyle}>
+                {startingTailoring ? "Starting…" : "Create Tailored CV"}
+              </button>
+              {!applicationId && (
+                <button onClick={prepareApplication} style={buttonStyle}>Prepare Application Package</button>
+              )}
             </div>
+
+            {/* Phase 19: package review — once an application exists for this job */}
+            {applicationId && (
+              <div style={{ marginTop: 32 }}>
+                <PackageReview
+                  applicationId={applicationId}
+                  jobId={jobId ?? undefined}
+                  job={{ title: jobData.title, company: jobData.company, location: jobData.location }}
+                  language={jobData.detected_language === "ar" ? "ar" : "en"}
+                  matchSummary={jobData.raw_data?.match_result}
+                  onStatus={(msg, kind) => {
+                    if (kind !== "success") setError(msg);
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

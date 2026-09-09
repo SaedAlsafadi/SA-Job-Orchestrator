@@ -66,3 +66,53 @@ async def test_manual_provider_normalization():
     assert normalized["detected_language"] == "ENGLISH"
     assert normalized["url"] == ""
 
+
+@pytest.mark.asyncio
+async def test_ingest_fails_loudly_without_queue(client, db_session):
+    """No Redis/arq pool behind the app: the job must be marked FAILED with a
+    clear error instead of being left in PROCESSING with the UI polling forever."""
+    from app.models.job import Job
+
+    resp = await client.post(
+        "/api/v1/opportunities/ingest",
+        json={"text": "https://example.com/jobs/42", "source_type": "url"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+
+    job = await db_session.get(Job, body["job_id"])
+    assert job.status == JobStatus.FAILED
+    assert "Redis" in job.raw_data["error"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_retries_failed_job(client, db_session):
+    """Re-ingesting a FAILED job resets it for re-processing (retry semantics),
+    so a transient infrastructure failure never permanently blocks a URL."""
+    from app.models.job import Job
+
+    resp = await client.post(
+        "/api/v1/opportunities/ingest",
+        json={"text": "https://example.com/jobs/43", "source_type": "url"},
+    )
+    job_id = resp.json()["job_id"]
+
+    # Simulate an earlier, different failure on the row.
+    job = await db_session.get(Job, job_id)
+    job.raw_data = {"error": "old scrape failure"}
+    await db_session.commit()
+
+    resp2 = await client.post(
+        "/api/v1/opportunities/ingest",
+        json={"text": "https://example.com/jobs/43", "source_type": "url"},
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()["job_id"] == job_id
+
+    # The retry path ran: the old error was cleared and replaced by the current
+    # queue-unavailable error (return-as-is would have kept the old message).
+    await db_session.refresh(job)
+    assert job.status == JobStatus.FAILED
+    assert job.raw_data["error"] != "old scrape failure"
+    assert "Redis" in job.raw_data["error"]

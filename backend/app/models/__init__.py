@@ -1,6 +1,7 @@
 """SQLAlchemy ORM models."""
 
 from app.models.application import Application
+from app.models.application_package import ApplicationPackage
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
 from app.models.candidate_profile import CandidateProfile
 from app.models.harness import (
@@ -37,6 +38,7 @@ from app.models.telegram_connection import (
 
 __all__ = [
     "Application",
+    "ApplicationPackage",
     "ApplicationRoute",
     "Base",
     "CandidateProfile",

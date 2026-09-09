@@ -13,6 +13,7 @@ from app.api.v1.platform_sessions import router as platform_sessions_router
 from app.api.v1.resumes import router as resumes_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.dev import router as dev_router
+from app.api.v1.packages import router as packages_router
 from app.api.v1 import candidate_profile
 from app.api.v1 import workflow
 
@@ -52,6 +53,7 @@ v1_router.include_router(
 v1_router.include_router(
     telegram_router, prefix="/telegram", tags=["Telegram"], dependencies=_auth
 )
+v1_router.include_router(packages_router, tags=["Packages"], dependencies=_auth)
 
 # Admin/health routes require a superuser.
 v1_router.include_router(

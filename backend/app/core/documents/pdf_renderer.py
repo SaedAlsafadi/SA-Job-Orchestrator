@@ -46,6 +46,7 @@ class WeasyPrintPDFRenderer(BasePDFRenderer):
         html_out = template.render(**context)
         
         try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             # Weasyprint requires base_url for assets like images/css
             base_url = (self._templates_dir / "resume" / template_name).resolve().as_uri()
             weasyprint.HTML(string=html_out, base_url=base_url).write_pdf(str(output_path))
@@ -60,14 +61,13 @@ class WeasyPrintPDFRenderer(BasePDFRenderer):
 
 
 class PlaywrightPDFRenderer(BasePDFRenderer):
-    """Modern renderer using Playwright Chromium."""
+    """Render through Chromium, avoiding WeasyPrint's native GTK dependency."""
     
     def __init__(self, templates_dir: Path = Path("templates")) -> None:
         self._templates_dir = templates_dir
 
-    async def render(self, template_name: str, context: dict[str, Any], output_path: Path) -> Path:
-        from playwright.async_api import async_playwright
-        
+    def _render_html(self, template_name: str, context: dict[str, Any]) -> str:
+        """Render an auto-escaped template independently of the browser process."""
         env = Environment(
             loader=FileSystemLoader(self._templates_dir / "resume"),
             autoescape=select_autoescape(["html", "xml"]),
@@ -77,19 +77,39 @@ class PlaywrightPDFRenderer(BasePDFRenderer):
         except Exception as exc:
             raise TemplateError(f"Template '{template_name}' not found: {exc}") from exc
 
-        html_content = template.render(**context)
-        
+        return template.render(**context)
+
+    async def render(self, template_name: str, context: dict[str, Any], output_path: Path) -> Path:
+        from playwright.async_api import async_playwright
+
+        html_content = self._render_html(template_name, context)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                page = await browser.new_page()
-                await page.set_content(html_content, wait_until="networkidle")
-                await page.pdf(path=str(output_path), format="A4", print_background=True)
-                await browser.close()
+                try:
+                    browser = await p.chromium.launch(headless=True)
+                except Exception:
+                    # Developer Windows environments commonly have system Chrome
+                    # but not Playwright's separately downloaded Chromium build.
+                    browser = await p.chromium.launch(channel="chrome", headless=True)
+                try:
+                    page = await browser.new_page()
+                    await page.set_content(html_content, wait_until="load")
+                    await page.pdf(
+                        path=str(output_path),
+                        format="A4",
+                        print_background=True,
+                        prefer_css_page_size=True,
+                    )
+                finally:
+                    await browser.close()
         except Exception as exc:
             raise GenerationError(f"Playwright rendering failed: {exc}") from exc
             
         return output_path
 
-# Preserve backward compatibility for existing code that imports PDFRenderer
-PDFRenderer = WeasyPrintPDFRenderer
+# Playwright is already a project dependency and is portable across supported
+# hosts.  Keep WeasyPrint available explicitly for legacy callers, but do not
+# make successful PDF generation depend on native GTK libraries.
+PDFRenderer = PlaywrightPDFRenderer

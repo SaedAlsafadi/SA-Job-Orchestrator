@@ -27,7 +27,30 @@ class IngestOpportunityRequest(BaseModel):
 from arq.connections import ArqRedis
 from app.db.arq import get_arq_pool
 from app.models.enums import JobStatus
+from datetime import timedelta
 import hashlib
+
+# A job left in PROCESSING longer than the arq job_timeout (600s) + margin can
+# never still be genuinely in flight - the queue lost it (e.g. it was enqueued
+# to a Redis that went away, or the worker never ran). Re-ingest then retries.
+_STALE_PROCESSING = timedelta(seconds=900)
+
+_QUEUE_UNAVAILABLE_ERROR = (
+    "Task queue unavailable - Redis is not running. Start Redis and the arq "
+    "worker (arq app.workers.tasks.WorkerSettings), then re-submit the URL."
+)
+
+
+def _is_stale_processing(job):
+    # True if a PROCESSING/RECEIVED row is older than any legitimate in-flight task.
+    if job.status not in (JobStatus.PROCESSING, JobStatus.RECEIVED):
+        return False
+    updated = job.updated_at or job.received_at
+    if updated is None:
+        return True
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=UTC)
+    return datetime.now(UTC) - updated > _STALE_PROCESSING
 
 @router.post("/ingest")
 async def ingest_opportunity(
@@ -43,31 +66,40 @@ async def ingest_opportunity(
     existing_job = await db.execute(select(Job).where(Job.platform_job_id == content_hash))
     existing_job = existing_job.scalar_one_or_none()
     
+    job = None
     if existing_job:
-        # Just return the existing job. In the future, we could append source provenance instead.
-        return {"job_id": existing_job.id, "status": existing_job.status}
+        if existing_job.status == JobStatus.FAILED or _is_stale_processing(existing_job):
+            # Retry semantics: a FAILED row (or a stale in-flight one the queue
+            # lost) is re-processed instead of returned - a transient
+            # infrastructure failure must not permanently block a URL.
+            existing_job.raw_data = {}
+            job = existing_job
+        else:
+            # Just return the existing job. In the future, we could append source provenance instead.
+            return {"job_id": existing_job.id, "status": existing_job.status}
     
-    # 1. Create Canonical Job in RECEIVED state
-    job = Job(
-        user_id=user.id,
-        platform="manual",
-        platform_job_id=content_hash,
-        title="Processing...",
-        company="Processing...",
-        url=req.text if req.source_type == "url" else "",
-        # Provenance
-        source_type=req.source_type,
-        source_reference=req.source_reference,
-        raw_text=req.text,
-        received_at=datetime.now(UTC),
-        first_seen_at=datetime.now(UTC),
-        content_hash=content_hash,
-        status=JobStatus.RECEIVED
-    )
-    
-    db.add(job)
-    await db.commit()
-    await db.refresh(job)
+    if job is None:
+        # 1. Create Canonical Job in RECEIVED state
+        job = Job(
+            user_id=user.id,
+            platform="manual",
+            platform_job_id=content_hash,
+            title="Processing...",
+            company="Processing...",
+            url=req.text if req.source_type == "url" else "",
+            # Provenance
+            source_type=req.source_type,
+            source_reference=req.source_reference,
+            raw_text=req.text,
+            received_at=datetime.now(UTC),
+            first_seen_at=datetime.now(UTC),
+            content_hash=content_hash,
+            status=JobStatus.RECEIVED
+        )
+
+        db.add(job)
+        await db.commit()
+        await db.refresh(job)
     
     # 2. Update to processing and enqueue
     job.status = JobStatus.PROCESSING
@@ -75,7 +107,14 @@ async def ingest_opportunity(
     
     if pool:
         await pool.enqueue_job("process_opportunity", job.id)
-    
+    else:
+        # No queue behind the app: the job can never be processed. Fail it
+        # loudly (the UI renders raw_data.error on the failed state) instead of
+        # silently leaving the row in PROCESSING with the frontend polling forever.
+        job.status = JobStatus.FAILED
+        job.raw_data = {"error": _QUEUE_UNAVAILABLE_ERROR}
+        await db.commit()
+
     return {"job_id": job.id, "status": job.status}
 
 class RouteOverrideRequest(BaseModel):

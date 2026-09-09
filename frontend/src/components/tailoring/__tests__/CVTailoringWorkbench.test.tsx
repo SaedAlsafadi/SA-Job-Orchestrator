@@ -56,8 +56,8 @@ describe('CVTailoringWorkbench Integration', () => {
 
     test('loads session and allows accepting/rejecting changes, then finalizes', async () => {
         (tailoringService.getSession as any).mockResolvedValue(mockSession);
-        (jobService.getJob as any).mockResolvedValue({ id: 'job-123', title: 'Test Job', company: 'Test Corp', description: 'desc', url: 'http://u', platform: 'LinkedIn' });
-        (resumeService.getResume as any).mockResolvedValue({ id: 'res-123', name: 'Base CV', content_text: '{"name": "Test User", "skills": ["Python"], "experience": [{"title": "Dev", "company": "Corp", "description": "d"}]}' });
+        (getJob as any).mockResolvedValue({ id: 'job-123', title: 'Test Job', company: 'Test Corp', description: 'desc', url: 'http://u', platform: 'LinkedIn' });
+        (getResume as any).mockResolvedValue({ id: 'res-123', name: 'Base CV', content_text: '{"name": "Test User", "skills": ["Python"], "experience": [{"title": "Dev", "company": "Corp", "description": "d"}]}' });
 
         render(
             <MemoryRouter initialEntries={['/cv-tailoring/sess-123']}>

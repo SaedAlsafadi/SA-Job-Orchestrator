@@ -22,6 +22,7 @@ export interface CVTailoringSession {
     job_id: string;
     base_resume_id: string;
     status: 'reviewing' | 'rendering' | 'verified' | 'failed';
+    final_resume_id?: string | null;
     changes: CVTailoringChange[];
 }
 

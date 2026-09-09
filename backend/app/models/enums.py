@@ -141,5 +141,30 @@ class ReviewSeverity(StrEnum):
     BLOCKED = "blocked"
 
 
+class QAVerdict(StrEnum):
+    """Application-package QA verdict (Phase 19). PASS may proceed; WARNING requires
+    explicit user review; BLOCKED prevents approval until fixed."""
+    PASS = "pass"
+    WARNING = "warning"
+    BLOCKED = "blocked"
+
+
+class PostingQualitySignal(StrEnum):
+    """Lightweight heuristic signal about a posting's legitimacy — a signal, never a
+    definitive scam determination."""
+    LIKELY_LEGITIMATE = "likely_legitimate"
+    NEEDS_REVIEW = "needs_review"
+    SUSPICIOUS = "suspicious"
+
+
+class EmailSendState(StrEnum):
+    """Lifecycle of an application-email send. ``SENT`` means the provider ACCEPTED the
+    message (relay acceptance) — delivery is never claimed without delivery evidence."""
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+
+
 
 

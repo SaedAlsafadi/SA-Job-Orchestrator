@@ -37,6 +37,7 @@ describe('JobSearchPage', () => {
     expect(await screen.findByText('Senior Product Manager')).toBeInTheDocument();
     // Company is shown in the card subtitle (company · location), so match on substring.
     expect(screen.getByText(/Northwind Labs/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /prepare application/i })).toBeInTheDocument();
   });
 
   it('searches with the typed query', async () => {

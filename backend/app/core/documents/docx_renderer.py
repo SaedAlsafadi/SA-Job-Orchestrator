@@ -106,6 +106,9 @@ class DOCXRenderer:
             # Experience
             self._add_experience(doc, context.get("experience", []))
 
+            # Projects (parity with the HTML templates - previously dropped)
+            self._add_projects(doc, context.get("projects", []))
+
             # Education
             self._add_education(doc, context.get("education", []))
 
@@ -228,6 +231,27 @@ class DOCXRenderer:
                     bullet = bullet.strip()
                     if bullet:
                         doc.add_paragraph(bullet, style="List Bullet")
+
+    @staticmethod
+    def _add_projects(doc: Any, projects: list[dict[str, Any]]) -> None:
+        """Add the Projects section (parity with the HTML templates)."""
+        if not projects:
+            return
+
+        doc.add_heading("Projects", level=1)
+        for proj in projects:
+            name = proj.get("name", "")
+            if name:
+                p = doc.add_paragraph()
+                run = p.add_run(name)
+                run.bold = True
+
+            description = proj.get("description", "")
+            if description:
+                for line in description.split("\n"):
+                    line = line.strip()
+                    if line:
+                        doc.add_paragraph(line, style="List Bullet")
 
     @staticmethod
     def _add_education(doc: Any, education: list[dict[str, Any]]) -> None:

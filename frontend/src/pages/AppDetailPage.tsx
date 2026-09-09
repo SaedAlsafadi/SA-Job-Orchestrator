@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 
 import Icon from '@/components/ui/Icon';
 import RunTimeline from '@/components/applications/RunTimeline';
+import { PackageReview } from '@/components/applications/PackageReview';
 import { useApplication, useUpdateApplicationStatus } from '@/hooks/useApplications';
 import { useAppStore } from '@/store/useAppStore';
 import { buildAppTimeline } from '@/lib/timeline';
@@ -27,7 +28,7 @@ export default function AppDetailPage() {
     );
 
   return (
-    <div style={{ animation: 'aaUp .4s var(--ease) both', maxWidth: 860 }}>
+    <div style={{ animation: 'aaUp .4s var(--ease) both', maxWidth: 960 }}>
       <button
         onClick={() => navigate('/applications')}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 30, padding: '0 10px 0 8px', marginBottom: 16, borderRadius: 'var(--r-md)', background: 'transparent', border: '1px solid transparent', color: 'var(--text-3)', font: '600 12.5px/1 var(--font)', cursor: 'pointer' }}
@@ -89,6 +90,16 @@ export default function AppDetailPage() {
               <div style={{ ...card, padding: 20 }}>
                 <div style={{ font: '700 14px/1 var(--font)', letterSpacing: '-.01em', marginBottom: 16 }}>Run timeline</div>
                 <RunTimeline steps={steps} />
+              </div>
+
+              <div style={{ marginTop: 20 }}>
+                <PackageReview
+                  applicationId={app.id}
+                  jobId={app.job_id}
+                  job={{ title: app.job_title, company: app.company }}
+                  matchSummary={app.ats_score == null ? undefined : { score: app.ats_score }}
+                  onStatus={(message, kind) => notify(message, kind)}
+                />
               </div>
 
               {app.notes && (

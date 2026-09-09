@@ -210,129 +210,14 @@ async def _get_job(db: AsyncSession, job_id: str) -> Job:
 def _build_resume_data_from_text(content_text: str) -> dict:
     """Convert raw resume text into structured data for templates.
 
-    Extracts contact info, sections, and skills from plain text using
-    the same regex patterns as DocumentParser.
+    Delegates to :mod:`app.services.resume_text`, which normalizes positional
+    PDF-extraction artifacts (letter-spaced headings, glued blocks, mojibake
+    bullets) before structuring and preserves ALL base sections, including
+    projects (which this legacy implementation always dropped).
     """
-    from app.core.documents.parser import (
-        _EMAIL_RE,
-        _GITHUB_RE,
-        _LINKEDIN_RE,
-        _PHONE_RE,
-        _SECTION_HEADERS,
-    )
+    from app.services.resume_text import build_resume_data_from_text
 
-    lines = content_text.split("\n")
-    name = lines[0].strip() if lines else ""
-
-    # Extract contact info
-    email_m = _EMAIL_RE.search(content_text)
-    phone_m = _PHONE_RE.search(content_text)
-    linkedin_m = _LINKEDIN_RE.search(content_text)
-    github_m = _GITHUB_RE.search(content_text)
-
-    # Extract sections by header
-    sections: dict[str, str] = {}
-    current_section = ""
-    current_content: list[str] = []
-    lower_headers = {h.lower() for h in _SECTION_HEADERS}
-
-    for line in lines[1:]:
-        stripped = line.strip()
-        if stripped.lower().rstrip(":") in lower_headers:
-            if current_section:
-                sections[current_section] = "\n".join(current_content).strip()
-            current_section = stripped.lower().rstrip(":")
-            current_content = []
-        elif current_section:
-            current_content.append(stripped)
-
-    if current_section:
-        sections[current_section] = "\n".join(current_content).strip()
-
-    # Build skills list
-    skills_text = sections.get("skills", "") or sections.get("technical skills", "")
-    skills = [s.strip() for s in re.split(r"[,\n•·|]", skills_text) if s.strip()]
-
-    # Build experience entries
-    exp_text = (
-        sections.get("experience", "")
-        or sections.get("work experience", "")
-        or sections.get("professional experience", "")
-    )
-    experience = _parse_experience_section(exp_text) if exp_text else []
-
-    # Build education entries
-    edu_text = sections.get("education", "") or sections.get("academic background", "")
-    education = _parse_education_section(edu_text) if edu_text else []
-
-    # Certifications
-    cert_text = sections.get("certifications", "") or sections.get("certificates", "")
-    certifications = [c.strip() for c in cert_text.split("\n") if c.strip()] if cert_text else []
-
-    summary = (
-        sections.get("summary", "")
-        or sections.get("professional summary", "")
-        or sections.get("objective", "")
-        or sections.get("profile", "")
-    )
-
-    return {
-        "name": name,
-        "email": email_m.group() if email_m else "",
-        "phone": phone_m.group() if phone_m else "",
-        "location": "",
-        "linkedin": linkedin_m.group() if linkedin_m else "",
-        "github": github_m.group() if github_m else "",
-        "title": "",
-        "summary": summary,
-        "skills": skills,
-        "experience": experience,
-        "education": education,
-        "certifications": certifications,
-        "projects": [],
-    }
-
-
-def _parse_experience_section(text: str) -> list[dict]:
-    """Parse experience section text into structured entries."""
-    entries: list[dict] = []
-    current: dict | None = None
-
-    for line in text.split("\n"):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        # Heuristic: lines that look like titles (short, no bullet)
-        if not stripped.startswith(("•", "-", "*", "·")) and len(stripped) < 80:
-            if current:
-                entries.append(current)
-            current = {
-                "title": stripped,
-                "company": "",
-                "duration": "",
-                "description": "",
-            }
-        elif current:
-            current["description"] += stripped.lstrip("•-*· ") + "\n"
-
-    if current:
-        entries.append(current)
-    return entries
-
-
-def _parse_education_section(text: str) -> list[dict]:
-    """Parse education section text into structured entries."""
-    entries: list[dict] = []
-    for line in text.split("\n"):
-        stripped = line.strip()
-        if not stripped or stripped.startswith(("•", "-", "*")):
-            continue
-        entries.append({
-            "degree": stripped,
-            "institution": "",
-            "year": "",
-        })
-    return entries
+    return build_resume_data_from_text(content_text)
 
 
 async def generate_tailored_resume(

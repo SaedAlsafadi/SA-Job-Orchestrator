@@ -201,24 +201,12 @@ class TestResumeAutoescape:
         from app.core.documents.pdf_renderer import PDFRenderer
 
         renderer = PDFRenderer(templates_dir=_REPO_ROOT / "templates")
-        captured: dict[str, str] = {}
-
-        # Intercept WeasyPrint (imported inside _render_sync) so we assert on the HTML string only.
-        class _FakeHTML:
-            def __init__(self, string: str) -> None:
-                captured["html"] = string
-
-            def write_pdf(self, path, stylesheets=None) -> None:
-                Path(path).write_bytes(b"%PDF-1.4")
-
-        with patch("weasyprint.HTML", _FakeHTML), patch("weasyprint.CSS"):
-            renderer._render_sync(
-                "modern",
-                {"name": "A<b>C", "summary": "latency <5ms & up"},
-                tmp_path / "r.pdf",
-            )
-        assert "&lt;5ms" in captured["html"] and "&amp;" in captured["html"]
-        assert "<5ms" not in captured["html"]
+        html = renderer._render_html(
+            "modern",
+            {"name": "A<b>C", "summary": "latency <5ms & up"},
+        )
+        assert "&lt;5ms" in html and "&amp;" in html
+        assert "<5ms" not in html
 
 
 # --- L5: register maps a race unique-violation to a clean 409 -----------------------------

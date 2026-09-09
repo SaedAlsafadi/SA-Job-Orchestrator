@@ -54,4 +54,10 @@ describe('AppDetailPage', () => {
     await screen.findByText('Senior Product Manager');
     expect(document.querySelector('[data-step="applying"]')?.getAttribute('data-state')).toBe('failed');
   });
+
+  it('makes application package review discoverable from the normal detail route', async () => {
+    server.use(http.get('/api/v1/applications/:appId', () => HttpResponse.json(fullApp({ status: 'pending_review' }))));
+    renderDetail();
+    expect(await screen.findByRole('button', { name: /create application package/i })).toBeInTheDocument();
+  });
 });

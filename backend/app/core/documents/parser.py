@@ -21,6 +21,7 @@ _SECTION_HEADERS: list[str] = [
     "publications", "awards", "honors",
     "volunteer", "volunteering", "community involvement",
     "languages", "interests", "references",
+    "additional information", "activities",
 ]
 
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")

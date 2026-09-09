@@ -247,6 +247,16 @@ export const handlers = [
     });
   }),
 
+  // Phase 19 application-package review (empty by default; focused tests
+  // override these handlers with populated package fixtures).
+  http.get('/api/v1/applications/:appId/package', () => {
+    return HttpResponse.json(null);
+  }),
+
+  http.get('/api/v1/applications/:appId/readiness', () => {
+    return HttpResponse.json({ detail: 'No package created yet' }, { status: 404 });
+  }),
+
   // Analytics
   http.get('/api/v1/analytics/dashboard', () => {
     return HttpResponse.json({
