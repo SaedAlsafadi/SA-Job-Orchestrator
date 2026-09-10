@@ -1,4 +1,4 @@
-﻿import type { PaginatedResponse } from './api';
+import type { PaginatedResponse } from './api';
 
 export interface Job {
   id: string;
@@ -19,6 +19,24 @@ export interface Job {
   status: string;
   created_at: string;
   updated_at: string;
+  raw_data?: any;
+  operational_state?: OpportunityOperationalState;
+}
+
+export interface OpportunityOperationalState {
+  match_exists: boolean;
+  tailoring_session_id: string | null;
+  tailoring_status: string | null;
+  tailored_resume_id: string | null;
+  tailored_resume_verified: boolean;
+  application_id: string | null;
+  application_status: string | null;
+  package_id: string | null;
+  package_version: number | null;
+  package_ready: boolean;
+  package_approved: boolean;
+  route_type: string | null;
+  route_url: string | null;
 }
 
 export type JobListingResponse = Job;

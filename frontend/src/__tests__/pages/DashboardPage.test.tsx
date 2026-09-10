@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -65,5 +66,43 @@ describe('DashboardPage greeting pluralization (BUG-006)', () => {
     server.use(http.get('/api/v1/applications/', () => HttpResponse.json(listOf(app()))));
     renderDash();
     expect(await screen.findByText('86 roles')).toBeInTheDocument();
+  });
+});
+
+describe('Dashboard dismissal semantics', () => {
+  it('persists a dismissal while leaving workflow status unchanged', async () => {
+    const record = app({ status: 'waiting_for_review', job_title: 'Review Me' });
+    const saved: object[] = [];
+    server.use(
+      http.get('/api/v1/analytics/dashboard', () => HttpResponse.json(dashStats())),
+      http.get('/api/v1/applications/', () => HttpResponse.json(listOf(record))),
+      http.get('/api/v1/dashboard/dismissals', () => HttpResponse.json({ items: saved })),
+      http.post('/api/v1/dashboard/dismissals', async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>;
+        saved.push({ id: 'd1', dismissed_at: new Date().toISOString(), ...body });
+        return HttpResponse.json(saved[0], { status: 201 });
+      }),
+    );
+    const view = renderDash();
+    await screen.findByText('Review Me');
+    await userEvent.click(screen.getByRole('button', { name: /dismiss review me/i }));
+    expect(await screen.findByText(/you're caught up/i)).toBeInTheDocument();
+    expect(record.status).toBe('waiting_for_review');
+    view.unmount();
+    renderDash();
+    expect(await screen.findByText(/you're caught up/i)).toBeInTheDocument();
+    expect(screen.queryByText('Review Me')).not.toBeInTheDocument();
+  });
+
+  it('resurfaces the same application after its material fingerprint changes', async () => {
+    const old = app({ status: 'queued', updated_at: '2026-07-08T10:00:00Z', job_title: 'Changed Item' });
+    server.use(
+      http.get('/api/v1/analytics/dashboard', () => HttpResponse.json(dashStats())),
+      http.get('/api/v1/applications/', () => HttpResponse.json(listOf({ ...old, status: 'failed', updated_at: '2026-07-09T10:00:00Z' }))),
+      http.get('/api/v1/dashboard/dismissals', () => HttpResponse.json({ items: [{ id: 'd1', entity_type: 'application', entity_id: old.id, fingerprint: `${old.status}:${old.updated_at}`, dismissed_at: old.updated_at }] })),
+    );
+    renderDash();
+    expect(await screen.findByText('Changed Item')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Failed')).toBeInTheDocument());
   });
 });

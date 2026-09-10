@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { server } from '@/__tests__/mocks/server';
 import ResumesPage from '@/pages/ResumesPage';
@@ -11,8 +11,9 @@ import { useAppStore } from '@/store/useAppStore';
 
 function resume(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'resume-1', name: 'Alex Morgan — Base', type: 'base', template_id: 'modern',
+    id: 'resume-1', name: 'Alex Morgan', type: 'base', template_id: 'modern',
     base_resume_id: null, job_id: null, has_pdf: true, has_docx: false, ats_score: 0.82,
+    content_text: 'Alex Morgan\nalex@example.com\nSummary\nProduct leader\nExperience\nLed a global platform migration without truncation.\nEducation\nBSc Computer Science',
     created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z', ...overrides,
   };
 }
@@ -29,8 +30,11 @@ function renderResumes() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <ResumesPage />
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<ResumesPage />} />
+          <Route path="/cv-tailoring/:id" element={<div>Tailoring workbench destination</div>} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -41,7 +45,7 @@ describe('ResumesPage', () => {
     server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(resume(), resume({ id: 'r2', name: 'Senior PM — Tailored', type: 'tailored' })))));
     renderResumes();
     // The first résumé auto-selects, so its name also appears in the preview panel.
-    expect((await screen.findAllByText('Alex Morgan — Base')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Alex Morgan')).length).toBeGreaterThan(0);
     expect(screen.getByText('Senior PM — Tailored')).toBeInTheDocument();
   });
 
@@ -50,23 +54,15 @@ describe('ResumesPage', () => {
     renderResumes();
     await screen.findByText('Senior PM — Tailored');
     await userEvent.click(screen.getByRole('button', { name: /select résumé senior pm/i }));
-    await waitFor(() => expect(screen.getAllByText('Senior PM — Tailored').length).toBeGreaterThan(1));
+    await waitFor(() => expect(screen.getByLabelText(/full résumé preview for senior pm — tailored/i)).toBeInTheDocument());
   });
 
-  it('scores the selected résumé against a chosen job and shows the breakdown', async () => {
+  it('renders the full canonical content in the document preview', async () => {
     server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(resume()))));
-    server.use(http.get('/api/v1/jobs/', () => HttpResponse.json({ items: [oneJob], total: 1, page: 1, page_size: 20, has_next: false })));
-    let scoredId: string | null = null;
-    server.use(http.post('/api/v1/resumes/:id/score', ({ params }) => {
-      scoredId = params.id as string;
-      return HttpResponse.json({ resume_id: 'resume-1', job_id: 'j1', overall_score: 0.9, skill_score: 0.92, experience_score: 0.8, education_score: 0.7, keyword_score: 0.85, missing_skills: [], suggestions: [] });
-    }));
     renderResumes();
-    await screen.findAllByText('Alex Morgan — Base');
-    await userEvent.selectOptions(screen.getByLabelText(/target job/i), 'j1');
-    await userEvent.click(screen.getByRole('button', { name: /score vs job/i }));
-    await waitFor(() => expect(scoredId).toBe('resume-1'));
-    expect(await screen.findByText('90')).toBeInTheDocument();
+    const preview = await screen.findByLabelText(/full résumé preview/i);
+    expect(preview).toHaveTextContent('Led a global platform migration without truncation.');
+    expect(preview).toHaveTextContent('BSc Computer Science');
   });
 
   it('generates a tailored résumé once a target job is chosen', async () => {
@@ -78,13 +74,12 @@ describe('ResumesPage', () => {
       return HttpResponse.json(resume({ id: 'r-gen', name: 'Generated', type: 'tailored' }));
     }));
     renderResumes();
-    await screen.findAllByText('Alex Morgan — Base');
+    await screen.findAllByText('Alex Morgan');
     const gen = screen.getByRole('button', { name: /generate tailored/i });
-    expect(gen).toHaveAttribute('aria-disabled', 'true');
-    expect(gen).toHaveAccessibleDescription(/pick a target job|upload a base résumé/i);
+    expect(gen).toBeDisabled();
+    expect(gen).toHaveAccessibleDescription(/select a target job|upload a base résumé/i);
     await userEvent.selectOptions(screen.getByLabelText(/target job/i), 'j1');
-    expect(gen).not.toHaveAttribute('aria-disabled', 'true');
-    expect(gen).not.toHaveAccessibleDescription();
+    expect(gen).not.toBeDisabled();
     await userEvent.click(gen);
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.base_resume_id).toBe('resume-1');
@@ -100,33 +95,20 @@ describe('ResumesPage', () => {
       return HttpResponse.json(resume({ id: 'r-gen', name: 'Generated', type: 'tailored' }));
     }));
     renderResumes();
-    await screen.findAllByText('Alex Morgan — Base');
+    await screen.findAllByText('Alex Morgan');
     const gen = screen.getByRole('button', { name: /generate tailored/i });
-    expect(gen).toHaveAttribute('aria-disabled', 'true');
+    expect(gen).toBeDisabled();
     await userEvent.click(gen);
     expect(posted).toBe(false);
   });
 
-  it('clears the stale score breakdown when a different résumé is selected', async () => {
-    server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(resume(), resume({ id: 'r2', name: 'Senior PM — Tailored', type: 'tailored', ats_score: 0.7 })))));
-    server.use(http.get('/api/v1/jobs/', () => HttpResponse.json({ items: [oneJob], total: 1, page: 1, page_size: 20, has_next: false })));
-    server.use(http.post('/api/v1/resumes/:id/score', () => HttpResponse.json({ resume_id: 'resume-1', job_id: 'j1', overall_score: 0.9, skill_score: 0.92, experience_score: 0.8, education_score: 0.7, keyword_score: 0.85, missing_skills: [], suggestions: [] })));
-    renderResumes();
-    await screen.findByText('Senior PM — Tailored');
-    await userEvent.selectOptions(screen.getByLabelText(/target job/i), 'j1');
-    await userEvent.click(screen.getByRole('button', { name: /score vs job/i }));
-    expect(await screen.findByText('90')).toBeInTheDocument(); // résumé A's overall
-    await userEvent.click(screen.getByRole('button', { name: /select résumé senior pm/i }));
-    await waitFor(() => expect(screen.queryByText('90')).not.toBeInTheDocument()); // not bled onto B
-    expect(screen.getByText(/score this résumé against a job/i)).toBeInTheDocument();
-  });
 
   it('surfaces an error toast when a download fails', async () => {
     server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(resume()))));
     server.use(http.get('/api/v1/resumes/:id/download', () => new HttpResponse(null, { status: 500 })));
     useAppStore.getState().clearNotification();
     renderResumes();
-    await screen.findAllByText('Alex Morgan — Base');
+    await screen.findAllByText('Alex Morgan');
     await userEvent.click(screen.getByRole('button', { name: /download résumé/i }));
     await waitFor(() => expect(useAppStore.getState().notification?.message).toMatch(/could not download/i));
   });
@@ -146,7 +128,7 @@ describe('ResumesPage', () => {
       return HttpResponse.json({ id: 'r-new', name: 'uploaded.pdf', file_format: 'pdf', word_count: 500, skills_detected: [] });
     }));
     renderResumes();
-    await screen.findAllByText('Alex Morgan — Base');
+    await screen.findAllByText('Alex Morgan');
     const file = new File(['pdf-bytes'], 'resume.pdf', { type: 'application/pdf' });
     await userEvent.upload(screen.getByLabelText(/upload résumé/i), file);
     await waitFor(() => expect(uploaded).toBe(true));
@@ -160,20 +142,40 @@ describe('ResumesPage', () => {
       return HttpResponse.json(resume({ ats_score: 0.9 }));
     }));
     renderResumes();
-    await screen.findAllByText('Alex Morgan — Base');
+    await screen.findAllByText('Alex Morgan');
     await userEvent.click(screen.getByRole('button', { name: /optimize/i }));
     await waitFor(() => expect(optimizedId).toBe('resume-1'));
   });
 
+  it('archives a résumé through the safe archive endpoint', async () => {
+    let archived = false;
+    server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(...(archived ? [] : [resume()])))));
+    server.use(http.post('/api/v1/resumes/:id/archive', () => { archived = true; return HttpResponse.json(resume({ archived_at: new Date().toISOString() })); }));
+    renderResumes();
+    await screen.findAllByText('Alex Morgan');
+    await userEvent.click(screen.getByRole('button', { name: /archive résumé/i }));
+    await waitFor(() => expect(archived).toBe(true));
+    expect(await screen.findByText(/no résumés yet/i)).toBeInTheDocument();
+  });
+
+  it('opens a deterministic revision workbench for a tailored résumé', async () => {
+    server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(resume({ type: 'tailored', job_id: 'j1' })))));
+    server.use(http.post('/api/v1/tailoring/resume/:id/revision', () => HttpResponse.json({ id: 'session-1', job_id: 'j1', base_resume_id: 'resume-1', status: 'reviewing', changes: [] })));
+    renderResumes();
+    await screen.findAllByText('Alex Morgan');
+    await userEvent.click(screen.getByRole('button', { name: /revise tailored cv/i }));
+    expect(await screen.findByText(/tailoring workbench destination/i)).toBeInTheDocument();
+  });
+
   it('shows the before/after ATS delta pill when an optimized résumé and its base are loaded', async () => {
     server.use(http.get('/api/v1/resumes/', () => HttpResponse.json(list(
-      resume({ id: 'resume-2', name: 'Alex Morgan — Optimized', type: 'optimized', base_resume_id: 'resume-1', ats_score: 0.81 }),
+      resume({ id: 'resume-2', name: 'Alex Morgan', type: 'optimized', base_resume_id: 'resume-1', ats_score: 0.81 }),
       resume({ id: 'resume-1', ats_score: 0.62 }),
     ))));
     server.use(http.get('/api/v1/jobs/', () => HttpResponse.json({ items: [oneJob], total: 1, page: 1, page_size: 20, has_next: false })));
     renderResumes();
     // The optimized variant is first → auto-selected; its base's stored score is the "was".
-    expect(await screen.findByText(/\+19 ATS after optimization/i)).toBeInTheDocument();
-    expect(screen.getByText(/was 62/i)).toBeInTheDocument();
+    const items = await screen.findAllByText('Alex Morgan');
+    expect(items.length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -28,5 +28,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
     css: false,
+    // Browser acceptance helpers live at the package root; Vitest should only
+    // collect the unit/integration suite maintained under src.
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 });

@@ -1,8 +1,22 @@
 """Integration tests for the Jobs API routes."""
 
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
+
 import pytest
 
 from app.models.job import Job
+from app.schemas.job import JobListResponse
+from app.schemas.matching import (
+    CandidateMatchResult,
+    DimensionScore,
+    DimensionStatus,
+    MatchDimensions,
+    MatchProvenance,
+    MatchVerdict,
+)
+from app.services import job_search as job_service
+from app.services.eligibility import EligibilityResult
 
 API_PREFIX = "/api/v1/jobs"
 
@@ -18,7 +32,14 @@ def job_data(sample_job_data):
 class TestSearchJobs:
     """Tests for POST /api/v1/jobs/search."""
 
-    async def test_search_returns_empty_results(self, client):
+    async def test_search_returns_empty_results(self, client, monkeypatch):
+        # Job discovery has optional live providers. Keep the route test
+        # deterministic and verify the current service response contract.
+        monkeypatch.setattr(
+            job_service,
+            "search_jobs",
+            AsyncMock(return_value=JobListResponse(items=[], total=0, page=1, page_size=20, has_next=False)),
+        )
         response = await client.post(
             f"{API_PREFIX}/search",
             json={"query": "python developer", "location": "Remote"},
@@ -124,22 +145,49 @@ class TestAnalyzeJob:
 
         assert response.status_code == 404
 
-    async def test_analyze_existing_job(self, client, db_session, job_data):
+    async def test_analyze_existing_job(self, client, db_session, job_data, monkeypatch):
         job = Job(**job_data)
         db_session.add(job)
         await db_session.commit()
         await db_session.refresh(job)
 
+        valid_dimension = DimensionScore(
+            status=DimensionStatus.VALID_SCORE,
+            score=82,
+            explanation="Deterministic API fixture",
+        )
+        result = CandidateMatchResult(
+            eligibility=EligibilityResult(is_eligible=True, status="PASS"),
+            total_score=82,
+            verdict=MatchVerdict.GOOD_MATCH,
+            confidence=0.9,
+            data_quality="HIGH",
+            explanation="Strong overlap with the role requirements.",
+            recommendation="apply",
+            dimensions=MatchDimensions(
+                skills=valid_dimension,
+                experience=valid_dimension,
+                role_alignment=valid_dimension,
+            ),
+            strong_matches=["Python"],
+            provenance=MatchProvenance(
+                candidate_profile_version=1,
+                matching_algorithm_version="test",
+                model_provider="test",
+                model_name="test",
+                generated_at=datetime.now(UTC),
+            ),
+        )
+        monkeypatch.setattr(job_service, "analyze_job", AsyncMock(return_value=result))
+
         response = await client.post(f"{API_PREFIX}/{job.id}/analyze")
 
         assert response.status_code == 200
         body = response.json()
-        assert body["job_id"] == job.id
-        assert "match_score" in body
-        assert "skill_match" in body
-        assert "keyword_match" in body
-        assert "missing_skills" in body
-        assert "suggestions" in body
+        assert body["total_score"] == 82
+        assert body["verdict"] == "GOOD_MATCH"
+        assert body["dimensions"]["skills"]["score"] == 82
+        assert body["strong_matches"] == ["Python"]
 
 
 class TestDeleteJob:

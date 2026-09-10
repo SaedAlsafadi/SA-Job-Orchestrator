@@ -47,6 +47,19 @@ type Props = {
   onStatus?: (msg: string, kind: "success" | "error" | "info") => void;
 };
 
+export function applicationRouteMessage(route: string | null | undefined): string {
+  switch ((route ?? '').toUpperCase()) {
+    case 'EMAIL': return 'Application package ready to email after your approval.';
+    case 'WORKABLE': return 'Application package ready — continue in Workable.';
+    case 'GREENHOUSE': return 'Application package ready — continue in Greenhouse.';
+    case 'LEVER': return 'Application package ready — continue in Lever.';
+    case 'COMPANY_WEBSITE': return 'Application package ready — continue on the company website.';
+    case 'LINKEDIN': return 'Application package ready — continue on LinkedIn.';
+    case 'MANUAL': return 'Review the package and follow the application instructions manually.';
+    default: return 'Select an application route before submission.';
+  }
+}
+
 // Part H: dev-only mock AI. Opt in with localStorage.aa_mock_ai = "1" while in
 // Vite dev mode; fills package components with deterministic fixtures instead
 // of calling the LLM endpoints. Production routing is untouched.
@@ -242,6 +255,7 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
           <>
             <div style={{ marginTop: 12, fontSize: 13 }}>
               <div><strong>Route:</strong> {readiness.route ?? "—"}</div>
+              <div style={{ marginTop: 4, color: 'var(--text-2)' }}>{applicationRouteMessage(readiness.route)}</div>
               <div>
                 <strong>Posting:</strong> {readiness.posting_quality.signal.replace(/_/g, " ")}
                 {" · "}

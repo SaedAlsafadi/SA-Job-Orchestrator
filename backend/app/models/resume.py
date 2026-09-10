@@ -1,6 +1,8 @@
 """Resume database model."""
 
-from sqlalchemy import Float, ForeignKey, Index, String, Text, JSON
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Index, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
@@ -40,6 +42,7 @@ class Resume(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
 
     # Scoring
     ats_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Extracted text for search and analysis
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -84,10 +84,11 @@ async def upload_resume(
     summary="List all resumes",
 )
 async def list_resumes(
+    include_archived: bool = Query(default=False),
     db: AsyncSession = Depends(get_tenant_db),
 ) -> ResumeListResponse:
     """List all uploaded and generated resumes."""
-    return await resume_service.list_resumes(db)
+    return await resume_service.list_resumes(db, include_archived=include_archived)
 
 
 @router.get(
@@ -101,6 +102,18 @@ async def get_resume(
 ) -> ResumeResponse:
     resume = await resume_service.get_resume(db, resume_id)
     return resume
+
+
+@router.post(
+    "/{resume_id}/archive",
+    response_model=ResumeResponse,
+    summary="Archive a resume while preserving historical references",
+)
+async def archive_resume(
+    resume_id: str,
+    db: AsyncSession = Depends(get_tenant_db),
+) -> ResumeResponse:
+    return await resume_service.archive_resume(db, resume_id)
 
 
 @router.post(

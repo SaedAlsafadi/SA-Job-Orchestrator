@@ -3,7 +3,25 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class OpportunityOperationalState(BaseModel):
+    """Related-record summary used to resolve one safe next action."""
+
+    match_exists: bool = False
+    tailoring_session_id: str | None = None
+    tailoring_status: str | None = None
+    tailored_resume_id: str | None = None
+    tailored_resume_verified: bool = False
+    application_id: str | None = None
+    application_status: str | None = None
+    package_id: str | None = None
+    package_version: int | None = None
+    package_ready: bool = False
+    package_approved: bool = False
+    route_type: str | None = None
+    route_url: str | None = None
 
 
 class JobSearchRequest(BaseModel):
@@ -35,6 +53,7 @@ class JobListingResponse(BaseModel):
     posted_date: datetime | None = None
     experience_level: str | None = None
     match_score: float | None = None
+    operational_state: OpportunityOperationalState = Field(default_factory=OpportunityOperationalState)
     skills_required: dict | None = None
     status: str
     
@@ -45,6 +64,15 @@ class JobListingResponse(BaseModel):
     detected_language: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("match_score", mode="before")
+    @classmethod
+    def normalize_match_score(cls, value: float | None) -> float | None:
+        """Canonical API shape is 0..1; legacy rows stored 0..100."""
+        if value is None:
+            return None
+        score = float(value)
+        return score / 100 if abs(score) > 1 else score
 
 
 class JobDetailResponse(JobListingResponse):

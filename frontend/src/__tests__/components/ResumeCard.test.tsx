@@ -15,7 +15,7 @@ const noop = () => {};
 
 describe('ResumeCard', () => {
   it('shows the name, type badge, and ATS (0–1 scaled to percent)', () => {
-    render(<ResumeCard resume={resume()} selected={false} onSelect={noop} onOptimize={noop} onDownload={noop} optimizing={false} />);
+    render(<ResumeCard resume={resume()} selected={false} onSelect={noop} onOptimize={noop} onDownload={noop} onRevise={noop} onArchive={noop} optimizing={false} />);
     expect(screen.getByText('Alex Morgan — Senior PM')).toBeInTheDocument();
     expect(screen.getByText('Optimized')).toBeInTheDocument();
     expect(screen.getByText('86')).toBeInTheDocument();
@@ -25,15 +25,15 @@ describe('ResumeCard', () => {
     const onSelect = vi.fn();
     const onOptimize = vi.fn();
     const onDownload = vi.fn();
-    render(<ResumeCard resume={resume()} selected={false} onSelect={onSelect} onOptimize={onOptimize} onDownload={onDownload} optimizing={false} />);
+    render(<ResumeCard resume={resume()} selected={false} onSelect={onSelect} onOptimize={onOptimize} onDownload={onDownload} onRevise={noop} onArchive={noop} optimizing={false} />);
 
     await userEvent.click(screen.getByRole('button', { name: /select résumé/i }));
     expect(onSelect).toHaveBeenCalledOnce();
 
-    await userEvent.click(screen.getByRole('button', { name: /^optimize$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Optimize r/i }));
     expect(onOptimize).toHaveBeenCalledOnce();
 
-    await userEvent.click(screen.getByRole('button', { name: /^download$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Download r/i }));
     expect(onDownload).toHaveBeenCalledOnce();
     expect(onSelect).toHaveBeenCalledOnce(); // inner buttons don't bubble to select
   });

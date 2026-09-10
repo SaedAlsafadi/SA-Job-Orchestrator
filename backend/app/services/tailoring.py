@@ -15,6 +15,62 @@ from app.schemas.tailoring import CVTailorOutput, CVReviewOutput
 
 logger = structlog.get_logger(__name__)
 
+
+async def get_or_create_revision_session(
+    db: AsyncSession,
+    user_id: str,
+    resume_id: str,
+) -> CVTailoringSession:
+    """Open a workbench session for a tailored résumé without invoking a model.
+
+    Older tailored résumés were generated before session lineage was persisted.
+    For those records we create an empty review session whose immutable source is
+    the selected tailored résumé. Generating suggestions remains an explicit,
+    model-backed action from inside the workbench.
+    """
+    resume = (
+        await db.execute(
+            select(Resume).where(Resume.id == resume_id, Resume.user_id == user_id)
+        )
+    ).scalar_one_or_none()
+    if resume is None:
+        raise ValueError("Résumé not found")
+    if resume.type != "tailored" or not resume.job_id:
+        raise ValueError("Only a tailored résumé with a target job can be revised")
+
+    existing = (
+        await db.execute(
+            select(CVTailoringSession)
+            .where(
+                CVTailoringSession.user_id == user_id,
+                (
+                    (CVTailoringSession.final_resume_id == resume.id)
+                    | (
+                        (CVTailoringSession.base_resume_id == resume.id)
+                        & (CVTailoringSession.status == TailoringStatus.REVIEWING)
+                    )
+                ),
+            )
+            .order_by(CVTailoringSession.updated_at.desc())
+        )
+    ).scalars().first()
+    if existing is not None:
+        return existing
+
+    session = CVTailoringSession(
+        user_id=user_id,
+        job_id=resume.job_id,
+        # The selected immutable tailored version is the source for revision;
+        # finalization creates a new résumé rather than overwriting it.
+        base_resume_id=resume.id,
+        base_resume_version=resume.updated_at.isoformat() if resume.updated_at else None,
+        status=TailoringStatus.REVIEWING,
+    )
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
+
 async def start_tailoring_session(
     db: AsyncSession,
     user_id: str,

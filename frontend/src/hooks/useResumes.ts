@@ -5,10 +5,18 @@ import type { ResumeGenerateRequest } from '@/types/resume';
 const RESUMES_KEY = ['resumes'] as const;
 
 /** Fetch all resumes. */
-export function useResumes() {
+export function useResumes(includeArchived = false) {
   return useQuery({
-    queryKey: [...RESUMES_KEY, 'list'],
-    queryFn: () => resumeService.listResumes(),
+    queryKey: [...RESUMES_KEY, 'list', includeArchived],
+    queryFn: () => resumeService.listResumes(includeArchived),
+  });
+}
+
+export function useArchiveResume() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: resumeService.archiveResume,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RESUMES_KEY }),
   });
 }
 

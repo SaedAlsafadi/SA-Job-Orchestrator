@@ -257,6 +257,12 @@ export const handlers = [
     return HttpResponse.json({ detail: 'No package created yet' }, { status: 404 });
   }),
 
+  http.get('/api/v1/dashboard/dismissals', () => HttpResponse.json({ items: [] })),
+  http.post('/api/v1/dashboard/dismissals', async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ id: 'dismissal-1', dismissed_at: new Date().toISOString(), ...body }, { status: 201 });
+  }),
+
   // Analytics
   http.get('/api/v1/analytics/dashboard', () => {
     return HttpResponse.json({

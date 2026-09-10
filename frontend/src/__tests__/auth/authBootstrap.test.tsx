@@ -5,10 +5,14 @@ import { http, HttpResponse } from 'msw';
 
 import { AuthProvider } from '@/context/AuthProvider';
 import { server } from '@/__tests__/mocks/server';
-import { useAuthStore } from '@/store/useAuthStore';
+import { SESSION_HINT_KEY, useAuthStore } from '@/store/useAuthStore';
 
 describe('AuthProvider boot refresh', () => {
-  beforeEach(() => useAuthStore.getState().clear());
+  beforeEach(() => {
+    useAuthStore.getState().clear();
+    // AuthProvider intentionally probes refresh only for a returning device.
+    localStorage.setItem(SESSION_HINT_KEY, '1');
+  });
 
   it('issues only one /auth/refresh even when the effect double-invokes (StrictMode)', async () => {
     // A rotating-refresh backend revokes the whole token family if the *same* refresh

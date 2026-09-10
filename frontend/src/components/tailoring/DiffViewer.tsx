@@ -9,18 +9,18 @@ interface Props {
 export const DiffViewer: React.FC<Props> = ({ change }) => {
     const { t } = useTranslation();
     return (
-        <div className="diff-viewer text-sm rounded border bg-gray-50 overflow-hidden">
-            <div className="bg-gray-200 px-2 py-1 text-xs text-gray-600 border-b font-mono">
-                {t('target')} {change.target_reference}
+        <div style={{ borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-3)', padding: '6px 10px', font: '600 11px/1.2 var(--mono)', color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>
+                {t('target')}: {change.target_reference}
             </div>
-            <div className="p-2">
+            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(change.change_type === 'remove' || change.change_type === 'modify') && (
-                    <div className="text-red-700 bg-red-50 p-1 mb-1 rounded line-through" dir="auto">
+                    <div style={{ color: 'var(--rejected)', background: 'var(--rejected-soft)', padding: '6px 10px', borderRadius: 'var(--r-sm)', font: '400 13px/1.4 var(--font)', textDecoration: 'line-through' }} dir="auto">
                         - {change.original_text || 'None'}
                     </div>
                 )}
                 {(change.change_type === 'add' || change.change_type === 'modify') && (
-                    <div className="text-green-800 bg-green-50 p-1 rounded" dir="auto">
+                    <div style={{ color: 'var(--applied)', background: 'var(--applied-soft)', padding: '6px 10px', borderRadius: 'var(--r-sm)', font: '400 13px/1.4 var(--font)' }} dir="auto">
                         + {change.proposed_text}
                     </div>
                 )}
@@ -28,4 +28,3 @@ export const DiffViewer: React.FC<Props> = ({ change }) => {
         </div>
     );
 };
-

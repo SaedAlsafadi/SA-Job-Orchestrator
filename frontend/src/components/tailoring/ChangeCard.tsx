@@ -23,21 +23,40 @@ export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevi
         }
     };
 
-    let statusColor = 'bg-white border-gray-200';
-    if (change.user_decision === 'accepted') statusColor = 'bg-green-50 border-green-200';
-    if (change.user_decision === 'rejected') statusColor = 'bg-red-50 border-red-200';
+    let borderColor = 'var(--border)';
+    let bgColor = 'var(--surface)';
+    if (change.user_decision === 'accepted') {
+        borderColor = 'var(--applied)';
+        bgColor = 'var(--applied-soft)';
+    } else if (change.user_decision === 'rejected') {
+        borderColor = 'var(--rejected)';
+        bgColor = 'var(--rejected-soft)';
+    }
 
     return (
-        <div className={'change-card border p-4 rounded-lg shadow-sm mb-4 transition-colors ' + statusColor}>
-            <div className="flex justify-between items-center mb-2">
-                <span className="font-bold uppercase text-xs text-gray-500">{change.change_type}</span>
+        <div style={{
+            border: `1px solid ${borderColor}`,
+            background: bgColor,
+            padding: 16,
+            borderRadius: 'var(--r-md)',
+            marginBottom: 16,
+            transition: 'all .2s'
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ font: '700 11px/1 var(--font)', textTransform: 'uppercase', color: 'var(--text-3)', letterSpacing: '.04em' }}>
+                    {change.change_type}
+                </span>
                 
-                <div className="flex gap-2">
-                    {change.review_severity === 'warning' && <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-bold text-xs">{t('warning')}</span>}
-                    {change.review_severity === 'blocked' && <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold text-xs">{t('blocked')}</span>}
+                <div style={{ display: 'flex', gap: 6 }}>
+                    {change.review_severity === 'warning' && <span style={{ background: 'var(--warning-soft)', color: 'var(--warning)', padding: '4px 6px', borderRadius: 'var(--r-sm)', font: '700 10px/1 var(--font)', textTransform: 'uppercase' }}>{t('warning')}</span>}
+                    {change.review_severity === 'blocked' && <span style={{ background: 'var(--failed-soft)', color: 'var(--failed)', padding: '4px 6px', borderRadius: 'var(--r-sm)', font: '700 10px/1 var(--font)', textTransform: 'uppercase' }}>{t('blocked')}</span>}
                     {change.user_decision !== 'pending' && (
-                        <span className={'px-2 py-0.5 rounded font-bold text-xs ' + (change.user_decision === 'accepted' ? 'text-green-700 bg-green-200' : 'text-red-700 bg-red-200')}>
-                            {t(change.user_decision).toUpperCase()}
+                        <span style={{
+                            padding: '4px 6px', borderRadius: 'var(--r-sm)', font: '800 10px/1 var(--font)', textTransform: 'uppercase',
+                            background: change.user_decision === 'accepted' ? 'var(--applied)' : 'var(--rejected)',
+                            color: '#fff'
+                        }}>
+                            {t(change.user_decision)}
                         </span>
                     )}
                 </div>
@@ -45,34 +64,41 @@ export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevi
             
             <DiffViewer change={change} />
             
-            <div className="mt-3 text-sm text-gray-700">
-                <strong>{t('reason')}</strong> {change.reason}
+            <div style={{ marginTop: 12, font: '500 13px/1.4 var(--font)', color: 'var(--text)' }}>
+                <strong style={{ color: 'var(--text-2)' }}>{t('reason')}:</strong> {change.reason}
             </div>
             
             {change.review_severity !== 'safe' && (
-                <div className={'mt-2 text-xs p-2 rounded ' + (change.review_severity === 'blocked' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800')}>
-                    <strong>{t('ai_review')}</strong> {change.review_reason}
+                <div style={{
+                    marginTop: 12, padding: 10, borderRadius: 'var(--r-sm)', font: '500 12px/1.4 var(--font)',
+                    background: change.review_severity === 'blocked' ? 'var(--failed-soft)' : 'var(--warning-soft)',
+                    color: change.review_severity === 'blocked' ? 'var(--failed)' : 'var(--warning)'
+                }}>
+                    <strong>{t('ai_review')}:</strong> {change.review_reason}
                 </div>
             )}
             
-            <div className="mt-4 flex gap-2">
+            <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
                 {change.user_decision === 'pending' && (
                     <>
                         <button 
                             disabled={change.review_severity === 'blocked'} 
                             onClick={onAccept}
                             title={change.review_severity === 'blocked' ? 'Cannot accept blocked changes' : ''}
-                            className="px-3 py-1 bg-green-600 text-white text-sm rounded disabled:opacity-50 hover:bg-green-700">
+                            style={{ padding: '6px 12px', background: 'var(--applied)', color: '#fff', border: 'none', borderRadius: 'var(--r-sm)', font: '700 12px/1 var(--font)', cursor: 'pointer', opacity: change.review_severity === 'blocked' ? 0.5 : 1 }}
+                        >
                             Accept
                         </button>
                         <button 
                             onClick={onReject}
-                            className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
+                            style={{ padding: '6px 12px', background: 'var(--surface-3)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', font: '700 12px/1 var(--font)', cursor: 'pointer' }}
+                        >
                             Reject
                         </button>
                         <button 
                             onClick={() => setIsRevising(!isRevising)}
-                            className="px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded hover:bg-gray-300">
+                            style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-2)', border: '1px solid transparent', borderRadius: 'var(--r-sm)', font: '600 12px/1 var(--font)', cursor: 'pointer' }}
+                        >
                             Revise
                         </button>
                     </>
@@ -81,30 +107,29 @@ export const ChangeCard: React.FC<Props> = ({ change, onAccept, onReject, onRevi
                     <button 
                         onClick={() => change.user_decision === 'accepted' ? onReject() : onAccept()}
                         disabled={change.user_decision === 'rejected' && change.review_severity === 'blocked'}
-                        className="px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded hover:bg-gray-300 disabled:opacity-50">
+                        style={{ padding: '6px 12px', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', font: '600 12px/1 var(--font)', cursor: 'pointer', opacity: (change.user_decision === 'rejected' && change.review_severity === 'blocked') ? 0.5 : 1 }}
+                    >
                         Undo Decision
                     </button>
                 )}
             </div>
 
             {isRevising && (
-                <div className="mt-3 p-3 bg-gray-50 border rounded">
-                    <label className="block text-xs font-bold mb-1">What should be changed?</label>
-                    <input 
-                        type="text" 
+                <div style={{ marginTop: 16, padding: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)' }}>
+                    <label style={{ display: 'block', font: '700 11px/1 var(--font)', color: 'var(--text-3)', marginBottom: 8, textTransform: 'uppercase' }}>What should be changed?</label>
+                    <input
+                        type="text"
                         value={instruction}
                         onChange={e => setInstruction(e.target.value)}
-                        className="w-full border p-1 text-sm rounded mb-2" 
+                        style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', font: '400 13px/1.4 var(--font)', color: 'var(--text)', marginBottom: 12, outline: 'none' }}
                         placeholder="e.g., Make it sound more technical"
                     />
-                    <div className="flex gap-2">
-                        <button onClick={handleReviseSubmit} className="px-2 py-1 bg-blue-600 text-white text-xs rounded">Submit Revision</button>
-                        <button onClick={() => setIsRevising(false)} className="px-2 py-1 bg-gray-300 text-xs rounded">Cancel</button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={handleReviseSubmit} style={{ padding: '6px 12px', background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none', borderRadius: 'var(--r-sm)', font: '700 12px/1 var(--font)', cursor: 'pointer' }}>Submit</button>
+                        <button onClick={() => setIsRevising(false)} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-2)', border: 'none', font: '600 12px/1 var(--font)', cursor: 'pointer' }}>Cancel</button>
                     </div>
                 </div>
             )}
         </div>
     );
 };
-
-

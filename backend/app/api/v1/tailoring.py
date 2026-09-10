@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.api.dependencies import get_db, get_current_user
+from app.api.deps import get_db, get_current_user
 from app.models.user import User
 from app.models.tailoring import CVTailoringSession, CVTailoringChange
 from app.schemas.tailoring import (
@@ -12,12 +12,49 @@ from app.schemas.tailoring import (
     CVTailoringDecisionsRequest,
     CVTailoringReviseRequest
 )
-from app.services.tailoring import start_tailoring_session
+from app.services.tailoring import get_or_create_revision_session, start_tailoring_session
 from app.core.llm.factory import build_llm_router_for_user
 from app.models.enums import TailoringStatus, ReviewerStatus
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/tailoring", tags=["tailoring"])
+
+
+@router.get("/resume/{resume_id}", response_model=CVTailoringSessionSchema)
+async def api_get_session_for_resume(
+    resume_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Resolve the existing workbench session that produced a tailored resume."""
+    result = await db.execute(
+        select(CVTailoringSession)
+        .where(
+            CVTailoringSession.final_resume_id == resume_id,
+            CVTailoringSession.user_id == user.id,
+        )
+        .order_by(CVTailoringSession.updated_at.desc())
+    )
+    session = result.scalars().first()
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tailoring session not found")
+    await db.refresh(session, ["changes"])
+    return session
+
+
+@router.post("/resume/{resume_id}/revision", response_model=CVTailoringSessionSchema)
+async def api_open_resume_revision(
+    resume_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Open a deterministic revision workbench, including for legacy résumés."""
+    try:
+        session = await get_or_create_revision_session(db, user.id, resume_id)
+        await db.refresh(session, ["changes"])
+        return session
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @router.post("/start", response_model=CVTailoringSessionSchema)
 async def api_start_tailoring(

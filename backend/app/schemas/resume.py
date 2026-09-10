@@ -68,6 +68,7 @@ class ResumeResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     content_text: str | None = None
+    archived_at: datetime | None = None
 
     @model_validator(mode="before")
     @classmethod

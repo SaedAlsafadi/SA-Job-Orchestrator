@@ -18,8 +18,8 @@ export async function uploadResume(file: File): Promise<ResumeUploadResponse> {
 }
 
 /** List all uploaded and generated resumes. */
-export async function listResumes(): Promise<ResumeListResponse> {
-  const { data } = await api.get<ResumeListResponse>('/resumes/');
+export async function listResumes(includeArchived = false): Promise<ResumeListResponse> {
+  const { data } = await api.get<ResumeListResponse>('/resumes/', { params: { include_archived: includeArchived } });
   return data;
 }
 
@@ -76,6 +76,11 @@ export async function downloadResumeFile(
 /** Get a single resume by ID. */
 export async function getResume(resumeId: string): Promise<Resume> {
   const { data } = await api.get<Resume>(`/resumes/${resumeId}`);
+  return data;
+}
+
+export async function archiveResume(resumeId: string): Promise<Resume> {
+  const { data } = await api.post<Resume>(`/resumes/${resumeId}/archive`);
   return data;
 }
 

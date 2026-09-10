@@ -15,6 +15,7 @@ export interface Resume {
   created_at: string;
   updated_at: string;
   content_text?: string | null;
+  archived_at?: string | null;
 }
 
 /** Alias matching the backend schema name `ResumeResponse`. */

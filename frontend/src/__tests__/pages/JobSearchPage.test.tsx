@@ -37,7 +37,7 @@ describe('JobSearchPage', () => {
     expect(await screen.findByText('Senior Product Manager')).toBeInTheDocument();
     // Company is shown in the card subtitle (company · location), so match on substring.
     expect(screen.getByText(/Northwind Labs/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /prepare application/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /tailor cv/i })).toBeInTheDocument();
   });
 
   it('searches with the typed query', async () => {
@@ -67,7 +67,7 @@ describe('JobSearchPage', () => {
     await waitFor(() => expect(analyzedId).toBe('j1'));
   });
 
-  it('opens the job drawer with the analysis when a job title is clicked', async () => {
+  it('opens the job drawer when a job title is clicked', async () => {
     server.use(http.get('/api/v1/jobs/', () => HttpResponse.json(listOf(job()))));
     server.use(http.post('/api/v1/jobs/:id/analyze', () =>
       HttpResponse.json({ job_id: 'j1', match_score: 0.88, skill_match: 0.9, keyword_match: 0.8, missing_skills: ['GraphQL'], suggestions: ['Add GraphQL experience'] }),
@@ -75,7 +75,7 @@ describe('JobSearchPage', () => {
     renderJobs();
     await userEvent.click(await screen.findByRole('button', { name: 'Senior Product Manager' }));
     expect(await screen.findByRole('dialog', { name: /job details/i })).toBeInTheDocument();
-    expect(await screen.findByText('GraphQL')).toBeInTheDocument();
+    expect(screen.getByText('Own the roadmap.')).toBeInTheDocument();
   });
 
   it('distinguishes "no results for this search" from "not searched yet" (BUG-008)', async () => {
@@ -83,13 +83,13 @@ describe('JobSearchPage', () => {
     server.use(http.post('/api/v1/jobs/search', () => HttpResponse.json(listOf())));
     renderJobs();
     // Before any search: the pre-search empty state.
-    expect(await screen.findByText(/no jobs yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no opportunities yet/i)).toBeInTheDocument();
     // Run a search that returns nothing.
     await userEvent.type(screen.getByLabelText(/job title or keywords/i), 'unobtanium');
     await userEvent.click(screen.getByRole('button', { name: /^search$/i }));
     // Now the copy must reflect that a search ran and matched nothing.
     expect(await screen.findByText(/no matching roles/i)).toBeInTheDocument();
-    expect(screen.queryByText(/no jobs yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no opportunities yet/i)).not.toBeInTheDocument();
   });
 
   it('toggles a platform chip off', async () => {

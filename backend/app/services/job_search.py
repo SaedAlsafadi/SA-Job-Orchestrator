@@ -19,6 +19,10 @@ from app.core.exceptions import RecordNotFoundError
 from app.core.job_discovery.exa_search import ExaJobSearch
 from app.models.job import Job
 from app.models.resume import Resume
+from app.models.tailoring import CVTailoringSession
+from app.models.application import Application
+from app.models.application_package import ApplicationPackage
+from app.models.application_route import ApplicationRoute
 from app.models.candidate_profile import CandidateProfile
 from app.schemas.candidate_profile import CandidateProfileSchema
 from app.services.matching import CandidateJobMatcher
@@ -28,13 +32,92 @@ import asyncio
 from app.observability.metrics import job_searches_total, jobs_found_total
 from app.schemas.matching import CandidateMatchResult
 from app.schemas.job import (
-    
+    OpportunityOperationalState,
     JobListingResponse,
     JobListResponse,
     JobSearchRequest,
 )
 
 logger = structlog.get_logger(__name__)
+
+
+def _stored_match_score(score: int | float | None) -> float | None:
+    """Persist new match scores in the canonical 0..1 representation."""
+    if score is None:
+        return None
+    value = float(score)
+    return value / 100 if abs(value) > 1 else value
+
+
+async def _operational_states(db: AsyncSession, jobs: list[Job]) -> dict[str, dict[str, Any]]:
+    """Batch related workflow records for opportunity-card decisions."""
+    ids = [job.id for job in jobs]
+    if not ids:
+        return {}
+    sessions = list((await db.execute(select(CVTailoringSession).where(CVTailoringSession.job_id.in_(ids)))).scalars())
+    tailored = list((await db.execute(select(Resume).where(Resume.job_id.in_(ids), Resume.type == "tailored"))).scalars())
+    applications = list((await db.execute(select(Application).where(Application.job_id.in_(ids)))).scalars())
+    packages = list((await db.execute(select(ApplicationPackage).where(ApplicationPackage.job_id.in_(ids), ApplicationPackage.is_current.is_(True)))).scalars())
+    routes = list((await db.execute(select(ApplicationRoute).where(ApplicationRoute.job_id.in_(ids)))).scalars())
+
+    def latest(rows: list[Any], job_id: str) -> Any | None:
+        matches = [row for row in rows if row.job_id == job_id]
+        return max(matches, key=lambda row: row.updated_at or row.created_at) if matches else None
+
+    states: dict[str, dict[str, Any]] = {}
+    for job in jobs:
+        session = latest(sessions, job.id)
+        resume = next((r for r in tailored if session and r.id == session.final_resume_id), None) or latest(tailored, job.id)
+        application = latest(applications, job.id)
+        package = latest(packages, job.id)
+        route = next((r for r in routes if package and r.id == package.route_id), None)
+        if route is None:
+            candidates = [r for r in routes if r.job_id == job.id]
+            route = next((r for r in candidates if r.is_preferred), None) or (latest(candidates, job.id) if candidates else None)
+        route_type = route.route_type.upper() if route else None
+        package_ready = False
+        if package:
+            package_ready = bool(package.resume_id and package.cover_letter_text)
+            if route_type == "EMAIL":
+                package_ready = package_ready and bool(package.email_to and package.email_subject and package.email_body)
+            package_ready = package_ready and package.qa_verdict != "blocked"
+        raw = job.raw_data if isinstance(job.raw_data, dict) else {}
+        analysis_keys = {"strengths", "gaps", "critical_gaps", "recommendation", "requirement_analysis"}
+        states[job.id] = {
+            "match_exists": bool(analysis_keys.intersection(raw) or job.match_score is not None),
+            "tailoring_session_id": session.id if session else None,
+            "tailoring_status": str(session.status) if session else None,
+            "tailored_resume_id": resume.id if resume else None,
+            # Modern sessions prove verification explicitly. Legacy generated
+            # tailored résumés predate session tracking, so their persisted
+            # document artifact + canonical content is the best existing proof.
+            "tailored_resume_verified": bool(
+                resume
+                and (
+                    (session and str(session.status) == "verified" and session.final_resume_id == resume.id)
+                    or (resume.content_text and (resume.file_path_pdf or resume.file_path_docx))
+                )
+            ),
+            "application_id": application.id if application else None,
+            "application_status": str(application.status) if application else None,
+            "package_id": package.id if package else None,
+            "package_version": package.version if package else None,
+            "package_ready": package_ready,
+            "package_approved": bool(package and package.approval_id and package.approved_at),
+            "route_type": route_type,
+            "route_url": route.url if route else None,
+        }
+    return states
+
+
+async def _job_responses(db: AsyncSession, jobs: list[Job]) -> list[JobListingResponse]:
+    states = await _operational_states(db, jobs)
+    responses: list[JobListingResponse] = []
+    for job in jobs:
+        response = JobListingResponse.model_validate(job)
+        response.operational_state = OpportunityOperationalState(**states[job.id])
+        responses.append(response)
+    return responses
 
 
 def _job_identity(job: Job) -> str:
@@ -208,7 +291,7 @@ async def search_jobs(
                     if j.match_score is None:
                         try:
                             res = await matcher.match_candidate(candidate, j)
-                            j.match_score = res.total_score or 0
+                            j.match_score = _stored_match_score(res.total_score or 0)
                             
                             is_eligible = False
                             if hasattr(res, "eligibility") and hasattr(res.eligibility, "is_eligible"):
@@ -240,7 +323,7 @@ async def search_jobs(
 
     # Apply limit
     limited = all_jobs[: request.limit]
-    items = [JobListingResponse.model_validate(j) for j in limited]
+    items = await _job_responses(db, limited)
 
     return JobListResponse(
         items=items,
@@ -335,7 +418,7 @@ async def list_jobs(
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
-    items = [JobListingResponse.model_validate(j) for j in jobs]
+    items = await _job_responses(db, jobs)
 
     return JobListResponse(
         items=items,
@@ -409,7 +492,7 @@ async def analyze_job(
     result = await matcher.match_candidate(schema, job, language=language)
     
     # Save score to DB
-    job.match_score = result.total_score
+    job.match_score = _stored_match_score(result.total_score)
     await db.commit()
     
     return result

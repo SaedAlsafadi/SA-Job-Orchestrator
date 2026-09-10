@@ -29,6 +29,7 @@ from app.models.user import User
 from app.models.user_credential import UserCredential
 from app.models.user_llm_config import UserLLMConfig
 from app.models.user_settings import UserSettings
+from app.models.dashboard_dismissal import DashboardDismissal
 from app.models.telegram_connection import (
     TelegramConnection,
     TelegramLinkToken,
@@ -68,6 +69,7 @@ __all__ = [
     "UserCredential",
     "UserLLMConfig",
     "UserSettings",
+    "DashboardDismissal",
     "pg_enum",
     "TelegramConnection",
     "TelegramLinkToken",

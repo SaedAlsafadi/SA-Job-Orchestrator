@@ -52,7 +52,8 @@ async def get_job(
 ) -> JobDetailResponse:
     """Get one of the current user's job listings by ID. Returns 404 if not found."""
     job = await job_service.get_job(db, job_id)
-    return JobDetailResponse.model_validate(job)
+    listing = (await job_service._job_responses(db, [job]))[0]
+    return JobDetailResponse(**listing.model_dump(), routes=job.routes)
 
 
 @router.post(

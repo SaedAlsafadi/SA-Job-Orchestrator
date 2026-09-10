@@ -21,7 +21,7 @@ export interface CVTailoringSession {
     id: string;
     job_id: string;
     base_resume_id: string;
-    status: 'reviewing' | 'rendering' | 'verified' | 'failed';
+    status: 'draft' | 'reviewing' | 'approved' | 'rendering' | 'verified' | 'failed';
     final_resume_id?: string | null;
     changes: CVTailoringChange[];
 }
@@ -34,6 +34,16 @@ export const tailoringService = {
     
     getSession: async (session_id: string): Promise<CVTailoringSession> => {
         const response = await api.get('/tailoring/' + session_id);
+        return response.data;
+    },
+
+    getSessionForResume: async (resume_id: string): Promise<CVTailoringSession> => {
+        const response = await api.get('/tailoring/resume/' + resume_id);
+        return response.data;
+    },
+
+    openRevisionSession: async (resume_id: string): Promise<CVTailoringSession> => {
+        const response = await api.post('/tailoring/resume/' + resume_id + '/revision');
         return response.data;
     },
     

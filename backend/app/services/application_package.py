@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -154,7 +155,33 @@ async def _default_route_id(db: AsyncSession, app: Application) -> str | None:
             )
         )
     ).scalars().first()
-    return route.id if route else None
+    if route:
+        return route.id
+
+    # Legacy opportunities may predate route resolution. A package must still
+    # explain the next safe step without invoking a model: use an explicit
+    # application URL when one exists, otherwise create an honest manual route.
+    job = app.job
+    explicit_url = job.application_url if job else None
+    route = ApplicationRoute(
+        user_id=app.user_id,
+        job_id=app.job_id,
+        route_type="COMPANY_WEBSITE" if explicit_url else "MANUAL",
+        url=explicit_url,
+        instructions=(
+            "Continue on the company application website."
+            if explicit_url
+            else "Review the package and follow the posting's application instructions manually."
+        ),
+        confidence=1.0 if explicit_url else 0.0,
+        resolution_reason="Package-time deterministic route fallback",
+        requires_human=True,
+        is_preferred=True,
+        resolved_at=datetime.now(UTC),
+    )
+    db.add(route)
+    await db.flush()
+    return route.id
 
 
 async def create_or_update_package(
@@ -183,7 +210,7 @@ async def create_or_update_package(
 
     # Defaults from the application / current package when not explicitly provided.
     if route_id is None:
-        route_id = current.route_id if current else await _default_route_id(db, app)
+        route_id = (current.route_id if current else None) or await _default_route_id(db, app)
     if route_id:
         route = await db.get(ApplicationRoute, route_id)
         if route is None or route.user_id != user_id or route.job_id != app.job_id:

@@ -168,12 +168,14 @@ async def test_api_create_package_and_readiness(client, db_session):
     body = resp.json()
     assert body["version"] == 1
     assert body["is_current"] is True
+    assert body["route_id"] is not None
 
     resp = await client.get(f"/api/v1/applications/{app.id}/readiness")
     assert resp.status_code == 200
     readiness = resp.json()
     assert readiness["ready"] is False
     assert "tailored CV" in readiness["missing"]
+    assert readiness["route"] == "MANUAL"
 
 
 @pytest.mark.asyncio

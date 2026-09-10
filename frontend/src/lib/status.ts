@@ -1,5 +1,18 @@
-/** Status + score presentation, mapped to the design's token palette. Shared by the
- *  pipeline table, status pills, and the app-detail drawer. */
+/**
+ * Score normalization utilities.
+ *
+ * CANONICAL CONTRACT (established from backend inspection):
+ * ─────────────────────────────────────────────────────────
+ * Job.match_score          → float 0–1  (stored in DB, from matching.py)
+ * CandidateMatchResult.total_score → int 0–100  (from matching LLM result)
+ * DimensionScore.score     → int 0–100  (from matching schema)
+ * ResumeScoreResponse.*_score → float 0–1  (from resume scoring endpoint)
+ *
+ * DISPLAY RULE:
+ * Use atsPercent(score) when the value is a 0–1 float (Job.match_score, resume scores).
+ * Use the value directly when it is already 0–100 (CandidateMatchResult.total_score).
+ * NEVER call atsPercent() on a value that is already 0–100.
+ */
 
 export interface StatusMeta {
   label: string;
@@ -32,15 +45,22 @@ export function isApprovable(status: string): boolean {
 }
 
 /**
- * Scale a 0–1 ATS/match score (as the API returns it) to a 0–100 integer for display.
- * Use this everywhere a score is shown or passed to {@link atsColor} — the raw 0–1 value
- * would otherwise render as "0"/"1" and always land in the rejected color band.
+ * Scale a 0–1 ATS/match score to a 0–100 integer for display.
+ *
+ * USE THIS when the source value is a 0–1 float:
+ *   - Job.match_score
+ *   - ResumeScoreResponse.*_score
+ *
+ * DO NOT USE THIS for CandidateMatchResult.total_score (already 0–100 int).
  */
 export function atsPercent(score: number | null | undefined): number {
   return Math.round((score ?? 0) * 100);
 }
 
-/** ATS-score color band (offer / applied / review / rejected). Expects a 0–100 value. */
+/**
+ * ATS-score color band (offer / applied / review / rejected).
+ * Expects a 0–100 integer value.
+ */
 export function atsColor(score: number): string {
   if (score >= 85) return 'var(--offer)';
   if (score >= 75) return 'var(--applied)';
@@ -48,7 +68,9 @@ export function atsColor(score: number): string {
   return 'var(--rejected)';
 }
 
-/** Compact relative time ("just now", "5m", "3h", "2d", or a short date). */
+/**
+ * Compact relative time ("just now", "5m", "3h", "2d", or a short date).
+ */
 export function relativeTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   const then = new Date(iso).getTime();

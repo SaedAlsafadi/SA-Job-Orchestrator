@@ -174,7 +174,7 @@ async def upload_resume(
     )
 
 
-async def list_resumes(db: AsyncSession) -> ResumeListResponse:
+async def list_resumes(db: AsyncSession, include_archived: bool = False) -> ResumeListResponse:
     """List all resumes.
 
     Args:
@@ -183,7 +183,10 @@ async def list_resumes(db: AsyncSession) -> ResumeListResponse:
     Returns:
         List of all resumes with total count.
     """
-    result = await db.execute(select(Resume).order_by(Resume.created_at.desc()))
+    query = select(Resume)
+    if not include_archived:
+        query = query.where(Resume.archived_at.is_(None))
+    result = await db.execute(query.order_by(Resume.created_at.desc()))
     resumes = list(result.scalars().all())
     items = [ResumeResponse.model_validate(r) for r in resumes]
     return ResumeListResponse(items=items, total=len(items))
@@ -196,6 +199,18 @@ async def get_resume(db: AsyncSession, resume_id: str) -> Resume:
     if resume is None:
         raise RecordNotFoundError("Resume", resume_id)
     return resume
+
+
+async def archive_resume(db: AsyncSession, resume_id: str) -> ResumeResponse:
+    """Archive a resume without invalidating immutable historical references."""
+    from datetime import datetime, timezone
+
+    resume = await get_resume(db, resume_id)
+    if resume.archived_at is None:
+        resume.archived_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(resume)
+    return ResumeResponse.model_validate(resume)
 
 
 async def _get_job(db: AsyncSession, job_id: str) -> Job:
