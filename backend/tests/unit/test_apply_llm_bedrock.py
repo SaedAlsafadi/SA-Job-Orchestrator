@@ -15,3 +15,6 @@ def test_bedrock_model_returns_bedrock_chat_without_api_key() -> None:
 def test_non_bedrock_model_uses_openai_byo_key() -> None:
     llm = build_apply_llm("sk-test", "gpt-4o")
     assert type(llm).__name__ == "ChatOpenAI"
+import pytest
+
+pytest.importorskip("browser_use", reason="Optional live browser automation dependency is not installed")

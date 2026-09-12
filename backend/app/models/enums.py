@@ -78,6 +78,16 @@ class LLMPurpose(StrEnum):
     JOB_ANALYSIS = "job_analysis"
     HARNESS_JUDGE = "harness_judge"
     SKILL_DISTILL = "skill_distill"
+    MATCH_DEEP = "match_deep"
+    JOB_REQUIREMENT_ANALYSIS = "job_requirement_analysis"
+    MATCH_EXPLANATION = "match_explanation"
+    CV_TAILOR = "cv_tailor"
+    CV_REVIEW = "cv_review"
+    APPLICATION_QA = "application_qa"
+    APPLICATION_EMAIL = "application_email"
+    APPLICATION_ANSWERS = "application_answers"
+    JOB_NORMALIZATION = "job_normalization"
+    ROUTE_RESOLUTION = "route_resolution"
     GENERAL = "general"
 
 

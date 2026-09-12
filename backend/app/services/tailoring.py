@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime, UTC
 from difflib import SequenceMatcher
@@ -156,8 +157,14 @@ ALL proposed texts and reasons MUST be written in {language}.
             task=LLMTask.CV_TAILOR,
             prompt=prompt_tailor,
             system_prompt=system_prompt_tailor,
-            output_schema=CVTailorOutput
+            output_schema=CVTailorOutput,
+            max_tokens=8192,
         )
+    except asyncio.CancelledError:
+        # A browser disconnect/timeout must not strand a session in REVIEWING.
+        session.status = TailoringStatus.FAILED
+        await asyncio.shield(db.commit())
+        raise
     except Exception as e:
         logger.error("Tailoring failed", error=str(e))
         session.status = TailoringStatus.FAILED
@@ -217,7 +224,8 @@ Otherwise mark SAFE.
                 task=LLMTask.CV_REVIEW,
                 prompt=prompt_review,
                 system_prompt=system_prompt_review,
-                output_schema=CVReviewOutput
+                output_schema=CVReviewOutput,
+                max_tokens=8192,
             )
             
             # Map review results
@@ -474,7 +482,8 @@ ALL proposed texts and reasons MUST be written in {language}.
             task=LLMTask.CV_TAILOR,
             prompt=prompt_revise,
             system_prompt=system_prompt_revise,
-            output_schema=CVTailorOutput
+            output_schema=CVTailorOutput,
+            max_tokens=8192,
         )
         
         if not tailor_result.changes:
@@ -521,7 +530,8 @@ Otherwise mark SAFE.
             task=LLMTask.CV_REVIEW,
             prompt=prompt_review,
             system_prompt=system_prompt_review,
-            output_schema=CVReviewOutput
+            output_schema=CVReviewOutput,
+            max_tokens=8192,
         )
         
         if review_result.reviews:

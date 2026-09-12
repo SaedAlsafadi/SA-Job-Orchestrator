@@ -43,10 +43,14 @@ function TelegramSettings() {
 
   return (
     <section style={{ ...card, marginBottom: 14 }}>
-      <SectionTitle icon="smartphone" title="Telegram Integration" sub="Get mobile notifications and send jobs to AutoApply." />
+      <SectionTitle icon="smartphone" title="Telegram Integration" sub="Get mobile notifications and send jobs to your configured bot." />
       <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <p style={{ margin: 0, font: '500 13px/1.4 var(--font)', color: 'var(--text-1)' }}>
           Status: <strong style={{ color: data?.status === 'CONNECTED' ? 'var(--primary)' : 'var(--text-3)' }}>{data?.status}</strong>
+        </p>
+        <p style={{ margin: 0, font: '500 13px/1.4 var(--font)', color: 'var(--text-2)' }}>
+          Bot: <strong>{data?.bot_username ? `@${data.bot_username}` : 'Not configured'}</strong>
+          {' · '}{data?.bot_running ? `Running (${data.update_mode})` : 'Unavailable'}
         </p>
         
         {data?.status === 'CONNECTED' ? (
@@ -57,7 +61,7 @@ function TelegramSettings() {
         ) : (
           <div>
             {!tokenData ? (
-              <button onClick={getLink} style={buttonStyle('var(--primary)', 'white', 'none')}>Connect Telegram</button>
+              <button disabled={!data?.bot_running} onClick={getLink} style={{ ...buttonStyle('var(--primary)', 'white', 'none'), opacity: data?.bot_running ? 1 : .55 }}>Connect Telegram</button>
             ) : (
               <a href={tokenData.bot_url} target="_blank" rel="noreferrer" style={{ ...buttonStyle('var(--primary)', 'white', 'none'), display: 'inline-block', textDecoration: 'none' }}>Open Telegram Bot</a>
             )}

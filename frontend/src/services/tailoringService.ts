@@ -1,6 +1,8 @@
 import api from './api';
 import type { Resume } from '../types/resume';
 
+const LLM_ACTION_TIMEOUT_MS = 300_000;
+
 export interface CVTailoringChange {
     change_id: string;
     target_type: string;
@@ -28,7 +30,11 @@ export interface CVTailoringSession {
 
 export const tailoringService = {
     startSession: async (job_id: string, base_resume_id: string): Promise<CVTailoringSession> => {
-        const response = await api.post('/tailoring/start', { job_id, base_resume_id });
+        const response = await api.post(
+            '/tailoring/start',
+            { job_id, base_resume_id },
+            { timeout: LLM_ACTION_TIMEOUT_MS },
+        );
         return response.data;
     },
     
@@ -53,12 +59,20 @@ export const tailoringService = {
     },
     
     regenerateSession: async (session_id: string): Promise<CVTailoringSession> => {
-        const response = await api.post('/tailoring/' + session_id + '/regenerate');
+        const response = await api.post(
+            '/tailoring/' + session_id + '/regenerate',
+            undefined,
+            { timeout: LLM_ACTION_TIMEOUT_MS },
+        );
         return response.data;
     },
     
     reviseChange: async (session_id: string, change_id: string, instruction: string): Promise<any> => {
-        const response = await api.post('/tailoring/' + session_id + '/revise', { change_id, instructions: instruction });
+        const response = await api.post(
+            '/tailoring/' + session_id + '/revise',
+            { change_id, instructions: instruction },
+            { timeout: LLM_ACTION_TIMEOUT_MS },
+        );
         return response.data;
     },
     

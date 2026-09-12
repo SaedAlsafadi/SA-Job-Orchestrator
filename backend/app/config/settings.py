@@ -191,6 +191,9 @@ class Settings(BaseSettings):
     telegram_enabled: bool = False
     telegram_polling: bool = True
     telegram_bot_token: SecretStr | None = None
+    # Public bot identity used for deep links and Settings display. The token is
+    # backend-only and is never included in an API response.
+    telegram_bot_username: str | None = None
     telegram_proxy: str | None = None
     frontend_url: str = "http://localhost:3000"
 

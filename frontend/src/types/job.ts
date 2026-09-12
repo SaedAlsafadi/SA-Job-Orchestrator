@@ -78,6 +78,10 @@ export interface RequirementAnalysis {
   status: RequirementStatus;
   evidence_ids: string[];
   explanation: string;
+  evidence_type?: "DIRECT" | "TRANSFERABLE" | "WEAK" | "NONE" | "UNKNOWN";
+  candidate_evidence?: Array<{ evidence_id: string; description: string }>;
+  contribution?: number;
+  max_contribution?: number;
 }
 
 export type DimensionStatus = "VALID_SCORE" | "UNKNOWN" | "INSUFFICIENT_DATA" | "NOT_APPLICABLE";

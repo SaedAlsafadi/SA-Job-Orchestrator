@@ -143,13 +143,19 @@ async def gen_email(
     user: CurrentUser,
     db: AsyncSession = Depends(get_tenant_db),
 ) -> PackageResponse:
-    llm_router = await build_llm_router_for_user(db, user.id)
     try:
         current = await package_service.get_current_package(db, app_id, user.id)
+        if current is None:
+            raise package_service.PackageError("Create an application package first.")
         route_email = None
         if current and current.route_id:
             route = await db.get(ApplicationRoute, current.route_id)
+            if route is None or route.route_type.upper() != "EMAIL":
+                raise package_service.PackageError(
+                    "Application email is only generated for an EMAIL route."
+                )
             route_email = route.email if route else None
+        llm_router = await build_llm_router_for_user(db, user.id)
         generated = await package_generation.generate_package_email(
             db, app_id, user.id, llm_router,
             route_email=route_email,
@@ -208,6 +214,7 @@ async def run_qa(
     package = await package_service.get_current_package(db, app_id, user.id)
     if package is None:
         raise HTTPException(status_code=404, detail="No package created for this application yet.")
+    package = await package_service.normalize_current_package_for_route(db, package)
     llm_router = await build_llm_router_for_user(db, user.id)
     try:
         await package_generation.run_package_qa(db, package, llm_router)

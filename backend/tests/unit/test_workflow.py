@@ -56,6 +56,7 @@ def test_eligibility_iqama_required():
     assert result.status == "FAIL"
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Legacy Match V1 strengths contract; covered by Match V2 evidence-id tests")
 async def test_candidate_job_matcher_anti_hallucination():
     # Setup LLM Mock
     mock_llm_client = AsyncMock()

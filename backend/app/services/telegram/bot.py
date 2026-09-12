@@ -43,6 +43,11 @@ async def start_telegram_bot() -> None:
         # Fetch bot info dynamically as per Phase 11 requirements
         bot_info = await _telegram_app.bot.get_me()
         _telegram_app.bot_data["username"] = bot_info.username
+        configured_username = (settings.telegram_bot_username or "").lstrip("@").strip()
+        if configured_username and configured_username.casefold() != (bot_info.username or "").casefold():
+            raise RuntimeError(
+                "TELEGRAM__BOT_USERNAME does not match the bot authenticated by TELEGRAM__BOT_TOKEN"
+            )
         logger.info("telegram_bot.started", username=bot_info.username)
 
         if settings.telegram_polling:

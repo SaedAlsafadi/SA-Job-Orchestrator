@@ -56,6 +56,7 @@ class TestRuntimeFactory:
         assert result.confirmation_id is None
 
     def test_build_browser_profile_carries_session_and_identity(self):
+        pytest.importorskip("browser_use", reason="Optional live browser automation dependency is not installed")
         state = {"cookies": [], "origins": []}
         profile = build_browser_profile(
             storage_state=state,

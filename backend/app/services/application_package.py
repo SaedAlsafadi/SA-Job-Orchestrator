@@ -24,7 +24,7 @@ from sqlalchemy.orm import selectinload
 from app.models.application import Application
 from app.models.application_package import ApplicationPackage
 from app.models.application_route import ApplicationRoute
-from app.models.enums import PostingQualitySignal, QAVerdict
+from app.models.enums import ApplicationStatus, PostingQualitySignal, QAVerdict
 from app.models.job import Job
 from app.models.resume import Resume
 from app.services.posting_quality import assess_posting_quality
@@ -207,6 +207,7 @@ async def create_or_update_package(
     """
     app = await get_application_owned(db, application_id, user_id)
     current = await get_current_package(db, application_id, user_id)
+    route: ApplicationRoute | None = None
 
     # Defaults from the application / current package when not explicitly provided.
     if route_id is None:
@@ -249,6 +250,14 @@ async def create_or_update_package(
     if answers is None and current:
         answers = current.answers
 
+    # Route-specific packages must not carry an old or client-supplied email into
+    # a portal/manual application. Changing the route therefore creates a clean,
+    # immutable package version with email fields removed.
+    if route and route.route_type.upper() != "EMAIL":
+        email_to = None
+        email_subject = None
+        email_body = None
+
     content_hash = compute_content_hash(
         application_id=application_id,
         route_id=route_id,
@@ -288,6 +297,9 @@ async def create_or_update_package(
         # the approval binds to the OLD package_id/hash and can never match this one.
     )
     db.add(package)
+    if current and current.approval_id and app.status == ApplicationStatus.APPROVED:
+        app.status = ApplicationStatus.PENDING_REVIEW
+        app.updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(package)
     logger.info(
@@ -297,6 +309,38 @@ async def create_or_update_package(
         version=package.version,
     )
     return package
+
+
+async def normalize_current_package_for_route(
+    db: AsyncSession,
+    package: ApplicationPackage,
+) -> ApplicationPackage:
+    """Create a clean immutable version when legacy artifacts violate its route.
+
+    Older COMPANY_WEBSITE packages may contain an email generated before package
+    generation became route-aware.  Keep those historical versions intact, but
+    never run QA or obtain a new approval against that incompatible artifact set.
+    """
+    if not package.route_id:
+        return package
+    route = await db.get(ApplicationRoute, package.route_id)
+    if (
+        route is None
+        or route.route_type.upper() == "EMAIL"
+        or not any((package.email_to, package.email_subject, package.email_body))
+    ):
+        return package
+    return await create_or_update_package(
+        db,
+        package.application_id,
+        package.user_id,
+        route_id=package.route_id,
+        resume_id=package.resume_id,
+        cover_letter_text=package.cover_letter_text,
+        attachment_keys=package.attachment_keys,
+        answers=package.answers,
+        language=package.language,
+    )
 
 
 async def build_readiness(db: AsyncSession, package: ApplicationPackage) -> dict:
@@ -329,9 +373,13 @@ async def build_readiness(db: AsyncSession, package: ApplicationPackage) -> dict
 
     # Application email (email route only)
     route_type = None
+    route_url = None
+    route_instructions = None
     if package.route_id:
         route = await db.get(ApplicationRoute, package.route_id)
         route_type = route.route_type if route else None
+        route_url = route.url if route else None
+        route_instructions = route.instructions if route else None
     if route_type == "EMAIL":
         if package.email_to and package.email_subject and package.email_body:
             documents.append({"name": "Application Email", "ok": True, "detail": "drafted"})
@@ -362,6 +410,8 @@ async def build_readiness(db: AsyncSession, package: ApplicationPackage) -> dict
         "warnings": warnings,
         "documents": documents,
         "route": route_type,
+        "route_url": route_url,
+        "route_instructions": route_instructions,
         "posting_quality": quality.as_dict(),
         "work_authorization": work_auth.as_dict(),
         "package_version": package.version,

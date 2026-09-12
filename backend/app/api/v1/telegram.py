@@ -24,6 +24,27 @@ class TelegramStatusResponse(BaseModel):
     status: str
     username: str | None = None
     linked_at: datetime | None = None
+    bot_username: str | None = None
+    bot_configured: bool = False
+    bot_running: bool = False
+    update_mode: str | None = None
+
+
+def _bot_runtime_status() -> dict:
+    """Return public bot health without ever exposing the configured token."""
+    from app.config.settings import get_settings
+
+    settings = get_settings()
+    app = get_telegram_app()
+    runtime_username = app.bot_data.get("username") if app else None
+    configured_username = (settings.telegram_bot_username or "").lstrip("@").strip() or None
+    running = bool(app and runtime_username and not app.bot_data.get("startup_error"))
+    return {
+        "bot_username": runtime_username or configured_username,
+        "bot_configured": bool(settings.telegram_enabled and settings.telegram_bot_token),
+        "bot_running": running,
+        "update_mode": "polling" if settings.telegram_polling else "webhook",
+    }
 
 @router.post("/link/token", response_model=LinkTokenResponse)
 async def generate_link_token(
@@ -31,6 +52,13 @@ async def generate_link_token(
     db: AsyncSession = Depends(get_tenant_db)
 ):
     """Generate a one-time secure token for Telegram linking."""
+    runtime = _bot_runtime_status()
+    bot_username = runtime["bot_username"]
+    if not runtime["bot_running"] or not bot_username:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram bot is not configured and running.",
+        )
     raw_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     
@@ -42,21 +70,9 @@ async def generate_link_token(
     db.add(token)
     await db.commit()
     
-    app = get_telegram_app()
-    error_msg = app.bot_data.get("startup_error") if app else "Bot app not initialized"
-    bot_username = app.bot_data.get("username") if app else None
-    
-    if not bot_username:
-        # Fallback but we will append the error to the url for debugging
-        import urllib.parse
-        encoded_err = urllib.parse.quote(str(error_msg))
-        bot_username = f"autoapply_bot?start={raw_token}&error={encoded_err}"
-    else:
-        bot_username = f"{bot_username}?start={raw_token}"
-    
     return LinkTokenResponse(
         token=raw_token,
-        bot_url=f"https://t.me/{bot_username}"
+        bot_url=f"https://t.me/{bot_username}?start={raw_token}"
     )
 
 @router.get("/status", response_model=TelegramStatusResponse)
@@ -72,13 +88,15 @@ async def get_telegram_status(
         )
     )).scalar_one_or_none()
     
+    runtime = _bot_runtime_status()
     if not conn:
-        return TelegramStatusResponse(status="NOT CONNECTED")
+        return TelegramStatusResponse(status="NOT CONNECTED", **runtime)
         
     return TelegramStatusResponse(
-        status="CONNECTED",
+        status="CONNECTED" if runtime["bot_running"] else "BOT UNAVAILABLE",
         username=conn.username,
-        linked_at=conn.created_at
+        linked_at=conn.created_at,
+        **runtime,
     )
 
 @router.delete("/link")
@@ -108,7 +126,7 @@ async def test_telegram_notification(
     """Send a test notification."""
     notifier = TelegramNotifier(db)
     await notifier._send_message(
-        user_id='test_user_id',
-        text="👋 This is a test notification from AutoApply!"
+        user_id=user.id,
+        text="👋 This is a test notification from your job application assistant."
     )
     return {"status": "ok"}

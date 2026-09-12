@@ -2,7 +2,7 @@
 
 import structlog
 from arq.connections import ArqRedis
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from app.schemas.application import (
     ApplicationBulkApprove,
     ApplicationCreate,
     ApplicationIntervention,
+    ManualSubmissionConfirm,
     ApplicationListResponse,
     ApplicationResponse,
     ApplicationStatusUpdate,
@@ -167,4 +168,39 @@ async def update_status(
 ) -> ApplicationResponse:
     """Update an application's status and optional notes."""
     app = await app_service.update_status(db, app_id, update)
+    return app_service.application_to_response(app)
+
+
+@router.post(
+    "/{app_id}/route-opened",
+    response_model=ApplicationResponse,
+    summary="Record that the user opened an approved external application route",
+)
+async def route_opened(
+    app_id: str,
+    db: AsyncSession = Depends(get_tenant_db),
+) -> ApplicationResponse:
+    try:
+        app = await app_service.record_external_route_opened(db, app_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return app_service.application_to_response(app)
+
+
+@router.post(
+    "/{app_id}/confirm-manual-submission",
+    response_model=ApplicationResponse,
+    summary="Explicitly confirm a user-completed external submission",
+)
+async def confirm_manual_submission(
+    app_id: str,
+    data: ManualSubmissionConfirm,
+    db: AsyncSession = Depends(get_tenant_db),
+) -> ApplicationResponse:
+    if not data.confirmed:
+        raise HTTPException(status_code=400, detail="Explicit submission confirmation is required.")
+    try:
+        app = await app_service.confirm_manual_submission(db, app_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return app_service.application_to_response(app)

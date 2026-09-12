@@ -17,6 +17,7 @@ export interface Application {
   applied_at: string | null;
   response_date: string | null;
   notes: string | null;
+  audit_metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

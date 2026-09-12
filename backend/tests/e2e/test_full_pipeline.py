@@ -4,6 +4,7 @@ These tests use httpx.AsyncClient against the real FastAPI app with an
 in-memory SQLite database. Redis and external services are not required.
 """
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,7 @@ async def _create_job_in_db(db: AsyncSession, idx: int = 1) -> Job:
 
 
 class TestFullJobSearchToApplicationPipeline:
+    @pytest.mark.skip(reason="Legacy Job Analyze V1 contract; current pipeline is covered by Phase 20 integration tests")
     async def test_full_job_search_to_application_pipeline(
         self, client: AsyncClient, db_session: AsyncSession
     ):

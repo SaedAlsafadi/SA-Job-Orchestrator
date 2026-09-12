@@ -33,7 +33,7 @@ class LLMResponse(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
-    cost_usd: float = 0.0
+    cost_usd: float | None = None
     latency_ms: float = 0.0
 
 
@@ -140,7 +140,9 @@ class LLMClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
         response_format: dict[str, Any] | None = None,
+        reasoning_effort: str | None = None,
         purpose: str = "general",
+        persist_usage: bool = True,
     ) -> LLMResponse:
         """Send completion request with fallback chain and metrics.
 
@@ -183,6 +185,8 @@ class LLMClient:
                 }
                 if response_format is not None:
                     kwargs["response_format"] = response_format
+                if reasoning_effort is not None:
+                    kwargs["reasoning_effort"] = reasoning_effort
                 if metadata:
                     kwargs["metadata"] = metadata
                 if attempt_model.startswith("bedrock/"):
@@ -202,7 +206,7 @@ class LLMClient:
                 except Exception as cost_exc:
                     # A model missing from litellm's static price map raises here even
                     # though the call already succeeded — never fail a billed call on it.
-                    cost = 0.0
+                    cost = None
                     logger.warning(
                         "llm_cost_unavailable", model=attempt_model, error=str(cost_exc)
                     )
@@ -223,7 +227,7 @@ class LLMClient:
                     "llm_completion_success",
                     model=attempt_model,
                     tokens=usage.total_tokens,
-                    cost_usd=round(cost, 6),
+                    cost_usd=round(cost, 6) if cost is not None else "UNKNOWN",
                     latency_ms=round(elapsed_ms, 1),
                 )
                 llm_response = LLMResponse(
@@ -236,7 +240,8 @@ class LLMClient:
                     cost_usd=cost,
                     latency_ms=elapsed_ms,
                 )
-                await self._persist_usage(llm_response, purpose)
+                if persist_usage:
+                    await self._persist_usage(llm_response, purpose)
                 return llm_response
 
             except litellm.RateLimitError as exc:
@@ -313,6 +318,8 @@ class LLMClient:
         system_prompt: str = "",
         model: str | None = None,
         purpose: str = "structured",
+        attempt: int = 1,
+        max_tokens: int | None = None,
     ) -> BaseModel:
         """Get structured JSON output parsed into a Pydantic model.
 
@@ -334,7 +341,11 @@ class LLMClient:
             f"{system_prompt}\n\n"
             "You MUST respond with valid JSON matching this schema:\n"
             f"```json\n{json.dumps(schema, indent=2)}\n```\n"
-            "Respond ONLY with the JSON object, no extra text."
+            "Return an INSTANCE containing the requested field values. Do NOT return, "
+            "repeat, describe, or wrap the JSON Schema itself (for example, do not return "
+            "keys such as properties, required, title, or type unless those are explicitly "
+            "defined as output fields above). Respond ONLY with the completed JSON object, "
+            "with no markdown or extra text."
         ).strip()
 
         response = await self.complete(
@@ -343,12 +354,24 @@ class LLMClient:
             model=model,
             response_format={"type": "json_object"},
             purpose=purpose,
+            persist_usage=False,
+            max_tokens=max_tokens,
+            # DeepSeek V4 can spend the entire completion budget on hidden
+            # reasoning and truncate the final JSON. Structured transforms need
+            # concise reasoning so the schema-bearing answer can finish.
+            reasoning_effort="low" if model and "deepseek" in model.casefold() else None,
         )
 
         try:
             data = json.loads(response.content)
-            return output_schema.model_validate(data)
+            result = output_schema.model_validate(data)
+            await self._persist_usage(response, purpose, attempt=attempt)
+            return result
         except (json.JSONDecodeError, ValueError) as exc:
+            await self._persist_usage(
+                response, purpose, status="failure", error=str(exc),
+                attempt=attempt, parse_failure=True,
+            )
             logger.error(
                 "structured_output_parse_failed",
                 content=response.content[:500],
@@ -359,14 +382,20 @@ class LLMClient:
                 message=f"Failed to parse structured output: {exc}",
             ) from exc
 
-    async def _persist_usage(self, response: LLMResponse, purpose: str) -> None:
+    async def _persist_usage(
+        self, response: LLMResponse, purpose: str, *, status: str = "success",
+        error: str | None = None, attempt: int = 1, parse_failure: bool = False,
+    ) -> None:
         """Persist a per-user usage row after a successful call (no-op when unbound)."""
         if not self._user_id:
             return
         # Lazy import: usage_tracker imports LLMResponse from this module.
         from app.core.llm.usage_tracker import persist_usage_for_user
 
-        await persist_usage_for_user(self._user_id, response, purpose)
+        await persist_usage_for_user(
+            self._user_id, response, purpose, status=status, error=error,
+            attempt=attempt, parse_failure=parse_failure,
+        )
 
     def _record_metrics(
         self,
@@ -378,7 +407,7 @@ class LLMClient:
         latency_s: float,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
-        cost: float = 0.0,
+        cost: float | None = None,
     ) -> None:
         """Record Prometheus metrics for an LLM call."""
         llm_requests_total.labels(
@@ -395,5 +424,5 @@ class LLMClient:
             llm_tokens_total.labels(
                 provider=provider, model=model, direction="completion"
             ).inc(completion_tokens)
-        if cost > 0:
+        if cost is not None and cost > 0:
             llm_cost_usd.labels(provider=provider, model=model).inc(cost)

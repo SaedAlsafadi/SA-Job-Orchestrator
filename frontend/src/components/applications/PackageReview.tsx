@@ -101,6 +101,7 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
+  const [manuallySubmitted, setManuallySubmitted] = useState(false);
   // Dev mock QA (Part H): client-side deterministic findings, never persisted.
   const [mockQa, setMockQa] = useState<{
     verdict: "pass" | "warning";
@@ -207,6 +208,8 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
   const blocked = qaVerdict === "blocked";
   const canApprove = Boolean(readiness?.ready && qaVerdict && !approved && !blocked);
   const isEmailRoute = readiness?.route?.toUpperCase() === "EMAIL";
+  const routeType = readiness?.route?.toUpperCase();
+  const isExternalRoute = Boolean(routeType && routeType !== "EMAIL");
   const canSend = approved && isEmailRoute && pkg.send_state !== "sent";
   const rawScore = matchSummary?.score ?? matchSummary?.total_score ?? matchSummary?.match_score;
   const matchScore = typeof rawScore === "number"
@@ -235,7 +238,7 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
       <div style={card}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0 }}>
-            {readiness?.ready ? "APPLICATION READY" : "NOT READY YET"}
+            {approved && isExternalRoute ? "READY TO APPLY" : readiness?.ready ? "APPLICATION READY" : "NOT READY YET"}
             <span style={{ marginLeft: 10, font: "600 11px/1 var(--mono)", color: "var(--text-3)" }}>
               v{pkg.version} · {pkg.content_hash.slice(0, 10)}
             </span>
@@ -257,6 +260,7 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
             <div style={{ marginTop: 12, fontSize: 13 }}>
               <div><strong>Route:</strong> {readiness.route ?? "—"}</div>
               <div style={{ marginTop: 4, color: 'var(--text-2)' }}>{applicationRouteMessage(readiness.route)}</div>
+              {readiness.route_instructions && <div style={{ marginTop: 4, color: 'var(--text-3)' }}>{readiness.route_instructions}</div>}
               <div>
                 <strong>Posting:</strong> {readiness.posting_quality.signal.replace(/_/g, " ")}
                 {" · "}
@@ -284,17 +288,21 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
         )}
       </div>
 
-      {/* Email compose — the exact submission */}
+      {/* Route-aware package actions and email compose. */}
       <div style={card}>
-        <h3 style={{ margin: "0 0 12px" }}>Application email</h3>
-        <div style={mono}>
-          <div><strong>TO:</strong> {pkg.email_to ?? "—"}</div>
-          <div><strong>SUBJECT:</strong> {pkg.email_subject ?? "—"}</div>
-          <div style={{ marginTop: 8 }}><strong>BODY:</strong>{"\n"}{pkg.email_body ?? "—"}</div>
-          <div style={{ marginTop: 8 }}>
-            <strong>ATTACHMENTS:</strong> {(pkg.attachment_keys ?? []).join(", ") || "—"}
+        <h3 style={{ margin: "0 0 12px" }}>{isEmailRoute ? "Application email" : "Application actions"}</h3>
+        {isEmailRoute ? (
+          <div style={mono}>
+            <div><strong>TO:</strong> {pkg.email_to ?? "—"}</div>
+            <div><strong>SUBJECT:</strong> {pkg.email_subject ?? "—"}</div>
+            <div style={{ marginTop: 8 }}><strong>BODY:</strong>{"\n"}{pkg.email_body ?? "—"}</div>
+            <div style={{ marginTop: 8 }}><strong>ATTACHMENTS:</strong> {(pkg.attachment_keys ?? []).join(", ") || "—"}</div>
           </div>
-        </div>
+        ) : (
+          <div style={{ color: "var(--text-2)", fontSize: 13 }}>
+            This route does not require an application email. Review the package, then continue manually using the verified route.
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <button style={btn} disabled={busy !== null}
             onClick={() => run("cover", () => (
@@ -304,7 +312,7 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
             ), "Cover letter generated")}>
             {busy === "cover" ? "Generating…" : pkg.cover_letter_text ? "Regenerate cover letter" : "Generate cover letter"}
           </button>
-          <button style={btn} disabled={busy !== null}
+          {isEmailRoute && <button style={btn} disabled={busy !== null}
             onClick={() => run("email", () => (
               mockAi
                 ? packageService.create(applicationId, {
@@ -316,7 +324,7 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
                 : packageService.generateEmail(applicationId, language)
             ), "Email generated")}>
             {busy === "email" ? "Generating…" : pkg.email_body ? "Regenerate email" : "Generate email"}
-          </button>
+          </button>}
           <button style={btn} disabled={busy !== null}
             onClick={() => run("answers", () => (
               mockAi
@@ -348,9 +356,29 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
               onClick={() => run("send", () => packageService.send(applicationId), "Email sent")}>
               {busy === "send" ? "Sending…" : pkg.send_state === "sent" ? "Sent ✓" : "Send email"}
             </button>
-          ) : approved ? (
-            <span style={{ alignSelf: "center", color: "var(--text-3)", fontSize: 12 }}>
-              Approval recorded — continue via the route above
+          ) : approved && isExternalRoute && !manuallySubmitted ? (
+            <>
+              {readiness?.route_url && (
+                <button style={btnPrimary} disabled={busy !== null} onClick={() => {
+                  window.open(readiness.route_url!, "_blank", "noopener,noreferrer");
+                  void packageService.recordRouteOpened(applicationId);
+                }}>
+                  {routeType === "COMPANY_WEBSITE" ? "Open Company Application" : "Open Application"}
+                </button>
+              )}
+              {routeType === "MANUAL" && <span style={{ alignSelf: "center", fontSize: 12 }}>{readiness?.route_instructions || "Follow the manual application instructions."}</span>}
+              <button style={btn} disabled={busy !== null} onClick={() => {
+                if (!window.confirm("Confirm that you submitted this application on the employer's website.")) return;
+                void run("confirm", async () => {
+                  const result = await packageService.confirmManualSubmission(applicationId);
+                  setManuallySubmitted(true);
+                  return result;
+                }, "Marked applied — user-confirmed manual submission");
+              }}>Mark as Submitted</button>
+            </>
+          ) : manuallySubmitted ? (
+            <span style={{ alignSelf: "center", color: "var(--success, #2e7d32)", fontSize: 12 }}>
+              Applied — user-confirmed manual submission (not system-verified)
             </span>
           ) : null}
         </div>

@@ -296,7 +296,77 @@ async def update_status(
         app.notes = update.notes
     if update.status == ApplicationStatus.APPLIED:
         app.applied_at = datetime.now(UTC)
+        metadata = dict(app.audit_metadata or {})
+        metadata.setdefault("submission_method", "USER_CONFIRMED")
+        metadata.setdefault("submission_verification", "MANUAL")
+        app.audit_metadata = metadata
     await db.commit()
     await db.refresh(app)
     logger.info("application_status_updated", app_id=app_id, status=update.status)
+    return app
+
+
+async def record_external_route_opened(db: AsyncSession, app_id: str) -> Application:
+    """Record that the user opened the approved external application route."""
+    from app.models.application_package import ApplicationPackage
+    from app.models.application_route import ApplicationRoute
+
+    app = await get_application(db, app_id)
+    package = (await db.execute(select(ApplicationPackage).where(
+        ApplicationPackage.application_id == app.id,
+        ApplicationPackage.is_current.is_(True),
+    ))).scalars().first()
+    route = await db.get(ApplicationRoute, package.route_id) if package and package.route_id else None
+    if app.status != ApplicationStatus.APPROVED or not package or not package.approval_id or not route or not route.url:
+        raise ValueError("Only an approved external-route package can be opened.")
+    metadata = dict(app.audit_metadata or {})
+    timeline = list(metadata.get("timeline") or [])
+    timeline.append({
+        "event": "USER_OPENED_APPLICATION",
+        "at": datetime.now(UTC).isoformat(),
+        "route": route.route_type,
+    })
+    metadata["timeline"] = timeline
+    app.audit_metadata = metadata
+    await db.commit()
+    await db.refresh(app)
+    return app
+
+
+async def confirm_manual_submission(db: AsyncSession, app_id: str) -> Application:
+    """Mark an approved external application APPLIED from explicit user confirmation."""
+    from app.models.application_package import ApplicationPackage
+    from app.models.application_route import ApplicationRoute
+
+    app = await get_application(db, app_id)
+    package = (await db.execute(select(ApplicationPackage).where(
+        ApplicationPackage.application_id == app.id,
+        ApplicationPackage.is_current.is_(True),
+    ))).scalars().first()
+    route = await db.get(ApplicationRoute, package.route_id) if package and package.route_id else None
+    if app.status != ApplicationStatus.APPROVED or not package or not package.approval_id or not route:
+        raise ValueError("Only an approved current package can be confirmed as submitted.")
+    if route.route_type.upper() == "EMAIL":
+        raise ValueError("EMAIL applications must use the reviewed send flow.")
+    now = datetime.now(UTC)
+    metadata = dict(app.audit_metadata or {})
+    timeline = list(metadata.get("timeline") or [])
+    timeline.append({
+        "event": "USER_CONFIRMED_SUBMITTED",
+        "at": now.isoformat(),
+        "route": route.route_type,
+        "submission_method": "USER_CONFIRMED",
+        "verification": "MANUAL",
+    })
+    metadata.update({
+        "timeline": timeline,
+        "submission_method": "USER_CONFIRMED",
+        "submission_route": route.route_type,
+        "submission_verification": "MANUAL",
+    })
+    app.audit_metadata = metadata
+    app.status = ApplicationStatus.APPLIED
+    app.applied_at = now
+    await db.commit()
+    await db.refresh(app)
     return app

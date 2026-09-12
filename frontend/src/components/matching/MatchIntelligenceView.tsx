@@ -99,7 +99,9 @@ export function MatchIntelligenceView({ result }: { result: any }) {
           </div>
           
           <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-            {analysis.requirement_analysis.filter((r:any) => r.status === 'MATCH').length} of {analysis.requirement_analysis.length} supported
+            {analysis.requirement_analysis.filter((r:any) => r.evidence_type === 'DIRECT').length} direct ·{' '}
+            {analysis.requirement_analysis.filter((r:any) => r.evidence_type === 'TRANSFERABLE').length} transferable ·{' '}
+            {analysis.requirement_analysis.length} total
           </div>
 
           {showDetailed && (
@@ -111,9 +113,18 @@ export function MatchIntelligenceView({ result }: { result: any }) {
                       {req.status === 'MATCH' ? '✓ ' : req.status === 'PARTIAL' ? '— ' : req.status === 'GAP' ? '✗ ' : '? '}
                       {req.normalized_requirement}
                     </strong>
-                    <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{req.importance}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-4)', textAlign: 'right' }}>
+                      {req.importance} · {req.evidence_type ?? 'UNKNOWN'}<br />
+                      +{Number(req.contribution ?? 0).toFixed(1)} / {Number(req.max_contribution ?? 0).toFixed(1)} pts
+                    </span>
                   </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-4)' }}>{String(req.category).replace(/_/g, ' ')}</div>
                   <p style={{ margin: '4px 0', fontSize: 12, color: 'var(--text-2)' }}>{req.explanation}</p>
+                  {(req.candidate_evidence ?? []).map((e:any) => (
+                    <div key={e.evidence_id} style={{ marginTop: 5, fontSize: 11, color: 'var(--text-3)' }}>
+                      <strong>{e.evidence_id}:</strong> {e.description}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

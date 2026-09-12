@@ -1,6 +1,6 @@
 """LLM usage tracking database model."""
 
-from sqlalchemy import Float, Index, Integer, String
+from sqlalchemy import Boolean, Float, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
@@ -27,7 +27,7 @@ class LLMUsage(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Cost
-    cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Performance
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -39,9 +39,11 @@ class LLMUsage(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     # Outcome (populated by the usage callback in Phase 3)
     status: Mapped[str | None] = mapped_column(String(20), nullable=True)
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    parse_failure: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     def __repr__(self) -> str:
         return (
             f"<LLMUsage(provider='{self.provider}', model='{self.model}', "
-            f"tokens={self.total_tokens}, cost=${self.cost_usd:.6f})>"
+            f"tokens={self.total_tokens}, cost={self.cost_usd if self.cost_usd is not None else 'UNKNOWN'})>"
         )

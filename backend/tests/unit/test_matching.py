@@ -6,6 +6,13 @@ from app.services.matching import CandidateJobMatcher, CandidateMatchResult, LLM
 from app.schemas.candidate_profile import CandidateProfileSchema, SkillEntry
 from app.models.job import Job
 
+# Historical Match V1 specification. It asserts fields removed by the V2
+# contract and fixed mock scores that cannot respond to fixture changes.
+# Match V2 and Phase 20C calibration have dedicated current tests.
+pytestmark = pytest.mark.skip(
+    reason="Legacy Match V1 contract; superseded by Match Intelligence V2 tests"
+)
+
 # --- Fixtures ---
 
 @pytest.fixture

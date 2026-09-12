@@ -19,15 +19,35 @@ class RequirementImportance(StrEnum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
+
+class RequirementCategory(StrEnum):
+    HARD_REQUIREMENT = "HARD_REQUIREMENT"
+    CORE_RESPONSIBILITY = "CORE_RESPONSIBILITY"
+    DOMAIN_EXPERIENCE = "DOMAIN_EXPERIENCE"
+    PREFERRED = "PREFERRED"
+    TRANSFERABLE_COMPETENCY = "TRANSFERABLE_COMPETENCY"
+
+
+class EvidenceType(StrEnum):
+    DIRECT = "DIRECT"
+    TRANSFERABLE = "TRANSFERABLE"
+    WEAK = "WEAK"
+    NONE = "NONE"
+    UNKNOWN = "UNKNOWN"
+
 class RequirementAnalysis(BaseModel):
     requirement_id: str = Field(description="A unique short identifier like 'req-1'")
     original_text: str = Field(description="The raw requirement text from the job description")
     normalized_requirement: str = Field(description="A clean, concise statement of the requirement")
-    category: str = Field(description="e.g., 'Skills', 'Experience', 'Education', 'Other'")
+    category: str = Field(description="HARD_REQUIREMENT, CORE_RESPONSIBILITY, DOMAIN_EXPERIENCE, PREFERRED, or TRANSFERABLE_COMPETENCY")
     importance: RequirementImportance
     status: RequirementStatus
     evidence_ids: list[str] = Field(description="Exact evidence_ids from CandidateProfile supporting the status", default_factory=list)
     explanation: str = Field(description="Short explanation of the candidate's status against this requirement")
+    evidence_type: EvidenceType = EvidenceType.UNKNOWN
+    candidate_evidence: list[MatchEvidence] = Field(default_factory=list)
+    contribution: float = Field(default=0.0, ge=0.0, le=100.0, description="Deterministic percentage-point contribution")
+    max_contribution: float = Field(default=0.0, ge=0.0, le=100.0)
 
 class DimensionStatus(StrEnum):
     VALID_SCORE = "VALID_SCORE"

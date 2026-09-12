@@ -37,6 +37,8 @@ async def record_usage(
     trace_id: str | None = None,
     status: str = "success",
     error: str | None = None,
+    attempt: int = 1,
+    parse_failure: bool = False,
 ) -> LLMUsage:
     """Save one LLM call record (caller supplies the session and the owning user_id)."""
     record = LLMUsage(
@@ -52,6 +54,8 @@ async def record_usage(
         trace_id=trace_id,
         status=status,
         error=error[:500] if error else None,
+        attempt=attempt,
+        parse_failure=parse_failure,
     )
     db.add(record)
     await db.commit()
@@ -61,7 +65,7 @@ async def record_usage(
         provider=response.provider,
         model=response.model,
         tokens=response.total_tokens,
-        cost=round(response.cost_usd, 6),
+        cost=round(response.cost_usd, 6) if response.cost_usd is not None else "UNKNOWN",
         purpose=str(record.purpose),
     )
     return record
@@ -72,6 +76,10 @@ async def persist_usage_for_user(
     response: LLMResponse,
     purpose: str | LLMPurpose = "general",
     trace_id: str | None = None,
+    status: str = "success",
+    error: str | None = None,
+    attempt: int = 1,
+    parse_failure: bool = False,
 ) -> None:
     """Best-effort: persist a usage row in a dedicated session. Never raises."""
     try:
@@ -79,7 +87,8 @@ async def persist_usage_for_user(
 
         async with async_session_factory() as db:
             await record_usage(
-                db, response, user_id=user_id, purpose=purpose, trace_id=trace_id
+                db, response, user_id=user_id, purpose=purpose, trace_id=trace_id,
+                status=status, error=error, attempt=attempt, parse_failure=parse_failure,
             )
     except Exception as exc:
         # Usage accounting must never break the LLM call — swallow and log.

@@ -39,6 +39,12 @@ class ApplicationStatusUpdate(BaseModel):
     notes: str | None = None
 
 
+class ManualSubmissionConfirm(BaseModel):
+    """Explicit acknowledgement for a user-completed external submission."""
+
+    confirmed: bool
+
+
 class ApplicationIntervention(BaseModel):
     """A user's response to a pending CAPTCHA/2FA intervention prompt."""
 
@@ -63,6 +69,7 @@ class ApplicationResponse(BaseModel):
     applied_at: datetime | None = None
     response_date: datetime | None = None
     notes: str | None = None
+    audit_metadata: dict | None = None
     created_at: datetime
     updated_at: datetime
 

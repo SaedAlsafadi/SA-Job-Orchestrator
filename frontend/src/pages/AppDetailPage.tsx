@@ -51,7 +51,7 @@ export default function AppDetailPage() {
       ) : (
         (() => {
           const sm = statusMeta(app.status);
-          const steps = buildAppTimeline(app.apply_mode, app.status);
+          const steps = buildAppTimeline(app.apply_mode, app.status, app.audit_metadata);
           return (
             <>
               {/* Header */}

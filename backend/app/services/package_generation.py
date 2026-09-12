@@ -17,6 +17,7 @@ the model to ignore instructions embedded in it, and no secret/prompt content is
 from __future__ import annotations
 
 import json
+from datetime import date
 
 import structlog
 from pydantic import BaseModel, Field
@@ -25,11 +26,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.settings import get_settings
 from app.core.llm.router import LLMTask, LLMTaskRouter
 from app.models.application_package import ApplicationPackage
+from app.models.application_route import ApplicationRoute
 from app.models.candidate_profile import CandidateProfile
-from app.models.enums import QAVerdict
+from app.models.enums import ApplicationStatus, QAVerdict
 from app.models.job import Job
 from app.models.resume import Resume
-from app.services.application_package import PackageError, get_application_owned
+from app.services.application_package import PackageError, compute_content_hash, get_application_owned
+from app.services.package_facts import (
+    build_protected_facts,
+    date_ranges,
+    llm_issue_overruled,
+    protected_entity_issues,
+    restore_protected_entities,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -96,6 +105,22 @@ class QAResult(BaseModel):
     issues: list[QAIssue] = Field(default_factory=list)
 
 
+def _email_sanity_error(body: str, cover_letter_text: str | None) -> str:
+    word_count = len(body.split())
+    if word_count > 170:
+        return f"The draft is too long ({word_count} words)."
+    if cover_letter_text:
+        email_words = {w.casefold().strip(".,:;!?()") for w in body.split() if len(w) > 3}
+        cover_words = {
+            w.casefold().strip(".,:;!?()")
+            for w in cover_letter_text.split() if len(w) > 3
+        }
+        overlap = len(email_words & cover_words) / max(1, len(email_words))
+        if overlap > .72:
+            return f"The draft substantially duplicates the cover letter ({overlap:.0%} overlap)."
+    return ""
+
+
 async def _load_generation_context(
     db: AsyncSession, application_id: str, user_id: str
 ) -> tuple[Job, dict, str]:
@@ -120,6 +145,7 @@ async def _load_generation_context(
             "education": profile.education,
             "skills": profile.skills,
             "certifications": profile.certifications,
+            "projects": profile.projects,
         }
 
     resume_text = ""
@@ -127,6 +153,14 @@ async def _load_generation_context(
         resume = await db.get(Resume, app.resume_id)
         resume_text = (resume.content_text or "") if resume else ""
     return job, candidate, resume_text
+
+
+def _facts_instruction(candidate: dict, resume_text: str) -> str:
+    facts = build_protected_facts(candidate, resume_text)
+    return (
+        "PROTECTED FACTS: Preserve these exact canonical strings whenever referenced: "
+        + json.dumps(facts, ensure_ascii=False)
+    )
 
 
 async def generate_package_cover_letter(
@@ -150,7 +184,7 @@ async def generate_package_cover_letter(
         "CRITICAL: Use ONLY facts present in the CANDIDATE EVIDENCE and MATCH ANALYSIS. "
         "Do NOT invent experience, achievements, motivation, company facts, or credentials. "
         "If evidence for a claim does not exist, do not make the claim. "
-        f"{_UNTRUSTED_DATA_GUARD} "
+        f"{_UNTRUSTED_DATA_GUARD} {_facts_instruction(candidate, resume_text)} "
         f"{_language_instruction(language)}"
     )
     prompt = (
@@ -160,14 +194,26 @@ async def generate_package_cover_letter(
         f"CANDIDATE EVIDENCE:\n{json.dumps(candidate, ensure_ascii=False)}\n\n"
         f"RESUME TEXT:\n{resume_text[:6000]}"
     )
-    result = await llm_router.complete_with_structured_output(
-        task=LLMTask.COVER_LETTER,
-        prompt=prompt,
-        output_schema=GeneratedCoverLetter,
-        system_prompt=system_prompt,
-    )
-    logger.info("package_cover_letter_generated", application_id=application_id, language=language)
-    return result
+    protected_facts = build_protected_facts(candidate, resume_text)
+    for attempt in (1, 2):
+        attempt_prompt = prompt
+        if attempt == 2:
+            attempt_prompt += (
+                "\n\nREPAIR REQUEST: The previous draft altered a protected proper name. "
+                "Rewrite it while preserving every protected name exactly as provided."
+            )
+        result = await llm_router.complete_with_structured_output(
+            task=LLMTask.COVER_LETTER,
+            prompt=attempt_prompt,
+            output_schema=GeneratedCoverLetter,
+            system_prompt=system_prompt,
+        )
+        result.body = restore_protected_entities(result.body, protected_facts)
+        entity_issues = protected_entity_issues([result.body], protected_facts)
+        if not entity_issues:
+            logger.info("package_cover_letter_generated", application_id=application_id, language=language)
+            return result
+    raise PackageError("Cover letter altered a protected candidate fact after one repair attempt.")
 
 
 async def generate_package_email(
@@ -187,11 +233,15 @@ async def generate_package_email(
     model is told to echo the provided recipient, never to invent one.
     """
     job, candidate, resume_text = await _load_generation_context(db, application_id, user_id)
+    protected_facts = build_protected_facts(candidate, resume_text)
     system_prompt = (
         "You draft concise job-application emails. "
         "CRITICAL: Use ONLY facts from the CANDIDATE EVIDENCE. Never invent facts. "
         "Use EXACTLY the provided RECIPIENT address — never invent or change it. "
-        f"{_UNTRUSTED_DATA_GUARD} "
+        "Write 80-150 words: greeting; one application sentence; one or two concise "
+        "relevant strengths; attachment reference; polite closing. Do not repeat the "
+        "cover letter or career history. "
+        f"{_UNTRUSTED_DATA_GUARD} {_facts_instruction(candidate, resume_text)} "
         f"{_language_instruction(language)}"
     )
     prompt = (
@@ -202,14 +252,32 @@ async def generate_package_email(
         f"CANDIDATE EVIDENCE:\n{json.dumps(candidate, ensure_ascii=False)}\n\n"
         f"RESUME TEXT:\n{resume_text[:4000]}"
     )
-    result = await llm_router.complete_with_structured_output(
-        task=LLMTask.APPLICATION_EMAIL,
-        prompt=prompt,
-        output_schema=GeneratedApplicationEmail,
-        system_prompt=system_prompt,
-    )
-    if route_email:
-        result.recipient = route_email  # recipient safety: never trust the model here
+    result: GeneratedApplicationEmail | None = None
+    sanity_error = ""
+    for attempt in (1, 2):
+        attempt_prompt = prompt
+        if attempt == 2:
+            attempt_prompt += (
+                f"\n\nREGENERATION REQUIRED: {sanity_error} Rewrite as a genuinely short "
+                "delivery email of 80-150 words without copying cover-letter paragraphs."
+            )
+        result = await llm_router.complete_with_structured_output(
+            task=LLMTask.APPLICATION_EMAIL,
+            prompt=attempt_prompt,
+            output_schema=GeneratedApplicationEmail,
+            system_prompt=system_prompt,
+        )
+        if route_email:
+            result.recipient = route_email  # recipient safety: never trust the model here
+        result.body = restore_protected_entities(result.body, protected_facts)
+        sanity_error = _email_sanity_error(result.body, cover_letter_text)
+        entity_issues = protected_entity_issues([result.body], protected_facts)
+        if entity_issues:
+            sanity_error = entity_issues[0]["detail"]
+        if not sanity_error:
+            break
+    if sanity_error or result is None:
+        raise PackageError(sanity_error or "Application email generation failed validation.")
     logger.info("package_email_generated", application_id=application_id, language=language)
     return result
 
@@ -233,7 +301,7 @@ async def generate_package_answers(
         "You answer job-application questions using ONLY the CANDIDATE EVIDENCE. "
         "If the evidence does not contain the answer, set status to 'REVIEW_REQUIRED' "
         "or 'UNKNOWN' and leave the answer empty. NEVER guess or fabricate. "
-        f"{_UNTRUSTED_DATA_GUARD} "
+        f"{_UNTRUSTED_DATA_GUARD} {_facts_instruction(candidate, '')} "
         f"{_language_instruction(language)}"
     )
     prompt = (
@@ -274,13 +342,36 @@ async def run_package_qa(
         issues.append(QAIssue(kind="missing_document", detail="No resume version in package", severity="blocker"))
     if not package.cover_letter_text:
         issues.append(QAIssue(kind="missing_document", detail="No cover letter in package", severity="blocker"))
-    if not package.email_to:
-        issues.append(QAIssue(kind="missing_recipient", detail="No recipient set for the application email", severity="blocker"))
-
     resume_text = ""
     if package.resume_id:
         resume = await db.get(Resume, package.resume_id)
         resume_text = (resume.content_text or "") if resume else ""
+
+    _, candidate, _ = await _load_generation_context(db, package.application_id, package.user_id)
+    protected_facts = build_protected_facts(candidate, resume_text)
+    route = await db.get(ApplicationRoute, package.route_id) if package.route_id else None
+    route_type = (route.route_type if route else "MANUAL").upper()
+    if route_type == "EMAIL" and not package.email_to:
+        issues.append(QAIssue(kind="missing_recipient", detail="No recipient set for the application email", severity="blocker"))
+    if route_type != "EMAIL" and any([package.email_to, package.email_subject, package.email_body]):
+        issues.append(QAIssue(kind="route_mismatch", detail=f"{route_type} package must not contain an automatic application email", severity="blocker"))
+    if not package.is_current:
+        issues.append(QAIssue(kind="stale_document", detail="QA can only run on the current package version", severity="blocker"))
+    expected_hash = compute_content_hash(
+        application_id=package.application_id, route_id=package.route_id, resume_id=package.resume_id,
+        cover_letter_text=package.cover_letter_text, email_to=package.email_to,
+        email_subject=package.email_subject, email_body=package.email_body,
+        attachment_keys=package.attachment_keys, answers=package.answers, language=package.language,
+    )
+    if expected_hash != package.content_hash:
+        issues.append(QAIssue(kind="package_hash", detail="Package content does not match its locked hash", severity="blocker"))
+    for item in date_ranges("\n".join([resume_text, package.cover_letter_text or "", package.email_body or ""])):
+        if item["end_status"] == "FUTURE":
+            issues.append(QAIssue(kind="future_date", detail=f'{item["range"]} ends after {date.today().isoformat()}', severity="warning"))
+    issues.extend(QAIssue(**item) for item in protected_entity_issues(
+        [package.cover_letter_text or "", package.email_body or "", json.dumps(package.answers or [])],
+        protected_facts,
+    ))
 
     system_prompt = (
         "You are a meticulous application QA reviewer. Review the COMPLETE application "
@@ -290,7 +381,9 @@ async def run_package_qa(
         "Arabic language quality, and keyword stuffing. "
         "Verdict rules: 'pass' = can proceed; 'warning' = user must review; "
         "'blocked' = cannot be approved until fixed. "
-        f"{_UNTRUSTED_DATA_GUARD}"
+        "The DETERMINISTIC FACTS below are authoritative. Do not flag a date as future "
+        "unless its deterministic end_status is FUTURE, and do not call a listed degree unsupported. "
+        f"Today is {date.today().isoformat()}. {_UNTRUSTED_DATA_GUARD}"
     )
     prompt = (
         f"JOB (untrusted data): {job.title} @ {job.company}\n\n"
@@ -298,7 +391,10 @@ async def run_package_qa(
         f"EMAIL TO: {package.email_to or ''}\nSUBJECT: {package.email_subject or ''}\n"
         f"EMAIL BODY:\n{package.email_body or ''}\n\n"
         f"ANSWERS:\n{json.dumps(package.answers or [], ensure_ascii=False)}\n\n"
-        f"RESUME TEXT:\n{resume_text[:6000]}"
+        f"RESUME TEXT:\n{resume_text[:6000]}\n\n"
+        f"DETERMINISTIC DATE FACTS:\n{json.dumps(date_ranges(resume_text), ensure_ascii=False)}\n\n"
+        f"PROTECTED FACTS:\n{json.dumps(protected_facts, ensure_ascii=False)}\n\n"
+        f"ROUTE: {route_type}\nPACKAGE VERSION: {package.version}\nPACKAGE HASH: {package.content_hash}"
     )
     try:
         llm_result = await llm_router.complete_with_structured_output(
@@ -307,20 +403,27 @@ async def run_package_qa(
             output_schema=QAResult,
             system_prompt=system_prompt,
         )
-        issues.extend(llm_result.issues)
+        issues.extend(i for i in llm_result.issues if not llm_issue_overruled(i, protected_facts))
         verdict = llm_result.verdict
+        if verdict == QAVerdict.WARNING and not any(i.severity in {"warning", "blocker"} for i in issues):
+            verdict = QAVerdict.PASS
     except Exception as exc:  # LLM failure must not produce a false PASS
         logger.error("package_qa_llm_failed", error=str(exc))
         issues.append(QAIssue(kind="qa_engine_error", detail=f"QA engine failed: {exc}", severity="warning"))
         verdict = QAVerdict.WARNING
 
-    # Any blocker issue forces BLOCKED regardless of the LLM verdict.
+    # Deterministic findings are authoritative in both directions: a model cannot
+    # turn a deterministic blocker or review warning into PASS.
     if any(i.severity == "blocker" for i in issues):
         verdict = QAVerdict.BLOCKED
+    elif any(i.severity == "warning" for i in issues):
+        verdict = QAVerdict.WARNING
 
     package.qa_verdict = verdict
     package.qa_issues = [i.model_dump() for i in issues]
     package.qa_model = get_settings().llm.heavy_model  # APPLICATION_QA is a heavy task
+    if not package.approval_id and app.status == ApplicationStatus.APPROVED:
+        app.status = ApplicationStatus.PENDING_REVIEW
     await db.commit()
     logger.info("package_qa_completed", package_id=package.id, verdict=verdict.value)
     return QAResult(verdict=verdict, issues=issues)

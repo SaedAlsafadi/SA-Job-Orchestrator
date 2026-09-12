@@ -35,6 +35,7 @@ export function useWebSocket(
   options: UseWebSocketOptions = {},
 ): UseWebSocketReturn {
   const { autoConnect = true, reconnectDelay = 3000, maxRetries = 10 } = options;
+  const authToken = useAuthStore((state) => state.token);
 
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
@@ -64,7 +65,7 @@ export function useWebSocket(
 
     // The WebSocket handshake is authenticated with a short-lived ticket. Only
     // connect when authenticated; if the ticket cannot be fetched, stay disconnected.
-    if (!useAuthStore.getState().token) {
+    if (!authToken) {
       return;
     }
     let ticket: string;
@@ -112,7 +113,7 @@ export function useWebSocket(
     ws.onerror = () => {
       ws.close();
     };
-  }, [url, reconnectDelay, maxRetries, disconnect]);
+  }, [url, reconnectDelay, maxRetries, disconnect, authToken]);
 
   const send = useCallback((message: WSMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

@@ -4,6 +4,10 @@ export interface TelegramStatusResponse {
   status: string;
   username?: string;
   linked_at?: string;
+  bot_username?: string;
+  bot_configured: boolean;
+  bot_running: boolean;
+  update_mode?: string;
 }
 
 export interface TelegramLinkTokenResponse {

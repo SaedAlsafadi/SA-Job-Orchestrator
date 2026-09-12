@@ -105,16 +105,61 @@ class LLMTaskRouter:
         output_schema: Type[T],
         system_prompt: str = "",
         model_override: Optional[str] = None,
+        max_tokens: int | None = None,
     ) -> T:
         model = model_override or self._get_model_for_task(task)
         purpose = self._get_purpose_for_task(task)
 
         logger.info("llm_task_router.complete_with_structured_output", task=task.value, model=model, is_heavy=task in self.HEAVY_TASKS)
 
-        return await self.client.complete_with_structured_output(
-            prompt=prompt,
-            output_schema=output_schema,
-            system_prompt=system_prompt,
-            model=model,
-            purpose=purpose,
-        )
+        try:
+            call_kwargs = dict(
+                prompt=prompt,
+                output_schema=output_schema,
+                system_prompt=system_prompt,
+                model=model,
+                purpose=purpose,
+            )
+            if max_tokens is not None:
+                call_kwargs["max_tokens"] = max_tokens
+            return await self.client.complete_with_structured_output(**call_kwargs)
+        except Exception as exc:
+            # A malformed/blank structured response gets one bounded repair attempt
+            # on the SAME task-selected model. Provider, quota, and transport errors
+            # are never silently routed to a fallback model.
+            if "Failed to parse structured output" not in str(exc):
+                raise
+            logger.warning(
+                "llm_structured_repair_retry",
+                task=task.value,
+                model=model,
+                attempt=2,
+                parse_failure=True,
+            )
+            repair_prompt = (
+                f"{prompt}\n\nREPAIR REQUEST: The previous response was blank, malformed, or did not "
+                "match the required schema. Return one complete JSON INSTANCE populated with "
+                "the requested values. Do not return or describe the schema itself."
+            )
+            try:
+                repair_kwargs = dict(
+                    prompt=repair_prompt,
+                    output_schema=output_schema,
+                    system_prompt=system_prompt,
+                    model=model,
+                    purpose=purpose,
+                    attempt=2,
+                )
+                if max_tokens is not None:
+                    repair_kwargs["max_tokens"] = max_tokens
+                return await self.client.complete_with_structured_output(**repair_kwargs)
+            except Exception:
+                logger.error(
+                    "llm_structured_output_failed_closed",
+                    task=task.value,
+                    model=model,
+                    attempt=2,
+                    parse_failure=True,
+                    success=False,
+                )
+                raise

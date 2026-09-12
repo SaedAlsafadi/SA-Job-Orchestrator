@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import os
 from pydantic import BaseModel, ConfigDict
 from typing import List, Dict, Any
 from app.core.llm.client import LLMClient
@@ -15,6 +16,8 @@ pytestmark = pytest.mark.asyncio
 # Removed mock
 
 async def test_openrouter_smoke_matching():
+    if not os.getenv("RUN_LIVE_LLM_TESTS"):
+        pytest.skip("Set RUN_LIVE_LLM_TESTS=1 to run paid/network OpenRouter smoke tests")
     client = LLMClient()
     
     # 1. Matching Schema Test
@@ -35,6 +38,8 @@ async def test_openrouter_smoke_matching():
         pytest.fail(f"Matching test failed: {e}")
 
 async def test_openrouter_smoke_category_c():
+    if not os.getenv("RUN_LIVE_LLM_TESTS"):
+        pytest.skip("Set RUN_LIVE_LLM_TESTS=1 to run paid/network OpenRouter smoke tests")
     client = LLMClient()
     
     profile = {

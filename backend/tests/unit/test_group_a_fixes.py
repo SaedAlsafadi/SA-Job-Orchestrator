@@ -62,7 +62,7 @@ class TestLLMClientRobustness:
             ml.Usage = MagicMock
             result = await client.complete("prompt")
         assert result.content == "ok"
-        assert result.cost_usd == 0.0  # billed call did not crash on a pricing-map miss
+        assert result.cost_usd is None  # unknown pricing is explicit, never reported as zero
 
     async def test_unexpected_error_raises_typed_not_raw(self):
         client = _llm_client()

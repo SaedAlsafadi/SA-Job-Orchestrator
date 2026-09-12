@@ -36,12 +36,12 @@ async def test_task_routing_models(router, mock_client):
 
 @pytest.mark.asyncio
 async def test_legacy_configuration_avoidance():
-    from app.config.settings import get_settings
-    settings = get_settings()
-    # Ensure preferred provider isn't implicitly breaking task routing models
-    # The default_model is mapped to the light model to prevent heavy billing.
-    assert settings.llm.default_model == settings.llm.light_model
-    assert settings.llm.preferred_provider != "gemini"
+    from app.config.settings import LLMSettings
+    # Assert product defaults rather than the developer's runtime .env overrides.
+    # The default model is mapped to the light model to prevent heavy billing.
+    defaults = LLMSettings.model_fields
+    assert defaults["default_model"].default == defaults["light_model"].default
+    assert defaults["preferred_provider"].default != "gemini"
 
 @pytest.mark.asyncio
 async def test_structured_output_routing(router, mock_client):

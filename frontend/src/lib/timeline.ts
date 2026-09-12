@@ -15,7 +15,38 @@ export interface TimelineStep {
 const FAILED_DIAG =
   "The application form changed mid-run; the agent couldn't locate the submit button. Safe to re-run.";
 
-export function buildAppTimeline(mode: string, status: string): TimelineStep[] {
+export function buildAppTimeline(
+  mode: string,
+  status: string,
+  auditMetadata?: Record<string, unknown> | null,
+): TimelineStep[] {
+  const auditEvents = Array.isArray(auditMetadata?.timeline)
+    ? (auditMetadata.timeline as Array<{ event?: string }>)
+    : [];
+  const openedExternally = auditEvents.some((event) => event.event === 'USER_OPENED_APPLICATION');
+  const userConfirmed = auditEvents.some((event) => event.event === 'USER_CONFIRMED_SUBMITTED');
+  if (openedExternally || userConfirmed) {
+    return [
+      { key: 'queued', label: 'Queued', desc: 'Added to the application workflow', state: 'done' },
+      { key: 'pending_review', label: 'Pending review', desc: 'Package reviewed by you', state: 'done' },
+      { key: 'approved', label: 'Approved', desc: 'Exact package version approved by you', state: 'done' },
+      {
+        key: 'route_opened', label: 'Application opened',
+        desc: 'You opened the employer application route',
+        state: openedExternally || userConfirmed ? 'done' : 'upcoming',
+      },
+      {
+        key: 'user_confirmed', label: 'Submission confirmed',
+        desc: 'User-confirmed manual submission; not independently verified by the system',
+        state: userConfirmed ? 'done' : 'current',
+      },
+      {
+        key: 'applied', label: 'Applied',
+        desc: 'Recorded from your explicit confirmation',
+        state: status === 'applied' ? 'current' : 'upcoming',
+      },
+    ];
+  }
   const defs = [
     { key: 'queued', label: 'Queued', desc: 'Added to the apply queue' },
     { key: 'pending_review', label: 'Pending review', desc: 'Waiting for your approval' },
@@ -29,8 +60,16 @@ export function buildAppTimeline(mode: string, status: string): TimelineStep[] {
             ? 'Approved in a batch'
             : 'Approved by you',
     },
-    { key: 'applying', label: 'Applying', desc: 'Agent submitting the application' },
-    { key: 'applied', label: 'Applied', desc: 'Application submitted successfully' },
+    {
+      key: 'applying',
+      label: 'Complete submission',
+      desc: 'Continue through the package\'s configured application route',
+    },
+    {
+      key: 'applied',
+      label: 'Applied',
+      desc: 'Recorded after user confirmation or verified delivery',
+    },
     { key: 'interview', label: 'Interview scheduled', desc: 'Recruiter reached out' },
     { key: 'offer', label: 'Offer received', desc: 'Congratulations — an offer landed' },
   ];

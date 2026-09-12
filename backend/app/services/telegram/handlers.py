@@ -32,7 +32,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if not args:
         await update.message.reply_text(
-            "Welcome to AutoApply! Please generate a connection link from your Web Dashboard Settings to link your account."
+            "Welcome! Please generate a connection link from your Web Dashboard Settings to link your account."
         )
         return
 
@@ -184,4 +184,3 @@ def register_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), message_handler))
-

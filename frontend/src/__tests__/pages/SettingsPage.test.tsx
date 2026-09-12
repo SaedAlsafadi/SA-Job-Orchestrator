@@ -20,6 +20,7 @@ function settings(overrides: Record<string, unknown> = {}) {
 }
 
 function renderSettings() {
+  server.use(http.get('/api/v1/telegram/status', () => HttpResponse.json({ connected: false })));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>

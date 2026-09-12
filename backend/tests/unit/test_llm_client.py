@@ -218,6 +218,20 @@ class TestStructuredOutput:
         assert result.title == "Engineer"
         assert result.score == pytest.approx(0.95)
 
+    async def test_prompt_forbids_returning_the_schema_itself(self, client: LLMClient) -> None:
+        mock_response = _make_completion_response(json.dumps({"title": "Engineer", "score": 0.95}))
+
+        with patch("app.core.llm.client.litellm") as mock_litellm:
+            mock_litellm.acompletion = AsyncMock(return_value=mock_response)
+            mock_litellm.completion_cost.return_value = 0.0
+            mock_litellm.Usage = MagicMock
+
+            await client.complete_with_structured_output("prompt", SampleOutput)
+
+        system_message = mock_litellm.acompletion.await_args.kwargs["messages"][0]["content"]
+        assert "Return an INSTANCE" in system_message
+        assert "Do NOT return, repeat, describe, or wrap the JSON Schema itself" in system_message
+
     async def test_raises_provider_error_on_invalid_json(self, client: LLMClient) -> None:
         mock_response = _make_completion_response("not valid json {{{")
 

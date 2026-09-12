@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -51,6 +51,8 @@ function readinessFor(pkg: ApplicationPackage, route = 'EMAIL'): Readiness {
       { name: 'Application Email', ok: Boolean(pkg.email_body), detail: pkg.email_body ? 'drafted' : 'not drafted' },
     ],
     route,
+    route_url: route === 'EMAIL' ? null : 'https://example.com/jobs/1',
+    route_instructions: route === 'EMAIL' ? null : 'Continue on the employer website.',
     posting_quality: { signal: 'likely_legitimate', reasons: [] },
     work_authorization: { status: 'UNKNOWN', requirements: [], evidence: [] },
     package_version: pkg.version,
@@ -99,6 +101,11 @@ function installPackageHandlers(initial: ApplicationPackage, route = 'EMAIL') {
       sendCalls += 1;
       return HttpResponse.json({ state: 'sent', message_id: 'unexpected' });
     }),
+    http.post('/api/v1/applications/:appId/route-opened', () => HttpResponse.json({ status: 'approved' })),
+    http.post('/api/v1/applications/:appId/confirm-manual-submission', () => HttpResponse.json({
+      status: 'applied',
+      audit_metadata: { submission_method: 'USER_CONFIRMED' },
+    })),
   );
 
   return { current: () => current, sendCalls: () => sendCalls };
@@ -184,6 +191,23 @@ describe('PackageReview', () => {
 
     expect(await screen.findByText(/Approved for version 1/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /send email/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/continue via the route above/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /generate email/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/does not require an application email/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Company Application' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark as Submitted' })).toBeInTheDocument();
+  });
+
+  it('requires explicit confirmation before recording a manual submission', async () => {
+    installPackageHandlers(packageFixture({
+      cover_letter_text: 'Reviewed letter', qa_verdict: 'pass',
+      approval_id: 'approval-website', approved_at: '2026-09-09T09:00:00Z',
+    }), 'COMPANY_WEBSITE');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<PackageReview applicationId="app-1" jobId="job-1" />);
+
+    await user.click(await screen.findByRole('button', { name: 'Mark as Submitted' }));
+    expect(confirm).toHaveBeenCalledWith("Confirm that you submitted this application on the employer's website.");
+    confirm.mockRestore();
   });
 });

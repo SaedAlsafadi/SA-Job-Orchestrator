@@ -63,6 +63,8 @@ class ReadinessResponse(BaseModel):
     warnings: list[str]
     documents: list[dict]
     route: str | None = None
+    route_url: str | None = None
+    route_instructions: str | None = None
     posting_quality: dict
     work_authorization: dict
     package_version: int

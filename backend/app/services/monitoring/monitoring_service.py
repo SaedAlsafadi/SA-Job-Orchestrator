@@ -79,7 +79,7 @@ class MonitoringService:
         eligibility = evaluate_eligibility(profile, job)
         if not eligibility.is_eligible:
             run_stats["ineligible"] += 1
-            job.status = "rejected"
+            job.status = "hidden"
             await self.db.commit()
             return None
         
@@ -87,7 +87,7 @@ class MonitoringService:
         
         # LLM Match check
         match_result = await self.matching.match_candidate(profile, job)
-        score = match_result.score if match_result.score else 0.0
+        score = (match_result.total_score or 0) / 100.0
         
         job.match_score = score
         await self.db.commit()

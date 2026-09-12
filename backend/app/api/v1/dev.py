@@ -27,7 +27,7 @@ async def llm_health() -> LLMHealthResponse:
     if not getattr(settings.llm, provider_key, None) or not getattr(settings.llm, provider_key).get_secret_value():
         return LLMHealthResponse(
             provider=settings.llm.preferred_provider,
-            model_override=settings.llm.default_model,
+            model=settings.llm.default_model,
             success=False,
             latency_ms=0.0,
             error_message=f"{provider_key.upper()} is not configured in .env"
@@ -59,7 +59,7 @@ async def llm_health() -> LLMHealthResponse:
     except Exception as exc:
         return LLMHealthResponse(
             provider=settings.llm.preferred_provider,
-            model_override=settings.llm.default_model,
+            model=settings.llm.default_model,
             success=False,
             latency_ms=0.0,
             error_message=str(exc)

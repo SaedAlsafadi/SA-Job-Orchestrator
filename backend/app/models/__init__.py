@@ -15,6 +15,7 @@ from app.models.harness import (
 from app.models.job import Job
 from app.models.application_route import ApplicationRoute
 from app.models.llm_usage import LLMUsage
+from app.models.monitoring import MonitoringRun, MonitoringSchedule
 from app.models.company_watch import CompanyWatch
 from app.models.search_profile import SearchProfile
 from app.models.discovery_run import DiscoveryRun
@@ -49,6 +50,8 @@ __all__ = [
     "DomainSkill",
     "Job",
     "LLMUsage",
+    "MonitoringRun",
+    "MonitoringSchedule",
     "PasswordResetToken",
     "PlatformSession",
     "RefreshToken",

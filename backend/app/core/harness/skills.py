@@ -43,6 +43,12 @@ def _contains_person_name(content: str) -> bool:
     name must not be stored. Requires >=2 tokens so single-word tech terms don't false-positive;
     falls back to the regex gate only if the model is unavailable.
     """
+    explicit_name = re.search(
+        r"\b(?:Applicant|Candidate|Name)\s*:?[ \t]+[A-Z][a-z]{1,30}[ \t]+[A-Z][a-z]{1,30}\b",
+        content,
+    )
+    if explicit_name:
+        return True
     try:
         from app.core.ats.nlp import get_nlp
 

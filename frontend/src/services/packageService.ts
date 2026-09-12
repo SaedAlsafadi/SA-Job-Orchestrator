@@ -40,6 +40,8 @@ export interface Readiness {
   warnings: string[];
   documents: Array<{ name: string; ok: boolean; detail: string }>;
   route: string | null;
+  route_url: string | null;
+  route_instructions: string | null;
   posting_quality: { signal: string; reasons: string[] };
   work_authorization: { status: string; requirements: string[]; evidence: string[] };
   package_version: number;
@@ -105,4 +107,10 @@ export const packageService = {
 
   send: (appId: string) =>
     api.post<SendResult>(`/applications/${appId}/package/send`).then((r) => r.data),
+
+  recordRouteOpened: (appId: string) =>
+    api.post(`/applications/${appId}/route-opened`).then((r) => r.data),
+
+  confirmManualSubmission: (appId: string) =>
+    api.post(`/applications/${appId}/confirm-manual-submission`, { confirmed: true }).then((r) => r.data),
 };
