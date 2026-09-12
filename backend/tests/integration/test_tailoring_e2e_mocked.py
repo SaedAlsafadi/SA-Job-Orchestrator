@@ -12,7 +12,13 @@ from app.models.job import Job
 from app.models.tailoring import CVTailoringSession, CVTailoringChange
 from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.schemas.tailoring import CVTailorOutput, CVReviewOutput, ProposedChangeOutput, ReviewDecisionOutput
-from app.services.tailoring import start_tailoring_session, finalize_session, revise_change, regenerate_session
+from app.services.tailoring import (
+    _rejected_novel_fragments,
+    start_tailoring_session,
+    finalize_session,
+    revise_change,
+    regenerate_session,
+)
 from app.core.documents.generator import DocumentGenerator
 
 @pytest.fixture
@@ -76,6 +82,151 @@ def mock_review_output():
             )
         ]
     )
+
+
+@pytest.mark.asyncio
+async def test_review_failure_keeps_session_reviewable_and_fails_closed(
+    db_session: AsyncSession,
+    current_user,
+    mock_tailor_output,
+):
+    job = Job(
+        id=uuid.uuid4().hex,
+        user_id=current_user.id,
+        title="Operations Engineer",
+        company="Example",
+        url="https://example.test/job",
+        description="Monitor services and respond to alarms",
+        platform="manual",
+        platform_job_id=uuid.uuid4().hex,
+    )
+    resume = Resume(
+        id=uuid.uuid4().hex,
+        user_id=current_user.id,
+        name="Base CV",
+        type="base",
+        content_text="Python developer",
+    )
+    db_session.add_all([job, resume])
+    await db_session.commit()
+
+    router = AsyncMock(spec=LLMTaskRouter)
+    router.settings = AsyncMock()
+    router.settings.heavy_model = "mocked-heavy"
+    transaction_states: list[bool] = []
+
+    async def complete_side_effect(task, **kwargs):
+        transaction_states.append(db_session.in_transaction())
+        if task == LLMTask.CV_TAILOR:
+            return mock_tailor_output
+        raise ValueError("review returned blank output")
+
+    router.complete_with_structured_output.side_effect = complete_side_effect
+
+    session = await start_tailoring_session(
+        db_session, current_user.id, job.id, resume.id, router
+    )
+    changes = (
+        await db_session.execute(
+            select(CVTailoringChange).where(CVTailoringChange.session_id == session.id)
+        )
+    ).scalars().all()
+
+    assert transaction_states == [False, False]
+    assert session.status == TailoringStatus.REVIEWING
+    assert len(changes) == len(mock_tailor_output.changes)
+    assert all(change.review_severity == ReviewSeverity.BLOCKED for change in changes)
+    assert all("review unavailable" in change.review_reason for change in changes)
+
+
+def test_rejected_integrity_check_uses_only_novel_proposed_text():
+    modified = CVTailoringChange(
+        session_id="session",
+        user_id="user",
+        change_id="change",
+        target_type="SUMMARY",
+        target_reference="summary",
+        section="Summary",
+        original_text="Built reliable Python services for business workflows.",
+        proposed_text=(
+            "Built reliable Python services for business workflows. "
+            "Handled telecom alarms and guaranteed SLA compliance."
+        ),
+        change_type=ChangeType.MODIFY,
+        reason="Keyword alignment",
+        linked_requirement_ids=[],
+        linked_evidence_ids=[],
+        user_decision=ReviewerStatus.REJECTED,
+        review_severity=ReviewSeverity.BLOCKED,
+    )
+    removed = CVTailoringChange(
+        session_id="session",
+        user_id="user",
+        change_id="removal",
+        target_type="BULLET",
+        target_reference="skills[0]",
+        section="Skills",
+        original_text="Python",
+        proposed_text=None,
+        change_type=ChangeType.REMOVE,
+        reason="Remove it",
+        linked_requirement_ids=[],
+        linked_evidence_ids=[],
+        user_decision=ReviewerStatus.REJECTED,
+        review_severity=ReviewSeverity.SAFE,
+    )
+
+    assert _rejected_novel_fragments(modified) == [
+        "Handled telecom alarms and guaranteed SLA compliance."
+    ]
+    assert _rejected_novel_fragments(removed) == []
+
+
+@pytest.mark.asyncio
+async def test_zero_change_finalization_preserves_uploaded_artifacts(
+    db_session: AsyncSession,
+    current_user,
+):
+    job = Job(
+        id=uuid.uuid4().hex,
+        user_id=current_user.id,
+        title="Operations Engineer",
+        company="Example",
+        url="https://example.test/zero-change-job",
+        description="Monitor services",
+        platform="manual",
+        platform_job_id=uuid.uuid4().hex,
+    )
+    resume = Resume(
+        id=uuid.uuid4().hex,
+        user_id=current_user.id,
+        name="Uploaded CV.pdf",
+        type="base",
+        content_text="Canonical extracted text",
+        file_path_pdf="users/user/resumes/original.pdf",
+        file_path_docx="users/user/resumes/original.docx",
+    )
+    db_session.add_all([job, resume])
+    await db_session.commit()
+
+    router = AsyncMock(spec=LLMTaskRouter)
+    router.settings = AsyncMock()
+    router.settings.heavy_model = "mocked-heavy"
+    router.complete_with_structured_output.return_value = CVTailorOutput(changes=[])
+
+    session = await start_tailoring_session(
+        db_session, current_user.id, job.id, resume.id, router
+    )
+    with patch.object(DocumentGenerator, "generate_resume") as generate_resume:
+        final_resume = await finalize_session(db_session, current_user.id, session.id)
+
+    generate_resume.assert_not_called()
+    assert final_resume.id != resume.id
+    assert final_resume.file_path_pdf == resume.file_path_pdf
+    assert final_resume.file_path_docx == resume.file_path_docx
+    assert final_resume.content_text == resume.content_text
+    assert final_resume.audit_metadata["artifact_strategy"] == "preserve_base_artifact"
+    assert session.status == TailoringStatus.VERIFIED
 
 @pytest.mark.asyncio
 async def test_full_tailoring_workflow(db_session: AsyncSession, current_user, mock_tailor_output, mock_review_output):

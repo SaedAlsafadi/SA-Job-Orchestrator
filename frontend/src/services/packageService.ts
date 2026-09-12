@@ -2,6 +2,11 @@
 
 import api from "@/services/api";
 
+// Real structured-output calls regularly exceed the generic 30-second HTTP
+// timeout. Keep ordinary API requests fast, but allow bounded completion time
+// for the explicitly model-backed package actions.
+export const LLM_ACTION_TIMEOUT_MS = 300_000;
+
 export interface ApplicationPackage {
   id: string;
   application_id: string;
@@ -65,21 +70,35 @@ export const packageService = {
       .post<ApplicationPackage>(`/applications/${appId}/package/cover-letter`, {
         match_summary: matchSummary ?? null,
         language,
-      })
+      }, { timeout: LLM_ACTION_TIMEOUT_MS })
       .then((r) => r.data),
 
   generateEmail: (appId: string, language = "en") =>
     api
-      .post<ApplicationPackage>(`/applications/${appId}/package/email`, { language })
+      .post<ApplicationPackage>(
+        `/applications/${appId}/package/email`,
+        { language },
+        { timeout: LLM_ACTION_TIMEOUT_MS },
+      )
       .then((r) => r.data),
 
   generateAnswers: (appId: string, questions: string[], language = "en") =>
     api
-      .post<ApplicationPackage>(`/applications/${appId}/package/answers`, { questions, language })
+      .post<ApplicationPackage>(
+        `/applications/${appId}/package/answers`,
+        { questions, language },
+        { timeout: LLM_ACTION_TIMEOUT_MS },
+      )
       .then((r) => r.data),
 
   runQa: (appId: string) =>
-    api.post<ApplicationPackage>(`/applications/${appId}/package/qa`).then((r) => r.data),
+    api
+      .post<ApplicationPackage>(
+        `/applications/${appId}/package/qa`,
+        undefined,
+        { timeout: LLM_ACTION_TIMEOUT_MS },
+      )
+      .then((r) => r.data),
 
   approve: (appId: string) =>
     api.post<ApplicationPackage>(`/applications/${appId}/package/approve`).then((r) => r.data),

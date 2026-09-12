@@ -77,7 +77,24 @@ class JobListingResponse(BaseModel):
 
 class JobDetailResponse(JobListingResponse):
     """Single job detail response — includes eagerly-loaded routes."""
-    routes: list[Any] | None = None
+    routes: list["ApplicationRouteResponse"] | None = None
+
+
+class ApplicationRouteResponse(BaseModel):
+    """JSON-safe application route projection for job details."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    route_type: str
+    url: str | None = None
+    email: str | None = None
+    instructions: str | None = None
+    confidence: float
+    resolution_reason: str | None = None
+    requires_human: bool
+    is_preferred: bool
+    resolved_at: datetime
 
 
 class JobListResponse(BaseModel):

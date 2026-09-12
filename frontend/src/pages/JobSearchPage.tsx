@@ -50,6 +50,10 @@ export default function JobSearchPage() {
 
   const openDrawer = (job: Job) => {
     setDrawerJob(job);
+    if (job.raw_data?.match_result) {
+      analyze.reset();
+      return;
+    }
     analyze.mutate(job.id, {
       onError: () => notify('Could not analyze this job', 'error'),
     });
@@ -244,8 +248,8 @@ export default function JobSearchPage() {
       {drawerJob && (
         <JobDrawer
           job={drawerJob}
-          analysis={analyze.data ?? null}
-          analyzing={analyze.isPending}
+          analysis={drawerJob.raw_data?.match_result ?? analyze.data ?? null}
+          analyzing={!drawerJob.raw_data?.match_result && analyze.isPending}
           baseResumeId={baseResumeId}
           generating={startingSession}
           onClose={() => setDrawerJob(null)}

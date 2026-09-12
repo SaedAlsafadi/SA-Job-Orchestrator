@@ -257,6 +257,7 @@ export const CVTailoringWorkbench: React.FC = () => {
     if (!session) return;
     try {
       setVerifying(true);
+      setError(null);
       const newResume = await tailoringService.finalizeSession(session.id);
       setFinalResume(newResume);
       setSession({ ...session, status: 'verified' });

@@ -11,17 +11,28 @@ function getMatchVerdict(recommendation: string): { label: string; color: string
   }
 }
 
+export function getMatchScorePercent(result: any): number | null {
+  const value = typeof result?.total_score === 'number'
+    ? result.total_score
+    : typeof result?.score === 'number'
+      ? result.score
+      : null;
+  if (value === null || !Number.isFinite(value)) return null;
+  return Math.round(value >= 0 && value <= 1 ? value * 100 : value);
+}
+
 export function MatchIntelligenceView({ result }: { result: any }) {
   const [showDetailed, setShowDetailed] = useState(false);
   const analysis = result;
 
   if (!analysis) return null;
 
-  const scoreDisplay = typeof analysis.score === 'number' 
-    ? (analysis.score * 100).toFixed(0) + '%'
-    : (analysis.score || 'N/A');
+  const scorePercent = getMatchScorePercent(analysis);
+  const scoreDisplay = scorePercent === null ? 'N/A' : `${scorePercent}%`;
     
-  const verdictInfo = getMatchVerdict(analysis.recommendation || (analysis.score > 0.8 ? 'apply' : 'skip'));
+  const verdictInfo = getMatchVerdict(
+    analysis.recommendation || ((scorePercent ?? 0) > 80 ? 'apply' : 'skip')
+  );
 
   return (
     <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>

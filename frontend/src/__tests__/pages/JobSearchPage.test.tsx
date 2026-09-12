@@ -78,6 +78,41 @@ describe('JobSearchPage', () => {
     expect(screen.getByText('Own the roadmap.')).toBeInTheDocument();
   });
 
+  it('reuses persisted match evidence when opening a job drawer', async () => {
+    let analysisCalls = 0;
+    const matchResult = {
+      total_score: 6,
+      verdict: 'WEAK_MATCH',
+      confidence: 0.9,
+      data_quality: 'HIGH',
+      explanation: 'The résumé does not show telecom operations experience.',
+      recommendation: 'skip',
+      dimensions: {},
+      strong_matches: [],
+      gaps: ['Ericsson RAN management'],
+      critical_gaps: [],
+      blockers: [],
+      requirement_analysis: [],
+    };
+    server.use(
+      http.get('/api/v1/jobs/', () =>
+        HttpResponse.json(listOf(job({ raw_data: { match_result: matchResult } }))),
+      ),
+      http.post('/api/v1/jobs/:id/analyze', () => {
+        analysisCalls += 1;
+        return HttpResponse.json(matchResult);
+      }),
+    );
+
+    renderJobs();
+    await userEvent.click(await screen.findByRole('button', { name: 'Senior Product Manager' }));
+
+    expect(await screen.findByText('WEAK MATCH')).toBeInTheDocument();
+    expect(screen.getByText('6%')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /tailor resume/i })).toBeInTheDocument();
+    expect(analysisCalls).toBe(0);
+  });
+
   it('distinguishes "no results for this search" from "not searched yet" (BUG-008)', async () => {
     server.use(http.get('/api/v1/jobs/', () => HttpResponse.json(listOf())));
     server.use(http.post('/api/v1/jobs/search', () => HttpResponse.json(listOf())));

@@ -75,6 +75,19 @@ async def _make_resume(db_session) -> Resume:
     return resume
 
 
+async def _make_email_route(db_session, job: Job) -> ApplicationRoute:
+    route = ApplicationRoute(
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        route_type="EMAIL",
+        email="jobs@techcorp.com",
+        resolved_at=datetime.now(UTC),
+    )
+    db_session.add(route)
+    await db_session.commit()
+    return route
+
+
 # ---------------- content hash / version locking ----------------
 
 
@@ -264,10 +277,63 @@ async def test_approval_binds_to_package_and_survives_idempotency(db_session):
     approval = await approve_package(db_session, app.id, pkg.id, TEST_USER_ID)
     assert approval.package_id == pkg.id
     assert approval.package_hash == pkg.content_hash
+    await db_session.refresh(app)
+    assert app.status == ApplicationStatus.APPROVED
 
     # Idempotent: same hash → same approval
     again = await approve_package(db_session, app.id, pkg.id, TEST_USER_ID)
     assert again.id == approval.id
+
+
+@pytest.mark.asyncio
+async def test_company_website_package_can_be_approved_without_email_recipient(db_session):
+    job = await _make_job(db_session)
+    app = await _make_application(db_session, job)
+    route = ApplicationRoute(
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        route_type="COMPANY_WEBSITE",
+        url="https://example.com/jobs/1",
+        resolved_at=datetime.now(UTC),
+    )
+    db_session.add(route)
+    await db_session.commit()
+    pkg = await create_or_update_package(
+        db_session, app.id, TEST_USER_ID, route_id=route.id
+    )
+
+    approval = await approve_package(db_session, app.id, pkg.id, TEST_USER_ID)
+
+    assert approval.package_id == pkg.id
+    assert approval.platform == "company_website"
+
+
+@pytest.mark.asyncio
+async def test_company_website_package_cannot_use_email_send(db_session):
+    job = await _make_job(db_session)
+    app = await _make_application(db_session, job)
+    route = ApplicationRoute(
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        route_type="COMPANY_WEBSITE",
+        url="https://example.com/jobs/1",
+        resolved_at=datetime.now(UTC),
+    )
+    db_session.add(route)
+    await db_session.commit()
+    pkg = await create_or_update_package(
+        db_session,
+        app.id,
+        TEST_USER_ID,
+        route_id=route.id,
+        email_to="wrongly-populated@example.com",
+        email_subject="Application",
+        email_body="Hello",
+    )
+    await approve_package(db_session, app.id, pkg.id, TEST_USER_ID)
+
+    with pytest.raises(PackageError, match="Only EMAIL-route"):
+        await send_package_email(db_session, app.id, pkg.id, TEST_USER_ID)
 
 
 @pytest.mark.asyncio
@@ -308,6 +374,7 @@ def test_validate_attachments_rejects_missing_resume():
 @pytest.mark.asyncio
 async def test_send_requires_approval(db_session):
     job = await _make_job(db_session)
+    route = await _make_email_route(db_session, job)
     app = await _make_application(db_session, job)
     resume = await _make_resume(db_session)
     pkg = await create_or_update_package(
@@ -317,6 +384,7 @@ async def test_send_requires_approval(db_session):
         email_subject="Application",
         email_body="Hello",
         attachment_keys=["users/u/resumes/r.pdf"],
+        route_id=route.id,
     )
     with pytest.raises(PackageError, match="No valid approval"):
         await send_package_email(db_session, app.id, pkg.id, TEST_USER_ID)
@@ -325,6 +393,7 @@ async def test_send_requires_approval(db_session):
 @pytest.mark.asyncio
 async def test_send_success_records_sent_state(db_session):
     job = await _make_job(db_session)
+    route = await _make_email_route(db_session, job)
     app = await _make_application(db_session, job)
     resume = await _make_resume(db_session)
     pkg = await create_or_update_package(
@@ -334,6 +403,7 @@ async def test_send_success_records_sent_state(db_session):
         email_subject="Application",
         email_body="Hello",
         attachment_keys=["users/u/resumes/r.pdf"],
+        route_id=route.id,
     )
     await approve_package(db_session, app.id, pkg.id, TEST_USER_ID)
     result = await send_package_email(db_session, app.id, pkg.id, TEST_USER_ID)
@@ -354,6 +424,7 @@ async def test_send_success_records_sent_state(db_session):
 @pytest.mark.asyncio
 async def test_stale_approval_cannot_send_newer_package(db_session):
     job = await _make_job(db_session)
+    route = await _make_email_route(db_session, job)
     app = await _make_application(db_session, job)
     resume = await _make_resume(db_session)
     pkg1 = await create_or_update_package(
@@ -363,6 +434,7 @@ async def test_stale_approval_cannot_send_newer_package(db_session):
         email_subject="Application",
         email_body="Hello",
         attachment_keys=["users/u/resumes/r.pdf"],
+        route_id=route.id,
     )
     await approve_package(db_session, app.id, pkg1.id, TEST_USER_ID)
 
@@ -379,3 +451,19 @@ async def test_stale_approval_cannot_send_newer_package(db_session):
     # pkg2 has no approval bound to ITS hash → cannot be sent
     with pytest.raises(PackageError, match="No valid approval"):
         await send_package_email(db_session, app.id, pkg2.id, TEST_USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_stale_package_cannot_be_approved(db_session):
+    job = await _make_job(db_session)
+    app = await _make_application(db_session, job)
+    pkg1 = await create_or_update_package(
+        db_session, app.id, TEST_USER_ID, cover_letter_text="version one"
+    )
+    pkg2 = await create_or_update_package(
+        db_session, app.id, TEST_USER_ID, cover_letter_text="version two"
+    )
+    assert pkg2.is_current
+
+    with pytest.raises(PackageError, match="current package"):
+        await approve_package(db_session, app.id, pkg1.id, TEST_USER_ID)

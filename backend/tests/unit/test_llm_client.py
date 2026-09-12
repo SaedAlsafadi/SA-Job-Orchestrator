@@ -155,6 +155,27 @@ class TestCompleteFallback:
 
         assert result.content == "fallback result"
 
+    async def test_explicit_heavy_model_402_is_not_silently_fallbacked(
+        self, client: LLMClient
+    ) -> None:
+        with patch("app.core.llm.client.litellm") as mock_litellm:
+            api_error = type("APIError", (Exception,), {})
+            mock_litellm.APIError = api_error
+            mock_litellm.RateLimitError = type("RateLimitError", (Exception,), {})
+            mock_litellm.Timeout = type("Timeout", (Exception,), {})
+            client._llm.fallback_providers = ["groq"]
+            mock_litellm.acompletion = AsyncMock(
+                side_effect=api_error("402 Payment Required")
+            )
+
+            with pytest.raises(LLMProviderError, match="402 Payment Required"):
+                await client.complete(
+                    "heavy prompt",
+                    model="openrouter/deepseek/deepseek-v4-flash-0731",
+                )
+
+        assert mock_litellm.acompletion.await_count == 1
+
 
 # ---------------------------------------------------------------------------
 # complete - rate limit

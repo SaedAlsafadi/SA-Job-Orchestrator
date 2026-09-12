@@ -4,6 +4,7 @@ import Icon from '@/components/ui/Icon';
 import RunTimeline from '@/components/applications/RunTimeline';
 import { PackageReview } from '@/components/applications/PackageReview';
 import { useApplication, useUpdateApplicationStatus } from '@/hooks/useApplications';
+import { useJob } from '@/hooks/useJobs';
 import { useAppStore } from '@/store/useAppStore';
 import { buildAppTimeline } from '@/lib/timeline';
 import { statusMeta, atsColor, atsPercent, relativeTime } from '@/lib/status';
@@ -18,6 +19,7 @@ export default function AppDetailPage() {
   const navigate = useNavigate();
   const notify = useAppStore((s) => s.showNotification);
   const { data: app, isLoading, isError } = useApplication(id);
+  const { data: job } = useJob(app?.job_id);
   const updateStatus = useUpdateApplicationStatus();
 
   const setStatus = (status: string, msg: string) =>
@@ -97,7 +99,7 @@ export default function AppDetailPage() {
                   applicationId={app.id}
                   jobId={app.job_id}
                   job={{ title: app.job_title, company: app.company }}
-                  matchSummary={app.ats_score == null ? undefined : { score: app.ats_score }}
+                  matchSummary={job?.raw_data?.match_result ?? (app.ats_score == null ? undefined : { score: app.ats_score })}
                   onStatus={(message, kind) => notify(message, kind)}
                 />
               </div>

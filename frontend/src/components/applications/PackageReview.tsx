@@ -206,7 +206,8 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
   const qaIssues = mockQa?.issues ?? pkg.qa_issues ?? [];
   const blocked = qaVerdict === "blocked";
   const canApprove = Boolean(readiness?.ready && qaVerdict && !approved && !blocked);
-  const canSend = approved && pkg.send_state !== "sent";
+  const isEmailRoute = readiness?.route?.toUpperCase() === "EMAIL";
+  const canSend = approved && isEmailRoute && pkg.send_state !== "sent";
   const rawScore = matchSummary?.score ?? matchSummary?.total_score ?? matchSummary?.match_score;
   const matchScore = typeof rawScore === "number"
     ? `${Math.round(rawScore <= 1 ? rawScore * 100 : rawScore)}%`
@@ -342,12 +343,16 @@ export function PackageReview({ applicationId, jobId, job, language = "en", matc
             <span style={{ alignSelf: "center", color: "var(--text-3)", fontSize: 12 }}>
               Review-only mock mode — sending is disabled
             </span>
-          ) : (
+          ) : isEmailRoute ? (
             <button style={btnPrimary} disabled={!canSend || busy !== null}
               onClick={() => run("send", () => packageService.send(applicationId), "Email sent")}>
               {busy === "send" ? "Sending…" : pkg.send_state === "sent" ? "Sent ✓" : "Send email"}
             </button>
-          )}
+          ) : approved ? (
+            <span style={{ alignSelf: "center", color: "var(--text-3)", fontSize: 12 }}>
+              Approval recorded — continue via the route above
+            </span>
+          ) : null}
         </div>
 
         {sendResult && (

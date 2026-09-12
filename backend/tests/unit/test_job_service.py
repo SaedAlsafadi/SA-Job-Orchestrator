@@ -1,5 +1,6 @@
 """Unit tests for the job search service."""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -157,6 +158,24 @@ class TestGetJob:
         with pytest.raises(RecordNotFoundError):
             await job_search.get_job(db_session, "nonexistent_id")
 
+    async def test_stale_processing_job_becomes_visible_retryable_failure(
+        self, db_session, sample_job_data
+    ):
+        job = Job(
+            **{
+                **sample_job_data,
+                "status": "processing",
+                "updated_at": datetime.now(UTC) - timedelta(minutes=16),
+            }
+        )
+        db_session.add(job)
+        await db_session.commit()
+
+        found = await job_search.get_job(db_session, job.id)
+
+        assert found.status == "failed"
+        assert "Arq worker" in found.raw_data["error"]
+
 
 class TestDeleteJob:
     async def test_delete_job_success(self, db_session, sample_job_data):
@@ -176,21 +195,17 @@ class TestDeleteJob:
 
 
 class TestAnalyzeJob:
-    async def test_analyze_job_no_resume_returns_placeholder(
+    async def test_analyze_job_requires_candidate_profile(
         self, db_session, sample_job_data,
     ):
-        """Without a resume_id, analyze_job returns zero scores."""
+        """Real matching must not fabricate a placeholder without candidate data."""
         job = Job(**sample_job_data)
         db_session.add(job)
         await db_session.commit()
         await db_session.refresh(job)
 
-        result = await job_search.analyze_job(db_session, job.id)
-        assert result.job_id == job.id
-        assert result.match_score == 0.0
-        assert result.skill_match == 0.0
-        assert result.keyword_match == 0.0
-        assert len(result.suggestions) > 0
+        with pytest.raises(ValueError, match="No candidate profile found"):
+            await job_search.analyze_job(db_session, job.id)
 
     async def test_analyze_job_not_found_raises(self, db_session):
         with pytest.raises(RecordNotFoundError):

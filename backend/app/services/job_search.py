@@ -5,6 +5,7 @@ scrapers, and ATS-based job analysis.
 """
 
 import hashlib
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -39,6 +40,31 @@ from app.schemas.job import (
 )
 
 logger = structlog.get_logger(__name__)
+
+_STALE_PROCESSING = timedelta(seconds=900)
+_WORKER_TIMEOUT_ERROR = (
+    "Background worker did not complete this opportunity within 15 minutes. "
+    "Verify the Arq worker is running, then retry the import."
+)
+
+
+async def _expire_stale_processing_jobs(db: AsyncSession) -> None:
+    """Turn worker-lost jobs into a visible, retryable failure state."""
+    cutoff = datetime.now(UTC) - _STALE_PROCESSING
+    result = await db.execute(
+        select(Job).where(
+            Job.status.in_(["processing", "received"]),
+            Job.updated_at < cutoff,
+        )
+    )
+    stale = list(result.scalars().all())
+    if not stale:
+        return
+    for job in stale:
+        job.status = "failed"
+        job.raw_data = {**(job.raw_data or {}), "error": _WORKER_TIMEOUT_ERROR}
+    await db.commit()
+    logger.warning("stale_opportunity_jobs_failed", count=len(stale))
 
 
 def _stored_match_score(score: int | float | None) -> float | None:
@@ -396,6 +422,7 @@ async def list_jobs(
     Returns:
         Paginated job list response.
     """
+    await _expire_stale_processing_jobs(db)
     page_size = min(page_size, MAX_PAGE_SIZE)
     offset = (page - 1) * page_size
 
@@ -442,6 +469,7 @@ async def get_job(db: AsyncSession, job_id: str) -> Job:
     Raises:
         RecordNotFoundError: If job does not exist.
     """
+    await _expire_stale_processing_jobs(db)
     from sqlalchemy.orm import selectinload
     result = await db.execute(select(Job).options(selectinload(Job.routes)).where(Job.id == job_id))
     job = result.scalar_one_or_none()
@@ -490,8 +518,12 @@ async def analyze_job(
     matcher = CandidateJobMatcher(router)
     
     result = await matcher.match_candidate(schema, job, language=language)
-    
-    # Save score to DB
+
+    # Persist the score and its evidence atomically so every UI surface refers
+    # to the same analysis. JSON mode converts provenance datetimes and enums.
+    raw_data = dict(job.raw_data or {})
+    raw_data["match_result"] = result.model_dump(mode="json")
+    job.raw_data = raw_data
     job.match_score = _stored_match_score(result.total_score)
     await db.commit()
     

@@ -1,6 +1,9 @@
 """Phase 20A.3 deterministic operational UX API coverage."""
 
+from datetime import UTC, datetime
+
 from app.models.application import Application
+from app.models.application_route import ApplicationRoute
 from app.models.job import Job
 from app.models.resume import Resume
 from app.models.tailoring import CVTailoringSession
@@ -25,6 +28,41 @@ async def test_jobs_payload_normalizes_legacy_score_once(client, db_session, cur
     response = await client.get("/api/v1/jobs/")
     assert response.status_code == 200
     assert response.json()["items"][0]["match_score"] == 0.47
+
+
+async def test_job_detail_serializes_application_routes(client, db_session, current_user):
+    job = await _job(db_session, "route-detail", score=.47)
+    route = ApplicationRoute(
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        route_type="COMPANY_WEBSITE",
+        url="https://example.com/apply",
+        confidence=.9,
+        resolution_reason="Explicit application URL provided",
+        requires_human=False,
+        is_preferred=True,
+        resolved_at=datetime.now(UTC),
+    )
+    db_session.add(route)
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/jobs/{job.id}")
+
+    assert response.status_code == 200
+    assert response.json()["routes"] == [
+        {
+            "id": route.id,
+            "route_type": "COMPANY_WEBSITE",
+            "url": "https://example.com/apply",
+            "email": None,
+            "instructions": None,
+            "confidence": .9,
+            "resolution_reason": "Explicit application URL provided",
+            "requires_human": False,
+            "is_preferred": True,
+            "resolved_at": route.resolved_at.isoformat().replace("+00:00", "Z"),
+        }
+    ]
 
 
 async def test_dashboard_dismissal_persists_each_material_fingerprint(client, current_user):

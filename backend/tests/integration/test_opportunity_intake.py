@@ -1,5 +1,7 @@
 import pytest
+from unittest.mock import AsyncMock
 import urllib.parse
+import httpx
 from app.core.job_discovery.url_provider import UrlProvider, SSRFSecurityError
 from app.core.job_discovery.manual_provider import ManualProvider
 from app.models.enums import JobStatus
@@ -28,6 +30,16 @@ async def test_ssrf_protections():
     # Should not raise
     provider._validate_url("https://boards.greenhouse.io/openai/jobs/12345")
 
+
+@pytest.mark.asyncio
+async def test_invalid_url_is_rejected_before_persistence(client):
+    response = await client.post(
+        "/api/v1/opportunities/ingest",
+        json={"text": "not a job URL", "source_type": "url"},
+    )
+    assert response.status_code == 422
+    assert "valid public HTTP(S) job URL" in response.text
+
 @pytest.mark.asyncio
 async def test_url_extraction(monkeypatch):
     provider = UrlProvider()
@@ -49,6 +61,60 @@ async def test_url_extraction(monkeypatch):
     text = provider._extract_text(html)
     assert "ignore me" not in text
     assert "We are hiring" in text
+
+
+def test_url_extraction_preserves_jobposting_json_ld():
+    provider = UrlProvider()
+    html = """
+    <html><body>
+      <script type="application/ld+json">
+        {"@type":"JobPosting","title":"Network Engineer",
+         "description":"Maintain the radio access network.",
+         "hiringOrganization":{"name":"Ericsson"}}
+      </script>
+      <script>window.noise = "ignore me"</script>
+      <main>Careers</main>
+    </body></html>
+    """
+
+    text = provider._extract_text(html)
+
+    assert "title: Network Engineer" in text
+    assert "Maintain the radio access network" in text
+    assert 'hiringOrganization: {"name": "Ericsson"}' in text
+    assert "ignore me" not in text
+
+
+@pytest.mark.asyncio
+async def test_url_fetch_retries_transient_transport_errors(monkeypatch):
+    provider = UrlProvider()
+    attempts = 0
+    real_async_client = httpx.AsyncClient
+
+    async def handler(request):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise httpx.ConnectError("temporary TLS reset", request=request)
+        return httpx.Response(
+            200,
+            request=request,
+            text="<html><body>complete posting</body></html>",
+            headers={"content-type": "text/html"},
+        )
+
+    def client_factory(**kwargs):
+        return real_async_client(transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr("app.core.job_discovery.url_provider.httpx.AsyncClient", client_factory)
+    sleep = AsyncMock()
+    monkeypatch.setattr("app.core.job_discovery.url_provider.asyncio.sleep", sleep)
+
+    result = await provider._fetch_url("https://jobs.example.com/42")
+
+    assert "complete posting" in result
+    assert attempts == 3
+    assert sleep.await_count == 2
 
 @pytest.mark.asyncio
 async def test_manual_provider_normalization():
@@ -116,3 +182,30 @@ async def test_ingest_retries_failed_job(client, db_session):
     assert job.status == JobStatus.FAILED
     assert job.raw_data["error"] != "old scrape failure"
     assert "Redis" in job.raw_data["error"]
+
+
+@pytest.mark.asyncio
+async def test_ingest_retry_uses_stable_source_after_normalization(client, db_session):
+    """Worker normalization changes platform_job_id, but the same source URL
+    must still retry the original tenant-owned job instead of creating a duplicate."""
+    from app.models.job import Job
+
+    source_url = "https://example.com/jobs/normalized-44"
+    first = await client.post(
+        "/api/v1/opportunities/ingest",
+        json={"text": source_url, "source_type": "url"},
+    )
+    job_id = first.json()["job_id"]
+
+    job = await db_session.get(Job, job_id)
+    job.platform_job_id = "normalized-content-hash"
+    job.status = JobStatus.FAILED
+    await db_session.commit()
+
+    retry = await client.post(
+        "/api/v1/opportunities/ingest",
+        json={"text": source_url, "source_type": "url"},
+    )
+
+    assert retry.status_code == 200
+    assert retry.json()["job_id"] == job_id

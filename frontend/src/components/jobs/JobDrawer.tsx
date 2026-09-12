@@ -171,7 +171,7 @@ export default function JobDrawer({ job, analysis, analyzing, baseResumeId, gene
           <a href={job.url} target="_blank" rel="noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px', height: 40, borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', font: '500 13.5px/1 var(--font)', textDecoration: 'none' }}>
             <Icon name="ext" size={15} /> Original Post
           </a>
-          {analysis && analysis.recommendation !== 'skip' && (
+          {analysis && (
             <button
               onClick={onGenerate}
               disabled={!canGenerate}

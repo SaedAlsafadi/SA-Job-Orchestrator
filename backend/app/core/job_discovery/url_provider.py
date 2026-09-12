@@ -1,5 +1,6 @@
 """URL Opportunity Provider for web ingestion."""
 
+import asyncio
 import json
 import re
 import socket
@@ -57,22 +58,71 @@ class UrlProvider(UserFedOpportunitySource):
             timeout=10.0,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64 AppleWebKit/537.36)"}
         ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            
-            content_type = resp.headers.get("content-type", "")
-            if "text/html" not in content_type and "text/plain" not in content_type:
-                raise ValueError(f"Unsupported content type: {content_type}")
-                
-            return resp.text
+            for attempt in range(3):
+                try:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+
+                    content_type = resp.headers.get("content-type", "")
+                    if "text/html" not in content_type and "text/plain" not in content_type:
+                        raise ValueError(f"Unsupported content type: {content_type}")
+
+                    return resp.text
+                except httpx.HTTPStatusError as exc:
+                    status = exc.response.status_code
+                    if attempt == 2 or (status != 429 and status < 500):
+                        raise
+                except httpx.TransportError:
+                    if attempt == 2:
+                        raise
+
+                delay = 0.5 * (2**attempt)
+                logger.warning(
+                    "url_provider.fetch_retry",
+                    url=url,
+                    attempt=attempt + 1,
+                    delay_seconds=delay,
+                )
+                await asyncio.sleep(delay)
+
+        raise RuntimeError("URL fetch retry loop exited unexpectedly")
 
     def _extract_text(self, html: str) -> str:
         soup = BeautifulSoup(html, "html.parser")
+
+        # Job boards commonly render the visible body client-side but expose
+        # the complete posting as schema.org JobPosting JSON-LD. Preserve that
+        # authoritative content before removing scripts from the page chrome.
+        structured_parts = []
+        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            try:
+                payload = json.loads(script.string or script.get_text())
+            except (TypeError, json.JSONDecodeError):
+                continue
+
+            records = payload if isinstance(payload, list) else [payload]
+            for record in records:
+                if not isinstance(record, dict) or record.get("@type") != "JobPosting":
+                    continue
+                for field in (
+                    "title",
+                    "description",
+                    "employmentType",
+                    "datePosted",
+                    "hiringOrganization",
+                    "jobLocation",
+                ):
+                    value = record.get(field)
+                    if value:
+                        rendered = value if isinstance(value, str) else json.dumps(value)
+                        clean = BeautifulSoup(rendered, "html.parser").get_text(" ", strip=True)
+                        structured_parts.append(f"{field}: {clean}")
+
         for script in soup(["script", "style", "nav", "footer", "header", "aside"]):
             script.decompose()
-        
-        text = soup.get_text(separator="\n", strip=True)
-        return text
+
+        visible_text = soup.get_text(separator="\n", strip=True)
+        return "\n".join([*structured_parts, visible_text])
 
     async def ingest(self, input_text: str, **kwargs) -> Dict[str, Any]:
         """Ingest URL and use LLM to extract JSON from unstructured text.

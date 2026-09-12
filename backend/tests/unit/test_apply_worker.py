@@ -1,13 +1,18 @@
 """Phase 1.2: the Arq apply pipeline — idempotency, status lifecycle, retry classification."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from enum import StrEnum
+import json
 
 import pytest
 from arq import Retry
+from sqlalchemy import select
 
 from app.models.application import Application
 from app.models.enums import ApplicationStatus, ApplyMode
 from app.models.job import Job
+from app.models.application_route import ApplicationRoute
 from app.workers import tasks
 from tests.conftest import TEST_USER_ID
 
@@ -25,6 +30,77 @@ async def _seed_app(db, sample_job_data, status=ApplicationStatus.QUEUED) -> App
     await db.commit()
     await db.refresh(app)
     return app
+
+
+class TestWorkerRuntime:
+    async def test_startup_initializes_worker_observability(self):
+        with patch("app.observability.sentry.init_sentry") as init_sentry:
+            await tasks._on_startup({})
+
+        init_sentry.assert_called_once_with("worker")
+
+    def test_process_opportunity_is_registered(self):
+        assert tasks.process_opportunity in tasks.WorkerSettings.functions
+
+    def test_match_payload_dump_is_json_native(self):
+        from pydantic import BaseModel
+
+        class Verdict(StrEnum):
+            GOOD = "GOOD"
+
+        class MatchPayload(BaseModel):
+            verdict: Verdict
+            generated_at: datetime
+
+        payload = MatchPayload(
+            verdict=Verdict.GOOD,
+            generated_at=datetime(2026, 9, 10, tzinfo=UTC),
+        ).model_dump(mode="json")
+
+        assert json.loads(json.dumps(payload)) == {
+            "verdict": "GOOD",
+            "generated_at": "2026-09-10T00:00:00Z",
+        }
+
+    async def test_route_merge_is_idempotent(self, db_session, sample_job_data):
+        job = Job(**sample_job_data)
+        db_session.add(job)
+        await db_session.flush()
+
+        def resolved_route():
+            return ApplicationRoute(
+                user_id=job.user_id,
+                job_id=job.id,
+                route_type="COMPANY_WEBSITE",
+                url="https://jobs.example.com/42",
+                confidence=0.9,
+                resolution_reason="Explicit application URL provided",
+                requires_human=False,
+                is_preferred=True,
+                resolved_at=datetime.now(UTC),
+            )
+
+        await tasks._merge_application_routes(db_session, job, [resolved_route()])
+        await db_session.flush()
+        first_id = (
+            await db_session.execute(
+                select(ApplicationRoute.id).where(ApplicationRoute.job_id == job.id)
+            )
+        ).scalar_one()
+
+        await tasks._merge_application_routes(db_session, job, [resolved_route()])
+        await db_session.flush()
+        routes = list(
+            (
+                await db_session.execute(
+                    select(ApplicationRoute).where(ApplicationRoute.job_id == job.id)
+                )
+            ).scalars()
+        )
+
+        assert len(routes) == 1
+        assert routes[0].id == first_id
+        assert routes[0].is_preferred is True
 
 
 class TestApplyPipeline:

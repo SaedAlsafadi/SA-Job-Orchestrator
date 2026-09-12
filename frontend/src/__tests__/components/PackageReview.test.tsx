@@ -39,7 +39,7 @@ function packageFixture(overrides: Partial<ApplicationPackage> = {}): Applicatio
   };
 }
 
-function readinessFor(pkg: ApplicationPackage): Readiness {
+function readinessFor(pkg: ApplicationPackage, route = 'EMAIL'): Readiness {
   const complete = Boolean(pkg.resume_id && pkg.cover_letter_text && pkg.email_to && pkg.email_subject && pkg.email_body);
   return {
     ready: complete,
@@ -50,7 +50,7 @@ function readinessFor(pkg: ApplicationPackage): Readiness {
       { name: 'Cover Letter', ok: Boolean(pkg.cover_letter_text), detail: pkg.cover_letter_text ? 'drafted' : 'not generated' },
       { name: 'Application Email', ok: Boolean(pkg.email_body), detail: pkg.email_body ? 'drafted' : 'not drafted' },
     ],
-    route: 'EMAIL',
+    route,
     posting_quality: { signal: 'likely_legitimate', reasons: [] },
     work_authorization: { status: 'UNKNOWN', requirements: [], evidence: [] },
     package_version: pkg.version,
@@ -60,13 +60,13 @@ function readinessFor(pkg: ApplicationPackage): Readiness {
   };
 }
 
-function installPackageHandlers(initial: ApplicationPackage) {
+function installPackageHandlers(initial: ApplicationPackage, route = 'EMAIL') {
   let current = initial;
   let sendCalls = 0;
 
   server.use(
     http.get('/api/v1/applications/:appId/package', () => HttpResponse.json(current)),
-    http.get('/api/v1/applications/:appId/readiness', () => HttpResponse.json(readinessFor(current))),
+    http.get('/api/v1/applications/:appId/readiness', () => HttpResponse.json(readinessFor(current, route))),
     http.get('/api/v1/resumes/', () => HttpResponse.json({
       items: [{
         id: 'resume-tailored', name: 'Tailored CV — Senior Engineer', type: 'tailored',
@@ -170,5 +170,20 @@ describe('PackageReview', () => {
     expect(await screen.findByText(/Awaiting approval for version 2/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve package' })).toBeDisabled();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Regenerate email' })).toBeEnabled());
+  });
+
+  it('never offers email sending for an approved company-website package', async () => {
+    installPackageHandlers(packageFixture({
+      cover_letter_text: 'Reviewed letter',
+      qa_verdict: 'warning',
+      approval_id: 'approval-website',
+      approved_at: '2026-09-09T09:00:00Z',
+    }), 'COMPANY_WEBSITE');
+
+    render(<PackageReview applicationId="app-1" jobId="job-1" />);
+
+    expect(await screen.findByText(/Approved for version 1/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /send email/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/continue via the route above/i)).toBeInTheDocument();
   });
 });

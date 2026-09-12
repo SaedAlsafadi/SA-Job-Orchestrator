@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, UTC
+from difflib import SequenceMatcher
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,6 +15,33 @@ from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.schemas.tailoring import CVTailorOutput, CVReviewOutput
 
 logger = structlog.get_logger(__name__)
+
+
+def _rejected_novel_fragments(change: CVTailoringChange) -> list[str]:
+    """Return only text introduced by a rejected proposal.
+
+    A modified proposal commonly starts with the original sentence. Treating
+    that shared prefix as forbidden makes an unchanged, correctly rejected CV
+    fail integrity verification. Removed text has no introduced fragment.
+    """
+    proposed = (change.proposed_text or "").strip()
+    if not proposed:
+        return []
+    original = (change.original_text or "").strip()
+    if not original:
+        return [proposed]
+
+    original_words = original.split()
+    proposed_words = proposed.split()
+    fragments: list[str] = []
+    for tag, _i1, _i2, j1, j2 in SequenceMatcher(
+        None, original_words, proposed_words
+    ).get_opcodes():
+        if tag in {"insert", "replace"}:
+            fragment = " ".join(proposed_words[j1:j2]).strip()
+            if len(fragment) >= 8:
+                fragments.append(fragment)
+    return fragments
 
 
 async def get_or_create_revision_session(
@@ -103,7 +131,10 @@ async def start_tailoring_session(
         review_model=router.settings.heavy_model,
     )
     db.add(session)
-    await db.flush()
+    # Persist the session before the network call.  Keeping an uncommitted SQLite
+    # write transaction open while the model runs prevents the independent usage
+    # tracker from recording the call ("database is locked").
+    await db.commit()
     
     # 2. AI Pass 1: Tailor
     system_prompt_tailor = f"""
@@ -127,32 +158,46 @@ ALL proposed texts and reasons MUST be written in {language}.
             system_prompt=system_prompt_tailor,
             output_schema=CVTailorOutput
         )
-        
-        # Save changes to DB
-        for change in tailor_result.changes:
-            db_change = CVTailoringChange(
-                session_id=session.id,
-                user_id=user_id,
-                change_id=uuid.uuid4().hex,
-                target_type=change.target_type,
-                target_reference=change.target_reference,
-                section=change.section,
-                original_text=change.original_text,
-                proposed_text=change.proposed_text,
-                change_type=change.change_type,
-                reason=change.reason,
-                linked_requirement_ids=change.linked_requirement_ids,
-                linked_evidence_ids=change.linked_evidence_ids,
-                user_decision=ReviewerStatus.PENDING,
-                review_severity=ReviewSeverity.SAFE
-            )
-            db.add(db_change)
-            
-        await db.flush()
-        
-        # 3. AI Pass 2: Review
-        changes_list = (await db.execute(select(CVTailoringChange).where(CVTailoringChange.session_id == session.id))).scalars().all()
-        if changes_list:
+    except Exception as e:
+        logger.error("Tailoring failed", error=str(e))
+        session.status = TailoringStatus.FAILED
+        await db.commit()
+        await db.refresh(session)
+        return session
+
+    # Save the proposed changes and release the write lock before AI Pass 2.
+    for change in tailor_result.changes:
+        db_change = CVTailoringChange(
+            session_id=session.id,
+            user_id=user_id,
+            change_id=uuid.uuid4().hex,
+            target_type=change.target_type,
+            target_reference=change.target_reference,
+            section=change.section,
+            original_text=change.original_text,
+            proposed_text=change.proposed_text,
+            change_type=change.change_type,
+            reason=change.reason,
+            linked_requirement_ids=change.linked_requirement_ids,
+            linked_evidence_ids=change.linked_evidence_ids,
+            user_decision=ReviewerStatus.PENDING,
+            review_severity=ReviewSeverity.SAFE,
+        )
+        db.add(db_change)
+    await db.commit()
+
+    changes_list = (
+        await db.execute(
+            select(CVTailoringChange).where(CVTailoringChange.session_id == session.id)
+        )
+    ).scalars().all()
+    # The SELECT above opens a new implicit transaction. Close it before the
+    # second network call as well; mapped objects remain usable because the
+    # application session factory sets expire_on_commit=False.
+    await db.commit()
+
+    if changes_list:
+        try:
             system_prompt_review = """
 You are an independent CV Review AI. Check the proposed changes against the candidate's base CV.
 Flag ANY changes that hallucinate experience, invent skills, or exaggerate seniority as BLOCKED.
@@ -181,11 +226,19 @@ Otherwise mark SAFE.
                 if c.change_id in review_map:
                     c.review_severity = review_map[c.change_id].severity
                     c.review_reason = review_map[c.change_id].reason
-                    
-    except Exception as e:
-        logger.error("Tailoring failed", error=str(e))
-        session.status = TailoringStatus.FAILED
-        
+                else:
+                    c.review_severity = ReviewSeverity.BLOCKED
+                    c.review_reason = "The independent review did not return a verdict for this change."
+        except Exception as e:
+            # The tailoring suggestions are still useful input for a human review,
+            # but an unavailable/malformed safety review must fail closed.  Keeping
+            # the session REVIEWING also preserves the original-CV preview and lets
+            # the user reject every proposal instead of losing the whole run.
+            logger.error("Tailoring review failed; blocking all changes", error=str(e))
+            for c in changes_list:
+                c.review_severity = ReviewSeverity.BLOCKED
+                c.review_reason = "Independent AI review unavailable; reject or revise this change manually."
+
     await db.commit()
     await db.refresh(session)
     return session
@@ -223,13 +276,44 @@ async def finalize_session(
             
     base = await db.execute(select(Resume).where(Resume.id == session.base_resume_id))
     base_resume = base.scalar_one_or_none()
-    
+    if base_resume is None:
+        raise ValueError("Base resume not found")
+
+    accepted = [c for c in session.changes if c.user_decision == ReviewerStatus.ACCEPTED]
+    if not accepted:
+        # A zero-change result should be byte-faithful to the uploaded CV. Rebuilding
+        # it from extracted text can lose layout and even split words/bullets. The
+        # new Resume row is still an immutable, job-specific version; it simply
+        # references the same immutable source artifacts.
+        new_resume = Resume(
+            user_id=user_id,
+            name=f"Tailored - {base_resume.name}",
+            type="tailored",
+            template_id=base_resume.template_id,
+            base_resume_id=base_resume.id,
+            job_id=session.job_id,
+            file_path_pdf=base_resume.file_path_pdf,
+            file_path_docx=base_resume.file_path_docx,
+            content_text=base_resume.content_text,
+            audit_metadata={
+                "tailoring_session_id": session.id,
+                "accepted_change_count": 0,
+                "artifact_strategy": "preserve_base_artifact",
+            },
+        )
+        db.add(new_resume)
+        await db.flush()
+        session.final_resume_id = new_resume.id
+        session.status = TailoringStatus.VERIFIED
+        await db.commit()
+        await db.refresh(new_resume)
+        return new_resume
+
     # Parse structured doc
     base_dict = _build_resume_data_from_text(base_resume.content_text or "")
     base_doc = TailoredResumeData.model_validate(base_dict)
     
     # Merge accepted changes
-    accepted = [c for c in session.changes if c.user_decision == ReviewerStatus.ACCEPTED]
     try:
         new_doc = merge_tailoring_changes(base_doc, accepted)
     except Exception as e:
@@ -267,9 +351,10 @@ async def finalize_session(
         ]
         accepted_texts = [c.proposed_text or "" for c in accepted]
         rejected_texts = [
-            c.proposed_text or ""
+            fragment
             for c in session.changes
             if c.user_decision == ReviewerStatus.REJECTED
+            for fragment in _rejected_novel_fragments(c)
         ]
         verification = verify_pdf_document(
             doc_res.pdf_path,

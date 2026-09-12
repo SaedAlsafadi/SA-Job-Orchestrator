@@ -14,7 +14,9 @@ _settings = get_settings()
 
 engine = create_async_engine(
     _settings.database_url,
-    echo=_settings.environment.value == "development",
+    # SQL bind values can contain full CVs, cover letters, and other personal data.
+    # Keep engine echo opt-in even in development.
+    echo=_settings.database_echo,
     pool_pre_ping=True,
 )
 

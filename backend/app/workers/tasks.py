@@ -330,24 +330,9 @@ async def purge_deleted_accounts(ctx: dict[str, Any]) -> None:
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
     from app.observability.sentry import init_sentry
-    from sqlalchemy import select
-    from datetime import datetime, UTC, timedelta
 
-    async with async_session_factory() as session:
-        stmt = select(MonitoringSchedule).where(MonitoringSchedule.is_active == True)
-        result = await session.execute(stmt)
-        schedules = result.scalars().all()
-        
-        service = MonitoringService(session)
-        now = datetime.now(UTC)
-        
-        for schedule in schedules:
-            interval = timedelta(minutes=schedule.interval_minutes)
-            if not schedule.last_checked_at or now - schedule.last_checked_at >= interval:
-                try:
-                    await service.run_monitoring_cycle(schedule.id, dry_run=False)
-                except Exception as e:
-                    logger.exception(f"Cron monitoring failed for schedule {schedule.id}")
+    init_sentry("worker")
+    logger.info("worker.startup")
 
 
 async def _on_shutdown(ctx: dict[str, Any]) -> None:
@@ -459,8 +444,7 @@ async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
             from app.services.application_route_resolver import ApplicationRouteResolver
             resolver = ApplicationRouteResolver()
             routes = await resolver.resolve(job)
-            for route in routes:
-                db.add(route)
+            await _merge_application_routes(db, job, routes)
                 
             await db.commit()
             
@@ -472,11 +456,11 @@ async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
                 if job.raw_data is None:
                     job.raw_data = {}
                 raw_data_copy = dict(job.raw_data)
-                raw_data_copy["match_result"] = match_result.model_dump()
+                # Persist only JSON-native values; matching provenance includes
+                # datetimes and verdict/status fields are enums in Python mode.
+                raw_data_copy["match_result"] = match_result.model_dump(mode="json")
                 job.raw_data = raw_data_copy
                 
-                # Copy to Job fields if needed
-                job.match_score = match_result.total_score
             except Exception as match_err:
                 # If matching fails, we still want to save the normalized job
                 if job.raw_data is None:
@@ -489,15 +473,89 @@ async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
             await db.commit()
             
         except Exception as e:
-            job.status = JobStatus.FAILED
-            if job.raw_data is None:
-                job.raw_data = {}
+            # A flush/commit error leaves the session unusable and may expire
+            # ``job``. Roll back first, then reload it before persisting the
+            # terminal failure state.
+            await db.rollback()
+            failed_job = (
+                await db.execute(select(Job).where(Job.id == job_id))
+            ).scalar_one_or_none()
+            if failed_job is None:
+                raise
+
+            failed_job.status = JobStatus.FAILED
+            if failed_job.raw_data is None:
+                failed_job.raw_data = {}
             # SQLAlchemy JSON arrays/dicts need to be reassigned to trigger mutation
-            raw_data_copy = dict(job.raw_data)
+            raw_data_copy = dict(failed_job.raw_data)
             raw_data_copy["error"] = str(e)
-            job.raw_data = raw_data_copy
+            failed_job.raw_data = raw_data_copy
             await db.commit()
             raise e
+
+
+async def _merge_application_routes(
+    db: AsyncSession,
+    job: Job,
+    resolved_routes: list[Any],
+) -> None:
+    """Idempotently merge resolver output while preserving user overrides.
+
+    Failed jobs can be retried after route persistence has already committed.
+    Reusing the existing route keeps package references intact and prevents
+    multiple rows from all claiming to be preferred.
+    """
+    from sqlalchemy import select
+
+    from app.models.application_route import ApplicationRoute
+
+    existing_routes = list(
+        (
+            await db.execute(
+                select(ApplicationRoute).where(
+                    ApplicationRoute.job_id == job.id,
+                    ApplicationRoute.user_id == job.user_id,
+                )
+            )
+        ).scalars()
+    )
+    user_preferred = next(
+        (route for route in existing_routes if route.user_overridden and route.is_preferred),
+        None,
+    )
+    if user_preferred is None and any(route.is_preferred for route in resolved_routes):
+        for route in existing_routes:
+            if not route.user_overridden:
+                route.is_preferred = False
+
+    for resolved in resolved_routes:
+        if user_preferred is not None:
+            resolved.is_preferred = False
+        existing = next(
+            (
+                route
+                for route in existing_routes
+                if route.route_type == resolved.route_type
+                and route.url == resolved.url
+                and route.email == resolved.email
+            ),
+            None,
+        )
+        if existing is None:
+            db.add(resolved)
+            existing_routes.append(resolved)
+            continue
+        if existing.user_overridden:
+            continue
+        for field in (
+            "instructions",
+            "confidence",
+            "resolution_reason",
+            "requires_human",
+            "is_preferred",
+            "resolved_at",
+        ):
+            setattr(existing, field, getattr(resolved, field))
 
 
 class WorkerSettings:
@@ -508,7 +566,6 @@ class WorkerSettings:
     cron_jobs: ClassVar = [
         cron(monitor_system_health, minute={0, 15, 30, 45}),
         cron(purge_deleted_accounts, hour={3}, minute={30}),  # daily 03:30
-        cron(run_monitoring_cron, minute=set(range(0, 60, 5))),
     ]
     max_jobs = get_settings().browser.max_parallel
     job_timeout = 600

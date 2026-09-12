@@ -2,7 +2,7 @@
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, UTC
@@ -22,6 +22,18 @@ class IngestOpportunityRequest(BaseModel):
     source_reference: Optional[str] = None
     title_override: Optional[str] = None
     company_override: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_source(self):
+        if not self.text.strip():
+            raise ValueError("Opportunity text cannot be empty.")
+        if self.source_type == "url":
+            from urllib.parse import urlparse
+
+            parsed = urlparse(self.text.strip())
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("Enter a valid public HTTP(S) job URL.")
+        return self
 
 
 from arq.connections import ArqRedis
@@ -62,8 +74,21 @@ async def ingest_opportunity(
     # Determine the text to hash (URL or Paste)
     content_hash = hashlib.sha256(req.text.encode()).hexdigest()
     
-    # Check deduplication first based on raw content
-    existing_job = await db.execute(select(Job).where(Job.platform_job_id == content_hash))
+    # Deduplicate on the stable user-supplied source. ``platform_job_id`` is
+    # replaced with a normalized content hash by the worker, so it cannot be
+    # the retry key after the first successful extraction. Scope explicitly to
+    # the current tenant and prefer the original row if legacy retries created
+    # duplicates.
+    existing_job = await db.execute(
+        select(Job)
+        .where(
+            Job.user_id == user.id,
+            Job.source_type == req.source_type,
+            Job.raw_text == req.text,
+        )
+        .order_by(Job.created_at.asc())
+        .limit(1)
+    )
     existing_job = existing_job.scalar_one_or_none()
     
     job = None
@@ -149,6 +174,7 @@ async def override_application_route(
     if not found:
         # Create a new manual route if one doesn't exist
         new_route = ApplicationRoute(
+            user_id=user.id,
             job_id=job_id,
             route_type=req.preferred_route_type,
             confidence=1.0,

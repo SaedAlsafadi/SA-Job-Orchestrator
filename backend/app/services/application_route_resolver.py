@@ -28,6 +28,7 @@ class ApplicationRouteResolver:
             else:
                 # Company Website or other external link
                 routes.append(ApplicationRoute(
+                    user_id=job.user_id,
                     job_id=job.id,
                     route_type="COMPANY_WEBSITE",
                     url=explicit_url,
@@ -58,6 +59,7 @@ class ApplicationRouteResolver:
         # Fallback if even LLM fails or no text
         if not routes:
             routes.append(ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="MANUAL",
                 confidence=0.0,
@@ -103,6 +105,7 @@ class ApplicationRouteResolver:
             data = json.loads(cleaned.strip())
             
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type=data.get("route_type", "MANUAL"),
                 url=data.get("url"),
@@ -122,6 +125,7 @@ class ApplicationRouteResolver:
         url_lower = url.lower()
         if "workable.com" in url_lower:
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="WORKABLE",
                 url=url,
@@ -133,6 +137,7 @@ class ApplicationRouteResolver:
             )
         elif "greenhouse.io" in url_lower:
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="GREENHOUSE",
                 url=url,
@@ -144,6 +149,7 @@ class ApplicationRouteResolver:
             )
         elif "lever.co" in url_lower:
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="LEVER",
                 url=url,
@@ -155,6 +161,7 @@ class ApplicationRouteResolver:
             )
         elif "bayt.com" in url_lower:
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="BAYT",
                 url=url,
@@ -173,6 +180,7 @@ class ApplicationRouteResolver:
         explicit_email = raw_payload.get("application_email")
         if explicit_email:
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="EMAIL",
                 email=explicit_email,
@@ -189,6 +197,7 @@ class ApplicationRouteResolver:
         match = re.search(email_pattern, text)
         if match:
             return ApplicationRoute(
+                user_id=job.user_id,
                 job_id=job.id,
                 route_type="EMAIL",
                 email=match.group(1),

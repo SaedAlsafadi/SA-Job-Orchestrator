@@ -12,6 +12,7 @@ from app.api.v1.opportunities import IngestOpportunityRequest, ingest_opportunit
 def mock_job():
     return Job(
         id="test-job-id",
+        user_id="test-user-id",
         title="Software Engineer",
         company="Acme Corp",
         description="Great job.",
@@ -57,6 +58,18 @@ async def test_company_website_url(mock_job):
     assert len(routes) == 1
     assert routes[0].route_type == "COMPANY_WEBSITE"
     assert routes[0].confidence == 0.9
+    assert routes[0].user_id == mock_job.user_id
+
+@pytest.mark.asyncio
+async def test_all_resolved_routes_inherit_job_tenant(mock_job):
+    resolver = ApplicationRouteResolver()
+    mock_job.application_url = "https://apply.workable.com/acme"
+    mock_job.raw_text = "Or send your CV to careers@acme.com"
+
+    routes = await resolver.resolve(mock_job)
+
+    assert routes
+    assert all(route.user_id == mock_job.user_id for route in routes)
 
 @pytest.mark.asyncio
 async def test_deterministic_email_regex(mock_job):

@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.application import Application, ApplicationApproval, ApplicationRun
 from app.models.application_package import ApplicationPackage
+from app.models.application_route import ApplicationRoute
 from app.models.enums import ApplicationStatus, EmailSendState, QAVerdict
 from app.services.application_package import (
     PackageError,
@@ -73,8 +74,9 @@ async def approve_package(
         raise PackageError("Only the current package can be approved.")
     if package.qa_verdict == QAVerdict.BLOCKED:
         raise PackageError("Package is QA-BLOCKED and cannot be approved until fixed.")
-    if not package.email_to:
-        raise PackageError("Package has no verified recipient.")
+    route_type = await _package_route_type(db, package, user_id)
+    if route_type == "EMAIL" and not package.email_to:
+        raise PackageError("Email package has no verified recipient.")
 
     # Idempotency: reuse an existing unused, unexpired approval for THIS package hash.
     from sqlalchemy import select
@@ -90,6 +92,16 @@ async def approve_package(
         )
     ).scalar_one_or_none()
     if existing:
+        expected_platform = route_type.lower()
+        if existing.platform != expected_platform:
+            existing.platform = expected_platform
+        if app.status in {
+            ApplicationStatus.READY,
+            ApplicationStatus.WAITING_FOR_REVIEW,
+            ApplicationStatus.PENDING_REVIEW,
+        }:
+            app.status = ApplicationStatus.APPROVED
+        await db.commit()
         return existing
 
     approval = ApplicationApproval(
@@ -99,7 +111,7 @@ async def approve_package(
         application_run_id=await _ensure_prep_run(db, app),
         job_id=app.job_id,
         candidate_profile_version=1,
-        platform="email",
+        platform=route_type.lower(),
         package_id=package.id,
         package_version=package.version,
         package_hash=package.content_hash,
@@ -109,11 +121,36 @@ async def approve_package(
 
     package.approval_id = approval.id
     package.approved_at = datetime.now(UTC)
-    if app.status == ApplicationStatus.READY:
-        app.status = ApplicationStatus.WAITING_FOR_REVIEW
+    if app.status in {
+        ApplicationStatus.READY,
+        ApplicationStatus.WAITING_FOR_REVIEW,
+        ApplicationStatus.PENDING_REVIEW,
+    }:
+        app.status = ApplicationStatus.APPROVED
     await db.commit()
     logger.info("package_approved", package_id=package.id, approval_id=approval.id)
     return approval
+
+
+async def _package_route_type(
+    db: AsyncSession, package: ApplicationPackage, user_id: str
+) -> str:
+    """Resolve the immutable package route without assuming every route is email."""
+    if package.route_id:
+        from sqlalchemy import select
+
+        route = (
+            await db.execute(
+                select(ApplicationRoute).where(
+                    ApplicationRoute.id == package.route_id,
+                    ApplicationRoute.user_id == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if route is None:
+            raise PackageError("Package route is missing or unauthorized.")
+        return route.route_type.upper()
+    return "EMAIL" if package.email_to else "MANUAL"
 
 
 async def _ensure_prep_run(db: AsyncSession, app: Application) -> str:
@@ -168,6 +205,8 @@ async def send_package_email(
         raise PackageError("Package does not belong to this application.")
     if not package.is_current:
         raise PackageError("Only the current package can be sent.")
+    if await _package_route_type(db, package, user_id) != "EMAIL":
+        raise PackageError("Only EMAIL-route packages can be sent by email.")
     if package.send_state == EmailSendState.SENT:
         raise PackageError("Package has already been sent (single-use send).")
     if not package.email_to or not package.email_subject or package.email_body is None:
