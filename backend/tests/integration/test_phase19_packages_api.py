@@ -2,27 +2,26 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from app.models.application import Application
 from app.models.enums import ApplicationStatus, QAVerdict
 from app.models.job import Job
 from app.models.resume import Resume
+from app.services.application_package import PackageError
 from app.services.package_generation import (
     GeneratedAnswers,
     GeneratedApplicationEmail,
     GeneratedCoverLetter,
-    QAIssue,
     QAResult,
-)
-from app.services.package_generation import (
     generate_package_answers,
     generate_package_cover_letter,
     generate_package_email,
     run_package_qa,
 )
-
-from tests.conftest import TEST_USER_ID, TEST_DATABASE_URL  # noqa: F401
+from tests.conftest import TEST_DATABASE_URL, TEST_USER_ID  # noqa: F401
 
 
 async def _seed(db_session) -> tuple[Job, Application]:
@@ -78,6 +77,70 @@ async def test_cover_letter_generation_mocked(db_session):
 
 
 @pytest.mark.asyncio
+async def test_cover_letter_uses_one_surgical_entity_repair(db_session, monkeypatch):
+    """An unresolved entity violation gets one correction-only same-task request."""
+    _, app = await _seed(db_session)
+    first = GeneratedCoverLetter(subject_line="Application", body="First draft")
+    repaired = GeneratedCoverLetter(subject_line="Application", body="Corrected draft")
+
+    class SequenceRouter(FakeRouter):
+        def __init__(self):
+            super().__init__()
+            self.prompts = []
+            self.outputs = iter([first, repaired])
+
+        async def complete_with_structured_output(self, task, prompt, output_schema, system_prompt=""):
+            self.calls.append(str(task.value))
+            self.prompts.append(prompt)
+            return next(self.outputs)
+
+    violation = {
+        "category": "employer", "canonical": "Minnha IT", "generated": "Minnah IT",
+        "difference": "TYPO", "source": "CandidateProfile.experience",
+        "evidence_ref": "exp-1", "confidence": .94, "safe_to_restore": False,
+    }
+    validator = MagicMock(side_effect=[([violation], [violation]), ([], [])])
+    monkeypatch.setattr("app.services.package_generation._restore_cover_entities", validator)
+    fake = SequenceRouter()
+
+    result = await generate_package_cover_letter(db_session, app.id, TEST_USER_ID, fake)
+
+    assert result.body == "Corrected draft"
+    assert fake.calls == ["cover_letter", "cover_letter"]
+    assert "Correct ONLY the listed protected-entity violations" in fake.prompts[1]
+    assert "Minnah IT" in fake.prompts[1] and "Minnha IT" in fake.prompts[1]
+
+
+@pytest.mark.asyncio
+async def test_cover_letter_rejects_after_one_failed_entity_repair(db_session, monkeypatch):
+    """A second invalid draft fails closed without a third model call."""
+    _, app = await _seed(db_session)
+    violation = {
+        "category": "employer", "canonical": "Minnha IT", "generated": "Minnah IT",
+        "difference": "TYPO", "source": "CandidateProfile.experience",
+        "evidence_ref": "exp-1", "confidence": .94, "safe_to_restore": False,
+    }
+
+    class InvalidRouter(FakeRouter):
+        async def complete_with_structured_output(
+            self, task, prompt, output_schema, system_prompt=""
+        ):
+            self.calls.append(str(task.value))
+            return GeneratedCoverLetter(subject_line="Application", body="Minnah IT")
+
+    monkeypatch.setattr(
+        "app.services.package_generation._restore_cover_entities",
+        MagicMock(return_value=([violation], [violation])),
+    )
+    fake = InvalidRouter()
+
+    with pytest.raises(PackageError, match="after one repair attempt"):
+        await generate_package_cover_letter(db_session, app.id, TEST_USER_ID, fake)
+
+    assert fake.calls == ["cover_letter", "cover_letter"]
+
+
+@pytest.mark.asyncio
 async def test_email_generation_ignores_model_recipient(db_session):
     """Recipient safety: the model's recipient is overridden by the verified route."""
     job, app = await _seed(db_session)
@@ -120,7 +183,6 @@ async def test_answers_generation_mocked(db_session):
 async def test_qa_blocked_on_missing_components(db_session):
     """Deterministic pre-checks force BLOCKED even if the fake LLM says PASS."""
     job, app = await _seed(db_session)
-    from app.models.application_package import ApplicationPackage
     from app.services.application_package import create_or_update_package
 
     pkg = await create_or_update_package(db_session, app.id, TEST_USER_ID)

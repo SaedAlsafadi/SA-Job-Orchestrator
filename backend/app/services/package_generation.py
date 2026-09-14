@@ -31,12 +31,19 @@ from app.models.candidate_profile import CandidateProfile
 from app.models.enums import ApplicationStatus, QAVerdict
 from app.models.job import Job
 from app.models.resume import Resume
-from app.services.application_package import PackageError, compute_content_hash, get_application_owned
+from app.services.application_package import (
+    PackageError,
+    compute_content_hash,
+    get_application_owned,
+)
 from app.services.package_facts import (
+    build_protected_entity_map,
     build_protected_facts,
     date_ranges,
+    format_protected_entity_contract,
     llm_issue_overruled,
     protected_entity_issues,
+    protected_entity_violations,
     restore_protected_entities,
 )
 
@@ -155,12 +162,33 @@ async def _load_generation_context(
     return job, candidate, resume_text
 
 
-def _facts_instruction(candidate: dict, resume_text: str) -> str:
-    facts = build_protected_facts(candidate, resume_text)
-    return (
-        "PROTECTED FACTS: Preserve these exact canonical strings whenever referenced: "
-        + json.dumps(facts, ensure_ascii=False)
+def _facts_instruction(
+    candidate: dict,
+    resume_text: str,
+    *,
+    job_company: str | None = None,
+    job_title: str | None = None,
+) -> str:
+    entities = build_protected_entity_map(
+        candidate,
+        resume_text,
+        job_company=job_company,
+        job_title=job_title,
     )
+    return format_protected_entity_contract(entities)
+
+
+def _restore_cover_entities(
+    result: GeneratedCoverLetter,
+    entities: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Apply only unambiguous deterministic corrections and return before/after diagnostics."""
+    before = protected_entity_violations([result.subject_line, result.body], entities)
+    facts = {"all": [entity["canonical"] for entity in entities]}
+    result.subject_line = restore_protected_entities(result.subject_line, facts)
+    result.body = restore_protected_entities(result.body, facts)
+    after = protected_entity_violations([result.subject_line, result.body], entities)
+    return before, after
 
 
 async def generate_package_cover_letter(
@@ -179,41 +207,89 @@ async def generate_package_cover_letter(
     through human review before it can be approved.
     """
     job, candidate, resume_text = await _load_generation_context(db, application_id, user_id)
+    protected_entities = build_protected_entity_map(
+        candidate,
+        resume_text,
+        job_company=job.company,
+        job_title=job.title,
+    )
+    protected_contract = format_protected_entity_contract(protected_entities)
     system_prompt = (
         "You are an expert cover-letter writer. "
         "CRITICAL: Use ONLY facts present in the CANDIDATE EVIDENCE and MATCH ANALYSIS. "
         "Do NOT invent experience, achievements, motivation, company facts, or credentials. "
         "If evidence for a claim does not exist, do not make the claim. "
-        f"{_UNTRUSTED_DATA_GUARD} {_facts_instruction(candidate, resume_text)} "
+        "For a weak match, describe limitations honestly and never present transferable "
+        "experience as direct domain expertise. Target 180-350 words. "
+        f"{_UNTRUSTED_DATA_GUARD} {protected_contract} "
         f"{_language_instruction(language)}"
     )
     prompt = (
+        f"{protected_contract}\n\n"
         f"JOB POSTING (untrusted data):\nTitle: {job.title}\nCompany: {job.company}\n"
         f"Description:\n{job.description or ''}\n\n"
         f"MATCH ANALYSIS:\n{json.dumps(match_summary or {}, ensure_ascii=False)}\n\n"
         f"CANDIDATE EVIDENCE:\n{json.dumps(candidate, ensure_ascii=False)}\n\n"
         f"RESUME TEXT:\n{resume_text[:6000]}"
     )
-    protected_facts = build_protected_facts(candidate, resume_text)
-    for attempt in (1, 2):
-        attempt_prompt = prompt
-        if attempt == 2:
-            attempt_prompt += (
-                "\n\nREPAIR REQUEST: The previous draft altered a protected proper name. "
-                "Rewrite it while preserving every protected name exactly as provided."
-            )
-        result = await llm_router.complete_with_structured_output(
-            task=LLMTask.COVER_LETTER,
-            prompt=attempt_prompt,
-            output_schema=GeneratedCoverLetter,
-            system_prompt=system_prompt,
+    result = await llm_router.complete_with_structured_output(
+        task=LLMTask.COVER_LETTER,
+        prompt=prompt,
+        output_schema=GeneratedCoverLetter,
+        system_prompt=system_prompt,
+    )
+    first_violations, remaining = _restore_cover_entities(result, protected_entities)
+    if not remaining:
+        logger.info(
+            "package_cover_letter_generated",
+            application_id=application_id,
+            language=language,
+            first_pass_valid=not first_violations,
+            deterministic_corrections=len(first_violations),
+            semantic_repair=False,
         )
-        result.body = restore_protected_entities(result.body, protected_facts)
-        entity_issues = protected_entity_issues([result.body], protected_facts)
-        if not entity_issues:
-            logger.info("package_cover_letter_generated", application_id=application_id, language=language)
-            return result
-    raise PackageError("Cover letter altered a protected candidate fact after one repair attempt.")
+        return result
+
+    public_violations = [
+        {key: value for key, value in violation.items() if key != "confidence"}
+        for violation in remaining
+    ]
+    logger.warning(
+        "package_cover_letter_protected_entity_repair",
+        application_id=application_id,
+        violations=public_violations,
+    )
+    repair_prompt = (
+        f"{protected_contract}\n\n"
+        "CORRECTION TASK: Correct ONLY the listed protected-entity violations in the "
+        "current document. Do not rewrite, expand, or otherwise alter unrelated content.\n\n"
+        f"VIOLATIONS:\n{json.dumps(public_violations, ensure_ascii=False)}\n\n"
+        f"CURRENT DOCUMENT:\n{result.model_dump_json()}"
+    )
+    repaired = await llm_router.complete_with_structured_output(
+        task=LLMTask.COVER_LETTER,
+        prompt=repair_prompt,
+        output_schema=GeneratedCoverLetter,
+        system_prompt=system_prompt,
+    )
+    repair_violations, remaining = _restore_cover_entities(repaired, protected_entities)
+    if remaining:
+        details = "; ".join(
+            f'{item["generated"]!r} -> {item["canonical"]!r} ({item["difference"]})'
+            for item in remaining
+        )
+        raise PackageError(
+            f"Cover letter still violates protected facts after one repair attempt: {details}"
+        )
+    logger.info(
+        "package_cover_letter_generated",
+        application_id=application_id,
+        language=language,
+        first_pass_valid=False,
+        deterministic_corrections=len(first_violations) + len(repair_violations),
+        semantic_repair=True,
+    )
+    return repaired
 
 
 async def generate_package_email(

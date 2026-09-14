@@ -52,6 +52,11 @@ function TelegramSettings() {
           Bot: <strong>{data?.bot_username ? `@${data.bot_username}` : 'Not configured'}</strong>
           {' · '}{data?.bot_running ? `Running (${data.update_mode})` : 'Unavailable'}
         </p>
+        {data?.configuration_error && (
+          <p role="alert" style={{ margin: 0, padding: '9px 11px', borderRadius: 'var(--r-md)', background: 'var(--failed-bg)', border: '1px solid var(--failed)', color: 'var(--failed)', font: '600 12px/1.4 var(--font)' }}>
+            {data.configuration_error}
+          </p>
+        )}
         
         {data?.status === 'CONNECTED' ? (
           <div style={{ display: 'flex', gap: 10 }}>

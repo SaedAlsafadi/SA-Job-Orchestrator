@@ -19,8 +19,8 @@ function settings(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function renderSettings() {
-  server.use(http.get('/api/v1/telegram/status', () => HttpResponse.json({ connected: false })));
+function renderSettings(telegramStatus: Record<string, unknown> = { status: 'NOT CONNECTED', bot_configured: false, bot_running: false }) {
+  server.use(http.get('/api/v1/telegram/status', () => HttpResponse.json(telegramStatus)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
@@ -73,5 +73,18 @@ describe('SettingsPage', () => {
     renderSettings();
     expect(await screen.findByText(/openai/i)).toBeInTheDocument();
     expect(screen.getByText(/groq/i)).toBeInTheDocument();
+  });
+
+  it('surfaces Telegram configuration failures without exposing credentials', async () => {
+    server.use(http.get('/api/v1/settings/', () => HttpResponse.json(settings())));
+    server.use(http.get('/api/v1/settings/llm-providers', () => HttpResponse.json([])));
+    renderSettings({
+      status: 'NOT CONNECTED', bot_configured: true, bot_running: false,
+      bot_username: 'ExpectedBot',
+      configuration_error: 'TELEGRAM_BOT_USERNAME does not match the authenticated bot.',
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(/does not match/i);
+    expect(screen.getByText('@ExpectedBot')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /connect telegram/i })).toBeDisabled();
   });
 });

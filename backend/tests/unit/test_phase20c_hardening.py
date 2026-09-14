@@ -2,7 +2,6 @@
 
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -19,12 +18,19 @@ from app.schemas.matching import (
 )
 from app.services.application import confirm_manual_submission, record_external_route_opened
 from app.services.application_package import create_or_update_package
-from app.services.matching import _direct_skill_matches, _ensure_requirement_coverage, score_requirement_analysis
+from app.services.matching import (
+    _direct_skill_matches,
+    _ensure_requirement_coverage,
+    score_requirement_analysis,
+)
 from app.services.package_facts import (
+    build_protected_entity_map,
     build_protected_facts,
     date_future_status,
+    format_protected_entity_contract,
     llm_issue_overruled,
     protected_entity_issues,
+    protected_entity_violations,
     restore_protected_entities,
 )
 from app.services.package_generation import QAIssue, _email_sanity_error
@@ -76,9 +82,50 @@ def test_resume_spelling_is_a_protected_fact():
 
 def test_near_match_name_is_restored_without_inserting_absent_entity():
     facts = {"employers": ["Minnha IT"], "candidate_names": ["Saed Alsafadi"]}
-    restored = restore_protected_entities("I improved workflows at Minha IT.", facts)
-    assert restored == "I improved workflows at Minnha IT."
+    text = "Beyond technical skills my background includes managing workflows at Minha IT."
+    restored = restore_protected_entities(text, facts)
+    assert restored == "Beyond technical skills my background includes managing workflows at Minnha IT."
     assert "Saed Alsafadi" not in restored
+
+
+def test_protected_entity_map_includes_provenance_and_job_facts():
+    entities = build_protected_entity_map(
+        {
+            "identity": {"first_name": "Saed", "last_name": "Alsafadi"},
+            "experience": [{"company": "Minnha IT", "evidence_id": "exp-1"}],
+        },
+        "Experience — MINNHA IT",
+        job_company="Kanz 90",
+        job_title="Front-End Web Developer",
+    )
+    employer = next(item for item in entities if item["category"] == "employer")
+    assert employer == {
+        "category": "employer", "canonical": "MINNHA IT",
+        "source": "Resume.content_text", "evidence_ref": "exp-1",
+    }
+    assert {item["category"] for item in entities} >= {"candidate_name", "job_company", "job_title"}
+    contract = format_protected_entity_contract(entities)
+    assert "Do not translate, normalize, respell, expand, abbreviate, or improve" in contract
+    assert "JOB_COMPANY: Kanz 90" in contract
+
+
+def test_ambiguous_protected_entity_variant_is_not_auto_repaired():
+    facts = {"employers": ["Minnha IT", "Minhha IT"]}
+    text = "I worked at Minha IT."
+    assert restore_protected_entities(text, facts) == text
+    entities = [
+        {"category": "employer", "canonical": name, "source": "CandidateProfile.experience", "evidence_ref": ref}
+        for name, ref in [("Minnha IT", "exp-1"), ("Minhha IT", "exp-2")]
+    ]
+    violations = protected_entity_violations([text], entities)
+    assert violations
+    assert all(item["safe_to_restore"] is False for item in violations)
+
+
+def test_short_entity_does_not_rewrite_a_substring_or_unrelated_word():
+    facts = {"certifications": ["IT"]}
+    text = "It includes JavaScript experience."
+    assert restore_protected_entities(text, facts) == text
 
 
 def test_relative_match_calibration_orders_direct_transferable_weak():

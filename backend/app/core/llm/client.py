@@ -108,15 +108,15 @@ class LLMClient:
         # Explicit model provided by task router: do not fallback to unrelated models
         if model is not None:
             return [model]
-            
+
         # BYO-key: use only the user's preferred model
         if self._credentials is not None:
             return [self._credentials.default_model]
-            
+
         primary = self._llm.default_model
         if primary.startswith("bedrock/"):
             return [primary]
-            
+
         fallbacks = [
             f"{provider}/{primary.split('/')[-1]}"
             for provider in self._llm.fallback_providers
@@ -187,6 +187,11 @@ class LLMClient:
                     kwargs["response_format"] = response_format
                 if reasoning_effort is not None:
                     kwargs["reasoning_effort"] = reasoning_effort
+                    if attempt_model.startswith("openrouter/"):
+                        # LiteLLM's static capability map can lag OpenRouter's pass-through
+                        # parameters. Explicitly allow this supported OpenAI-compatible field
+                        # instead of globally dropping unknown parameters.
+                        kwargs["allowed_openai_params"] = ["reasoning_effort"]
                 if metadata:
                     kwargs["metadata"] = metadata
                 if attempt_model.startswith("bedrock/"):

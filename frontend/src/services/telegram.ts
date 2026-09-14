@@ -8,6 +8,7 @@ export interface TelegramStatusResponse {
   bot_configured: boolean;
   bot_running: boolean;
   update_mode?: string;
+  configuration_error?: string;
 }
 
 export interface TelegramLinkTokenResponse {

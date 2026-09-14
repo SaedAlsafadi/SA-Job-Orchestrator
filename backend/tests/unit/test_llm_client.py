@@ -96,6 +96,22 @@ class TestCompleteSuccess:
 
         assert result.model == "openai/gpt-4o"
 
+    async def test_openrouter_reasoning_effort_is_explicitly_allowed(self, client: LLMClient) -> None:
+        mock_response = _make_completion_response()
+        with patch("app.core.llm.client.litellm") as mock_litellm:
+            mock_litellm.acompletion = AsyncMock(return_value=mock_response)
+            mock_litellm.completion_cost.return_value = 0.0
+            mock_litellm.Usage = MagicMock
+            await client.complete(
+                "prompt",
+                model="openrouter/deepseek/deepseek-v4-flash-0731",
+                reasoning_effort="low",
+            )
+
+        kwargs = mock_litellm.acompletion.await_args.kwargs
+        assert kwargs["reasoning_effort"] == "low"
+        assert kwargs["allowed_openai_params"] == ["reasoning_effort"]
+
 
 class TestBedrock:
     """AWS Bedrock is platform-authenticated (AWS credential chain), not a per-user BYO key."""
