@@ -1,3 +1,7 @@
+# ==============================================================================
+# SA Job Orchestrator — .gitignore
+# ==============================================================================
+
 # Python
 __pycache__/
 *.py[cod]
@@ -7,16 +11,33 @@ dist/
 build/
 .eggs/
 *.egg
+CACHEDIRX.TAG
 
 # Virtual environments
 .venv/
 venv/
 env/
 
-# Environment
+# Python caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Environment — NEVER commit real credentials
 .env
 .env.local
 .env.*.local
+.env.production
+backend/.env
+frontend/.env
+frontend/.env.local
+settings.local.json
 
 # IDE
 .idea/
@@ -27,8 +48,9 @@ env/
 *~
 .claude
 .claude/
+.qodo
 
-# Data (runtime generated)
+# Data — runtime generated directories (user uploads, sessions, etc.)
 data/db/*.db
 data/sessions/*
 !data/sessions/.gitkeep
@@ -42,29 +64,112 @@ data/logs/*
 data/uploads/*
 !data/uploads/.gitkeep
 
+# Storage — user file uploads (CVs, resumes, cover letters)
+# These may contain personal data — never commit
+data/storage/
+backend/data/storage/
+storage/
+
+# Databases — never commit live data
+*.db
+*.sqlite3
+
 # Node / Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+frontend/test-results/
+frontend/playwright-report/
+frontend/measure.cjs
+frontend/measure.spec.ts
 
-# Docker
+# Root-level node artifacts (from old project layout)
+/node_modules/
+/src/
+/dist/
+/build/
+/generated/
+/cover_letter/
+/resume/
+/sessions/
+/tmp/
+/v/
+/app/
+
+# Docker environment
 docker/.env
 
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-
-# OS
+# OS-specific
 .DS_Store
 Thumbs.db
+Desktop.ini
+*.lnk
 
-# Misc
-temp.py
-.qodo
+# Local development runtime
+.local-run/
 uv.lock
-# Local test files
-*.db
-data/storage/
+
+# Local test files (not part of test suite)
 *_test.py
-*.sqlite3
+backend/app/services/job_search.py.tmp
+backend/tmp/
+backend/validate_cv.py
+
+# Root-level ad-hoc debugging scripts (not part of the codebase)
+fix_*.py
+patch_*.py
+rewrite_*.py
+check_*.py
+inspect_*.py
+get_base_resume.py
+get_url*.py
+get_url_pw.py
+create_cv.py
+reset_alembic.py
+validate_cv.py
+e2e_script.py
+base_resume.txt
+temp_profile.txt
+html.txt
+urls.txt
+workable_jobs.html
+state.json
+
+# Additional root-level debug scripts (explicit)
+script.py
+script2.py
+update_api.py
+temp.html
+temp.tsx
+temp_app.tsx
+test.py
+backend/walkthrough.md
+smoke_test*.py
+*_smoke_test.py
+llm_smoke_test.py
+
+# Ad-hoc test scripts (distinct from backend/tests/ test suite)
+test_api*.py
+test_live*.py
+test_local.py
+test_match_manual.py
+test_merge.py
+test_scrape*.py
+test_grep.py
+test_gemini.py
+test_import.py
+test_404.py
+test_workable.py
+test_workflow_run.py
+test_get_url.py
+test_pw*.png
+test_candidate_cv.pdf
+smoke_test_match.py
+
+# Screenshots from debugging sessions
+*.png
+!docs/**/*.png
+
+# Playwright artifacts
+test-results/
+playwright-report/

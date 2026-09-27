@@ -1,261 +1,343 @@
-# AutoApply AI | Smart Job Application Assistant
+# SA Job Orchestrator
 
-<p align="center">
-  <img src="https://img.shields.io/badge/backend-FastAPI-0f766e" alt="FastAPI">
-  <img src="https://img.shields.io/badge/frontend-React%20%2B%20Vite-2563eb" alt="React and Vite">
-  <img src="https://img.shields.io/badge/python-3.11+-1d4ed8" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/status-v2.0-f59e0b" alt="v2.0">
-</p>
+**An AI-assisted job application orchestration system** — full-stack, locally validated, with explainable match intelligence, human-in-the-loop review, and evidence-grounded CV tailoring.
 
-AutoApply AI is a full-stack platform that automates and manages the modern job application workflow: discover opportunities, tailor resumes, track applications, review analytics, and orchestrate browser-based automation from a single workspace.
+> **Portfolio Project** — This repository represents completed engineering work, preserved as a technical reference. It is not a commercially deployed service.
 
-## What It Does
+---
 
-- **Job Discovery** across LinkedIn, Indeed, Glassdoor, and Exa AI semantic search
-- **ATS Resume Scoring** with multi-factor analysis (skills, keywords, experience, education)
-- **Resume Tailoring** with LLM-powered content optimization and PDF/DOCX generation
-- **Application Tracking** with status lifecycle, approval workflows, and batch processing
-- **Browser Automation** via browser-use + Playwright for platform-specific job submissions
-- **Real-time Dashboard** with funnel analytics, ATS score distribution, and LLM usage tracking
+## Project Status
 
-## Architecture
+| Area | Status |
+|---|---|
+| Core workflow (intake → match → tailor → package → approve) | ✅ **Implemented and locally validated** |
+| Multi-tenant authentication and tenant isolation | ✅ Implemented |
+| Redis/Arq async workflow queue | ✅ Implemented |
+| Explainable match intelligence | ✅ Implemented |
+| CV tailoring workbench with diff view | ✅ Implemented |
+| Application packages with PDF/DOCX verification | ✅ Implemented |
+| Approval binding to exact package version/hash | ✅ Implemented |
+| Telegram opportunity intake | ✅ Implemented |
+| Arabic/bilingual document generation | ✅ Implemented |
+| LLM task routing (light/heavy model split) | ✅ Implemented |
+| Backend test suite | ✅ **788 passing** |
+| Frontend test suite | ✅ **152 passing** |
+| External AI providers | ⚙️ Requires configuration |
+| Browser automation (Workable, Greenhouse, Lever) | ⚙️ Implemented, requires Playwright |
+| Live ATS submission | 🔴 **Disabled by default** |
+| Real email sending | 🔴 **Off unless explicitly configured** |
+| Production hosted platform | ❌ Not deployed |
+
+---
+
+## Architecture Overview
 
 ```
-Frontend (React + MUI + Vite)
-  |
-  REST API + WebSocket
-  |
-Backend (FastAPI)
-  |- API Layer (/api/v1) -- jobs, applications, resumes, analytics, settings
-  |- Service Layer -- orchestration and business logic
-  |- Core Modules -- ATS scoring, browser automation, document engine, LLM client
-  |- Workers -- Redis-backed async application processing
-  '- Data Layer -- SQLite/PostgreSQL, Redis, FAISS vector indices
+┌─────────────────────────────────────────────────────────────┐
+│                    FRONTEND (React + Vite)                  │
+│  Dashboard · Jobs · CV Tailoring · Applications · Profile   │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ REST + WebSocket
+┌──────────────────────▼──────────────────────────────────────┐
+│                  BACKEND (FastAPI)                          │
+│                                                             │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐ │
+│  │  API Layer  │  │ Service Layer │  │ Background Workers │ │
+│  │   /api/v1   │  │ (Business    │  │ (Arq + Redis)      │ │
+│  │  + WebSocket│  │  Logic)       │  │                    │ │
+│  └─────────────┘  └──────┬───────┘  └────────────────────┘ │
+│                           │                                  │
+│  ┌────────────────────────▼─────────────────────────────┐  │
+│  │               Core Modules                           │  │
+│  │  LLMTaskRouter · ATS Scorer · Document Renderer     │  │
+│  │  Match Intelligence · Tailoring · Harness           │  │
+│  └──────────────────────────────────────────────────────┘  │
+└───────────────────────────────┬─────────────────────────────┘
+                                │
+          ┌─────────────────────┼─────────────────────┐
+          ▼                     ▼                     ▼
+     SQLite/Postgres         Redis              LLM Providers
+     (SQLAlchemy async)    (Queue + Cache)    (Gemini/OpenAI/
+     Alembic migrations                       Groq/OpenRouter)
 ```
 
-- **Backend:** FastAPI, SQLAlchemy 2.0 async, Pydantic v2, Redis, structlog, Prometheus
-- **Frontend:** React 18, TypeScript, Vite, MUI, TanStack Query, Zustand, Recharts
-- **Automation:** browser-use + Playwright for platform workflows
-- **AI:** LiteLLM + Portkey gateway with OpenAI, Groq, Gemini, OpenRouter support
-- **Data:** SQLite (default) or PostgreSQL, Redis queue/cache, FAISS vector indices
+---
 
-For a full breakdown, see [ARCHITECTURE.md](ARCHITECTURE.md).
+## Key Engineering Features
+
+### 1. LLM Task Router — Cost-Aware Model Routing
+Separates LLM calls into **light tasks** (classification, metadata extraction, cleanup) and **heavy tasks** (match explanation, CV tailoring, QA, Arabic generation). Independently configurable per-environment, with a single bounded repair retry for structured output parse failures.
+
+### 2. Explainable Match Intelligence
+Multi-dimensional candidate-job analysis using: skills gap analysis, experience delta calculation, culture fit indicators, and GCC/KSA market eligibility. Returns structured, human-readable explanations with evidence grounding — not just a score.
+
+### 3. Evidence-Grounded CV Tailoring
+Tailoring suggestions must cite specific job-description evidence. The tailoring workbench presents a change-by-change diff view with accept/reject controls. No suggestion can be silently applied without human review.
+
+### 4. Approval Binding
+Application approval is cryptographically bound to the exact application package version/hash at time of approval. Any subsequent modification to a package automatically invalidates the prior approval — preventing stale-approval submission.
+
+### 5. Multi-Tenant Architecture
+Every database record carries a `user_id` foreign key. API middleware enforces tenant isolation — a user cannot read or modify another user's data even if they know the IDs. Row-level security enforced at query construction time.
+
+### 6. Fail-Closed Safety
+- Live ATS submission: **disabled by default** (`APPLY_MODE=review`)
+- Real email delivery: requires explicit SMTP configuration
+- Browser automation: requires Playwright install + explicit enablement
+- Telegram: only activates when `TELEGRAM_ENABLED=true` AND a valid bot token is present
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, TypeScript 5, Vite 5, Zustand, React Query, i18next |
+| Backend | FastAPI, Python 3.11, async/await throughout |
+| ORM | SQLAlchemy 2.0 (Mapped\[\] annotations), Alembic migrations |
+| Queue | Redis + Arq (async job queue) |
+| LLM | LiteLLM (unified provider interface), custom LLMTaskRouter |
+| Documents | WeasyPrint (PDF), python-docx (DOCX), Jinja2 templates |
+| Auth | PyJWT, Argon2 password hashing, Fernet credential encryption |
+| Storage | Local filesystem (S3-compatible interface, pluggable) |
+| Observability | Structlog (structured logging), Prometheus metrics |
+| Browser | Playwright, playwright-stealth |
+| Testing | pytest (788 tests), vitest (152 tests) |
+| Containers | Docker Compose (dev + prod configurations) |
+
+---
 
 ## Quick Start
 
-### Docker Compose (recommended)
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- Redis (or Docker)
+
+### Option 1: Windows One-Command Launcher
+
+```powershell
+cp .env.example .env
+# Edit .env — set at least one LLM provider key
+.\run-local.ps1
+```
+
+The launcher starts Redis, runs migrations, boots FastAPI, Arq worker, and Vite frontend. Logs to `.local-run/logs/`.
+
+### Option 2: Docker Compose
 
 ```bash
-cp .env.example .env         # Configure at least one LLM provider
+cp .env.example .env
+# Edit .env — set at least one LLM provider key
 docker compose up --build
 ```
 
 Development mode with hot reload:
-
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-### Local Development
-
-#### Backend
+### Option 3: Manual Setup
 
 ```bash
+# Backend
 cd backend
 python -m venv .venv
-.venv\Scripts\activate       # Windows
-# source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate    # macOS/Linux
 pip install -e ".[dev]"
-uvicorn app.main:app --reload
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+
+# Arq worker (new terminal)
+cd backend && python -m arq app.workers.tasks.WorkerSettings
+
+# Frontend (new terminal)
+cd frontend && npm install && npm run dev
 ```
 
-#### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-#### Worker (separate terminal)
-
-```bash
-cd backend
-python -m app.workers.application_worker
-```
-
-### Default Services
+### Service URLs
 
 | Service | URL |
 |---|---|
-| Frontend | `http://localhost:3000` |
-| Backend API | `http://localhost:8000` |
-| API Docs (Swagger) | `http://localhost:8000/docs` |
-| Health Check | `http://localhost:8000/health` |
-| Prometheus Metrics | `http://localhost:8000/metrics` |
-| Redis | `localhost:6379` |
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| OpenAPI Docs | http://localhost:8000/docs |
+| Health Check | http://localhost:8000/health |
+| Prometheus Metrics | http://localhost:8000/metrics |
+
+---
 
 ## Configuration
 
-Copy `.env.example` to `.env` and set at least one LLM provider key:
+Copy `.env.example` to `.env`. Minimum required configuration:
 
 ```env
 # Database
 DATABASE_URL=sqlite+aiosqlite:///data/db/autoapply.db
 REDIS_URL=redis://localhost:6379/0
 
-# LLM (set at least one)
-LLM__PREFERRED_PROVIDER=openai
-LLM__DEFAULT_MODEL=gpt-4o
-LLM__OPENAI_API_KEY=
-LLM__GROQ_API_KEY=
-LLM__OPENROUTER_API_KEY=
-LLM__GEMINI_API_KEY=
+# LLM — set at least one provider
+LLM__PREFERRED_PROVIDER=gemini
+LLM__DEFAULT_MODEL=gemini/gemini-1.5-flash
+LLM__GEMINI_API_KEY=your-key-here
 
-# Application
-APPLY_MODE=review              # autonomous | review | batch
-MIN_ATS_SCORE=0.75
+# Application safety
+APPLY_MODE=review          # autonomous | review | batch
 ENVIRONMENT=development
-
-# Browser Automation
-BROWSER__HEADLESS=true
-BROWSER__MAX_PARALLEL=3
 ```
 
-### Apply Modes
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete configuration reference.
 
-| Mode | Behavior |
-|---|---|
-| `review` | Applications created as `pending_review`; user approves before submission |
-| `autonomous` | Applications enqueued immediately for automated submission |
-| `batch` | Applications queued in bulk; user reviews and approves the batch |
+---
 
-## API Surface
+## Running Tests
 
-All routes are under `/api/v1`:
+```bash
+# Backend
+cd backend
+python -m pytest tests/ -v
+
+# Frontend
+cd frontend
+npm run test:run
+
+# TypeScript check
+cd frontend
+npm run typecheck
+```
+
+**Baseline (Phase 22):**  
+Backend: **788 passed, 21 skipped, 1 xfailed** | Frontend: **152 passed**
+
+Tests do not require real LLM credentials, real email delivery, or live platform access. All external services are mocked.
+
+---
+
+## AI Architecture
 
 ```
-POST   /api/v1/jobs/search              # Multi-platform job search
-GET    /api/v1/jobs                      # List jobs (paginated)
-GET    /api/v1/jobs/{id}                 # Get job details
-POST   /api/v1/jobs/{id}/analyze         # ATS match analysis
-DELETE /api/v1/jobs/{id}                 # Delete job
-
-POST   /api/v1/applications              # Create application
-POST   /api/v1/applications/batch        # Batch create
-GET    /api/v1/applications              # List applications
-PUT    /api/v1/applications/{id}/approve  # Approve for submission
-PUT    /api/v1/applications/{id}/status   # Update status
-
-POST   /api/v1/resumes/upload            # Upload resume (PDF/DOCX)
-GET    /api/v1/resumes                   # List resumes
-POST   /api/v1/resumes/generate          # Generate tailored resume
-POST   /api/v1/resumes/{id}/score        # ATS score against job
-GET    /api/v1/resumes/{id}/download     # Download as PDF or DOCX
-
-GET    /api/v1/analytics/dashboard       # Dashboard stats
-GET    /api/v1/analytics/funnel          # Application funnel
-GET    /api/v1/analytics/ats-scores      # Score distribution
-GET    /api/v1/analytics/llm-usage       # Token and cost tracking
-GET    /api/v1/analytics/timeline        # Daily activity timeline
-
-GET    /api/v1/settings                  # Get settings
-PUT    /api/v1/settings                  # Update settings
-GET    /api/v1/settings/llm-providers    # Provider status
-
-WS     /ws                              # Real-time event stream
-GET    /health                           # Health check
+User Action
+    │
+    ▼
+LLMTaskRouter
+    ├── Light Model (Gemini Flash / Groq Llama)
+    │   ├── CLASSIFICATION
+    │   ├── METADATA_EXTRACTION
+    │   ├── TEXT_CLEANUP
+    │   ├── SUMMARY
+    │   └── MESSAGE_INTENT
+    │
+    └── Heavy Model (Gemini Pro / DeepSeek)
+        ├── MATCH_DEEP + MATCH_EXPLANATION
+        ├── CV_TAILOR + CV_REVIEW
+        ├── APPLICATION_QA
+        ├── ARABIC_GENERATION
+        ├── COVER_LETTER
+        └── APPLICATION_ANSWERS
 ```
+
+Structured outputs use Pydantic schemas with JSON mode. Parse failures trigger one bounded repair attempt on the same model — provider failures, quota errors, and transport errors are never silently rerouted.
+
+---
+
+## Security and Responsible Use
+
+- **No live submission by default.** `APPLY_MODE=review` means all applications require explicit human approval before any action.
+- **No real email without SMTP.** Mailer is disabled unless explicitly configured.
+- **No browser automation without Playwright.** Must be installed separately.
+- **Approval is immutable.** Approval is hash-bound to the exact package version.
+- **All AI-generated content requires human review.** No autonomous submission path exists for production use without deliberate configuration.
+- **Tenant isolation.** All queries are scoped to the authenticated user's `user_id`.
+- **BYO-key credential encryption.** Per-user platform credentials are encrypted with Fernet before storage.
+
+Review AI-generated content before submission. Respect platform terms of service and automation policies. Do not misrepresent qualifications.
+
+---
+
+## Known Limitations
+
+See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for details.
+
+Key limitations:
+- `browser-use` package API has changed since integration; browser-automation tests are skipped
+- `beautifulsoup4` is used by the Bayt discovery provider but not declared in `pyproject.toml`
+- No production deployment exists; local-only validation
+- Arabic document quality is provider-dependent
+- Discovery orchestrator requires provider API keys (Exa AI) for job search
+- 11 backend tests are failing in harness/dedup/job-service areas (see test baseline)
+
+---
 
 ## Repository Layout
 
 ```
 backend/app/
-  api/            # FastAPI routes (v1) + WebSocket
-  core/           # ATS, automation, documents, LLM, matching, job discovery
-  services/       # Business logic orchestration
-  models/         # SQLAlchemy models (Job, Application, Resume, LLMUsage, UserSettings)
-  schemas/        # Pydantic request/response schemas
-  db/             # Database session + Redis + Alembic migrations
-  workers/        # Background queue workers
-  observability/  # Structlog + Prometheus metrics
+  api/              # FastAPI routes — /api/v1 + WebSocket
+  core/
+    ats/            # ATS scoring engine (multi-factor)
+    automation/     # Browser automation (Playwright + stealth)
+    documents/      # PDF/DOCX rendering (WeasyPrint + python-docx)
+    harness/        # Application run harness (skill registry, review)
+    job_discovery/  # Discovery providers (Exa, Bayt, LinkedIn, etc.)
+    llm/            # LLMClient, LLMTaskRouter, prompts
+    secrets/        # Fernet key encryption for credentials
+  services/         # Business logic (matching, tailoring, workflow, etc.)
+  models/           # SQLAlchemy models (23 Alembic migrations)
+  schemas/          # Pydantic request/response schemas
+  db/               # Async session, Redis, migration env
+  workers/          # Arq background task handlers
+  observability/    # Structlog + Prometheus
 
 frontend/src/
-  components/     # Reusable UI (layout, jobs, applications, resumes, dashboard, common)
-  pages/          # Route-level pages (Dashboard, Jobs, Applications, Resumes, Settings, Analytics)
-  hooks/          # React hooks (useJobs, useApplications, useResumes, useWebSocket, etc.)
-  services/       # API client layer (Axios)
-  store/          # Zustand state management
-  types/          # TypeScript type definitions
+  components/       # UI components (tailoring, matching, applications, etc.)
+  pages/            # Route-level pages
+  hooks/            # React hooks (data fetching, WebSocket, etc.)
+  services/         # Axios API client layer
+  store/            # Zustand state stores
+  types/            # TypeScript type definitions
 
-templates/        # Resume and cover letter HTML/CSS templates
-data/             # Runtime data (gitignored): db, uploads, sessions, vector indices, logs
-docker/           # Dockerfiles + nginx config
-docs/             # API docs, integration plan, tools reference
+templates/
+  resume/           # 5 HTML/CSS resume templates
+  cover_letter/     # 3 HTML/CSS cover letter templates
+
+docs/
+  ARCHITECTURE.md
+  CONFIGURATION.md
+  LOCAL_DEVELOPMENT.md
+  SECURITY.md
+  TESTING.md
+  KNOWN_LIMITATIONS.md
+  demo/             # Demo walkthrough guide
+  history/          # Historical engineering reports
+  maintenance/      # Audit and portfolio release reports
 ```
 
-## Development Commands
+---
 
-```bash
-# Backend
-cd backend
-pytest tests/ -v                    # Run tests
-ruff check app/                     # Lint
-ruff format app/                    # Format
+## Attribution and License
 
-# Frontend
-cd frontend
-npm run lint                        # Lint
-npm run build                       # Production build
-```
+This project was built on top of an open-source foundation. See [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) for the complete attribution statement including the upstream project, what was retained, and what was developed from scratch.
 
-## Current Status
+**Substantial custom development includes:**
+- Full multi-tenant authentication system (JWT + Argon2)
+- LLMTaskRouter with cost-aware light/heavy routing
+- Explainable match intelligence engine
+- CV tailoring workbench with evidence-grounded suggestions and diff review
+- Application package system with hash-bound approval
+- Arabic/bilingual document generation
+- Telegram opportunity intake
+- Harness-based application runner with skill registry
+- 23 Alembic database migrations
+- 788-test backend test suite
+- 152-test frontend test suite
 
-### Working
+---
 
-- FastAPI backend with versioned API routes and OpenAPI docs
-- React + MUI dashboard with jobs, applications, resumes, analytics, and settings pages
-- Application tracking CRUD with approval flow and status lifecycle
-- Resume upload with real parsing (PDF/DOCX), skill extraction, and ATS scoring
-- Multi-factor ATS scoring engine (skills, keywords, experience, education)
-- Analytics endpoints (dashboard stats, funnel, ATS distribution, LLM usage, timeline)
-- Redis worker scaffolding and WebSocket progress events
-- LLM client with provider fallback chain and Prometheus metrics
-- Exa AI semantic job search integration
-- Dockerized local environment (backend, frontend, worker, Redis)
-- 30+ unit tests and integration tests
+## Author
 
-### In Progress
+Saed Alsafadi — [github.com/SaedAlsafadi](https://github.com/SaedAlsafadi)
 
-- Live platform search execution (LinkedIn, Indeed, Glassdoor scrapers)
-- Fully automated browser-based application submission
-- LLM-powered resume generation and cover letter pipeline
-- Persistent settings and provider health checks
+---
 
-## Responsible Use
-
-This project touches hiring workflows, personal data, and platform automation.
-
-- Review all AI-generated materials before submission
-- Respect platform terms, rate limits, and automation policies
-- Do not misrepresent qualifications or fabricate experience
-- Protect stored credentials and personal profile data
-- Keep human approval in the loop unless you have a strong reason not to
-
-## Documentation
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) -- system architecture and data flows
-- [docs/API.md](docs/API.md) -- API reference
-- [docs/INTEGRATION_PLAN.md](docs/INTEGRATION_PLAN.md) -- integration roadmap
-- [docs/TOOLS.md](docs/TOOLS.md) -- tooling reference
-
-## Adding a New Platform
-
-1. Create `backend/app/core/automation/platforms/{name}.py`
-2. Implement the `JobPlatform` ABC (`login`, `search`, `scrape_details`, `apply`)
-3. Register in `platforms/__init__.py`
-
-## Adding a Resume Template
-
-1. Create `templates/resume/{name}/template.html` + `style.css`
-2. Add the template name to `RESUME_TEMPLATES` in `backend/app/config/constants.py`
+*This repository is made available for portfolio review and technical reference. It is not intended as a production product offering.*

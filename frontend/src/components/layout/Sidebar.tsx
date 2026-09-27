@@ -6,6 +6,7 @@ import Icon, { type IconName } from '@/components/ui/Icon';
 import api from '@/services/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUiStore } from '@/store/useUiStore';
+import { BRAND } from '@/lib/brand';
 
 export const SIDEBAR_W_EXPANDED = 244;
 export const SIDEBAR_W_COLLAPSED = 64;
@@ -20,7 +21,7 @@ const NAV: NavItem[] = [
   { to: '/dashboard', label: 'dashboard', icon: 'grid' },
   { to: '/profile', label: 'candidate_profile', icon: 'user' },
   { to: '/workflow', label: 'prepare_application', icon: 'activity' },
-  { to: '/jobs', label: 'jobs', icon: 'briefcase' },
+  { to: '/jobs', label: 'opportunities', icon: 'briefcase' },
   { to: '/applications', label: 'applications', icon: 'inbox' },
   { to: '/resumes', label: 'resumes', icon: 'file' },
   { to: '/analytics', label: 'insights', icon: 'chart' },
@@ -65,7 +66,7 @@ export default function Sidebar() {
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-2)',
-        borderRight: '1px solid var(--border)',
+        borderInlineEnd: '1px solid var(--border)',
         transition: 'width .22s var(--ease)',
         zIndex: 20,
       }}
@@ -79,15 +80,15 @@ export default function Sidebar() {
             color: 'var(--accent)', boxShadow: 'inset 0 0 14px var(--accent-glow)', flex: '0 0 auto',
           }}
         >
-          <Icon name="cpu" size={17} sw={1.9} />
+          <Icon name={BRAND.logoIcon} size={17} sw={1.9} />
         </div>
         {expanded && (
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <div style={{ font: '800 15px/1 var(--font)', letterSpacing: '-.02em' }}>
-              AutoApply<span style={{ color: 'var(--accent)' }}> AI</span>
+            <div style={{ font: '800 14px/1 var(--font)', letterSpacing: '-.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {BRAND.name}
             </div>
-            <div style={{ font: '600 9px/1 var(--mono)', letterSpacing: '.16em', color: 'var(--text-4)', marginTop: 4 }}>
-              JOB-SEARCH COPILOT
+            <div style={{ font: '600 9px/1 var(--mono)', letterSpacing: '.12em', color: 'var(--text-4)', marginTop: 4, textTransform: 'uppercase' }}>
+              {BRAND.tagline}
             </div>
           </div>
         )}
@@ -126,7 +127,7 @@ export default function Sidebar() {
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 2.5, borderRadius: 2, background: 'var(--accent)' }} />
+                  <span style={{ position: 'absolute', insetInlineStart: 0, top: 8, bottom: 8, width: 2.5, borderRadius: 2, background: 'var(--accent)' }} />
                 )}
                 <span style={{ display: 'grid', placeItems: 'center', width: 18, height: 18, flex: '0 0 auto' }}>
                   <Icon name={item.icon} size={18} sw={1.85} />
@@ -144,27 +145,6 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid var(--border)', padding: 12 }}>
-        <button
-          onClick={() => navigate('/applications')}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px',
-            borderRadius: 'var(--r-md)', background: 'var(--surface)', border: '1px solid var(--border)',
-            cursor: 'pointer', textAlign: 'left', marginBottom: 10, color: 'var(--text)',
-          }}
-        >
-          <span style={{ position: 'relative', flex: '0 0 auto', width: 9, height: 9, display: 'grid', placeItems: 'center' }}>
-            <span style={{ position: 'absolute', width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', animation: 'aaPulse 1.8s var(--ease-io) infinite' }} />
-            <span style={{ position: 'absolute', width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', animation: 'aaRing 1.8s var(--ease-io) infinite' }} />
-          </span>
-          {expanded && (
-            <span style={{ flex: '1 1 auto', minWidth: 0 }}>
-              <span style={{ display: 'block', font: '700 11.5px/1.2 var(--font)', color: 'var(--text)' }}>Agent active</span>
-              <span style={{ display: 'block', font: '500 10.5px/1.3 var(--font)', color: 'var(--text-3)', marginTop: 2 }}>Live apply ready</span>
-            </span>
-          )}
-          {expanded && <span style={{ color: 'var(--text-4)', flex: '0 0 auto' }}><Icon name="chevR" size={15} /></span>}
-        </button>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
           <button
             onClick={() => setMenuOpen((v) => !v)}
@@ -188,7 +168,7 @@ export default function Sidebar() {
                   {user?.full_name || user?.email || 'You'}
                 </span>
                 <span style={{ display: 'block', font: '500 10.5px/1.2 var(--font)', color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Free plan · BYO key
+                  BYO key
                 </span>
               </span>
             )}
@@ -211,7 +191,7 @@ export default function Sidebar() {
             <div
               role="menu"
               style={{
-                position: 'absolute', bottom: 46, left: 0, width: 236, background: 'var(--surface)',
+                position: 'absolute', bottom: 46, insetInlineStart: 0, width: 236, background: 'var(--surface)',
                 border: '1px solid var(--border-2)', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-pop)',
                 padding: 6, zIndex: 60, animation: 'aaPop .16s var(--ease)',
               }}
@@ -245,7 +225,7 @@ function MenuItem({ icon, label, hint, onClick, danger }: { icon: IconName; labe
       }}
     >
       <span style={{ width: 16, display: 'grid', placeItems: 'center' }}><Icon name={icon} size={15} /></span>
-      <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
+      <span style={{ flex: 1, textAlign: 'start' }}>{label}</span>
       {hint && <span style={{ font: '600 11px/1 var(--mono)', color: 'var(--text-4)' }}>{hint}</span>}
     </button>
   );

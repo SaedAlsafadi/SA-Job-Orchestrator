@@ -53,64 +53,66 @@ export default function AppDetailPage() {
           const sm = statusMeta(app.status);
           const steps = buildAppTimeline(app.apply_mode, app.status, app.audit_metadata);
           return (
-            <>
-              {/* Header */}
-              <div style={{ ...card, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <h1 style={{ margin: 0, font: '800 21px/1.2 var(--font)', letterSpacing: '-.02em' }}>{app.job_title ?? 'Untitled role'}</h1>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, background: sm.soft, color: sm.color, font: '700 11.5px/1 var(--font)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: sm.color }} />
-                        {sm.label}
-                      </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {/* Header */}
+                <div style={{ ...card, padding: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <h1 style={{ margin: 0, font: '800 24px/1.2 var(--font)', letterSpacing: '-.02em' }}>{app.job_title ?? 'Untitled role'}</h1>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, background: sm.soft, color: sm.color, font: '700 11.5px/1 var(--font)' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: sm.color }} />
+                          {sm.label}
+                        </span>
+                      </div>
+                      <p style={{ margin: '8px 0 0', font: '500 14px/1.4 var(--font)', color: 'var(--text-3)' }}>
+                        {app.company ?? '—'} · {app.apply_mode} mode · {app.applied_at ? `applied ${relativeTime(app.applied_at)}` : `created ${relativeTime(app.created_at)}`}
+                      </p>
                     </div>
-                    <p style={{ margin: '7px 0 0', font: '500 13px/1.4 var(--font)', color: 'var(--text-3)' }}>
-                      {app.company ?? '—'} · {app.apply_mode} mode · {app.applied_at ? `applied ${relativeTime(app.applied_at)}` : `created ${relativeTime(app.created_at)}`}
-                    </p>
+                    {app.ats_score != null && (
+                      <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'var(--surface-2)', padding: '12px 20px', borderRadius: 'var(--r-lg)', border: '1px solid var(--border)' }}>
+                        <span style={{ font: '800 28px/1 var(--mono)', color: atsColor(atsPercent(app.ats_score)) }}>{atsPercent(app.ats_score)}</span>
+                        <span style={{ font: '700 10px/1 var(--mono)', letterSpacing: '.12em', color: 'var(--text-4)' }}>ATS MATCH</span>
+                      </div>
+                    )}
                   </div>
-                  {app.ats_score != null && (
-                    <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                      <span style={{ font: '800 24px/1 var(--mono)', color: atsColor(atsPercent(app.ats_score)) }}>{atsPercent(app.ats_score)}</span>
-                      <span style={{ font: '600 9px/1 var(--mono)', letterSpacing: '.1em', color: 'var(--text-4)' }}>ATS</span>
-                    </div>
-                  )}
+
+                  <div style={{ display: 'flex', gap: 9, marginTop: 24, flexWrap: 'wrap', paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+                    {app.status === 'failed' && (
+                      <ActionButton icon="refresh" label="Re-run" primary disabled={updateStatus.isPending} onClick={() => setStatus('queued', 'Re-queued — the agent will retry')} />
+                    )}
+                    {ACTIVE.has(app.status) && (
+                      <ActionButton icon="x" label="Withdraw" danger disabled={updateStatus.isPending} onClick={() => setStatus('withdrawn', 'Application withdrawn')} />
+                    )}
+                    <ActionButton icon="briefcase" label="View Job Details" onClick={() => navigate('/jobs')} />
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 9, marginTop: 16, flexWrap: 'wrap' }}>
-                  {app.status === 'failed' && (
-                    <ActionButton icon="refresh" label="Re-run" primary disabled={updateStatus.isPending} onClick={() => setStatus('queued', 'Re-queued — the agent will retry')} />
-                  )}
-                  {ACTIVE.has(app.status) && (
-                    <ActionButton icon="x" label="Withdraw" danger disabled={updateStatus.isPending} onClick={() => setStatus('withdrawn', 'Application withdrawn')} />
-                  )}
-                  <ActionButton icon="briefcase" label="View job" onClick={() => navigate('/jobs')} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  <PackageReview
+                    applicationId={app.id}
+                    jobId={app.job_id}
+                    job={{ title: app.job_title, company: app.company }}
+                    matchSummary={job?.raw_data?.match_result ?? (app.ats_score == null ? undefined : { score: app.ats_score })}
+                    onStatus={(message, kind) => notify(message, kind)}
+                  />
                 </div>
+                
+                {app.notes && (
+                  <div style={{ ...card, padding: 18, marginTop: -8 }}>
+                    <div style={{ font: '700 13px/1 var(--font)', marginBottom: 8 }}>Notes</div>
+                    <p style={{ margin: 0, font: '500 12.5px/1.5 var(--font)', color: 'var(--text-2)' }}>{app.notes}</p>
+                  </div>
+                )}
               </div>
 
-              {/* Timeline */}
-              <div style={{ ...card, padding: 20 }}>
-                <div style={{ font: '700 14px/1 var(--font)', letterSpacing: '-.01em', marginBottom: 16 }}>Run timeline</div>
+              {/* Timeline (Right Column) */}
+              <div style={{ ...card, padding: 24, position: 'sticky', top: 24 }}>
+                <div style={{ font: '800 14px/1 var(--font)', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 24 }}>Activity Timeline</div>
                 <RunTimeline steps={steps} />
               </div>
-
-              <div style={{ marginTop: 20 }}>
-                <PackageReview
-                  applicationId={app.id}
-                  jobId={app.job_id}
-                  job={{ title: app.job_title, company: app.company }}
-                  matchSummary={job?.raw_data?.match_result ?? (app.ats_score == null ? undefined : { score: app.ats_score })}
-                  onStatus={(message, kind) => notify(message, kind)}
-                />
-              </div>
-
-              {app.notes && (
-                <div style={{ ...card, padding: 18, marginTop: 16 }}>
-                  <div style={{ font: '700 13px/1 var(--font)', marginBottom: 8 }}>Notes</div>
-                  <p style={{ margin: 0, font: '500 12.5px/1.5 var(--font)', color: 'var(--text-2)' }}>{app.notes}</p>
-                </div>
-              )}
-            </>
+            </div>
           );
         })()
       )}

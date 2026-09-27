@@ -1,4 +1,4 @@
-/* AutoApply AI — design tokens (ported verbatim from the Claude Design prototype).
+/* SA Job Orchestrator — design tokens.
    Dark is the default; [data-theme="light"] and [data-density="compact"] are set on the
    app root by useUiStore. Everything downstream references these CSS variables only. */
 

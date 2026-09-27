@@ -8,27 +8,31 @@ import { listResumes } from "@/services/resumeService";
 import { tailoringService } from "@/services/tailoringService";
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
-  padding: "10px 16px", cursor: "pointer", fontWeight: 600, fontSize: "14px",
+  flex: 1, padding: "12px 16px", cursor: "pointer", fontWeight: 700, fontSize: "13px",
   borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
-  color: active ? "var(--accent)" : "var(--text-3)",
-  background: "none", borderTop: "none", borderLeft: "none", borderRight: "none"
+  color: active ? "var(--text)" : "var(--text-3)",
+  background: active ? "var(--surface-2)" : "transparent",
+  borderTop: "none", borderLeft: "none", borderRight: "none",
+  transition: "all .2s var(--ease)"
 });
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "12px", background: "var(--surface-2)",
-  border: "1px solid var(--border)", borderRadius: "var(--r-sm)",
+  width: "100%", padding: "14px", background: "var(--surface-3)",
+  border: "1px solid var(--border)", borderRadius: "var(--r-md)",
   color: "var(--text)", fontFamily: "var(--font)", fontSize: "14px",
-  marginTop: "4px", marginBottom: "16px"
+  marginTop: "6px", marginBottom: "20px", outline: "none",
+  boxShadow: "inset 0 1px 2px rgba(0,0,0,0.1)", transition: "border-color .2s"
 };
 const buttonStyle: React.CSSProperties = {
   background: "var(--accent)", color: "var(--accent-ink)", padding: "12px 24px",
-  border: "none", borderRadius: "var(--r-md)", fontWeight: 700, cursor: "pointer", fontSize: "14px"
+  border: "1px solid var(--accent)", borderRadius: "var(--r-md)", fontWeight: 700, cursor: "pointer", fontSize: "13px",
+  boxShadow: "0 0 0 1px var(--accent-line),0 6px 16px -8px var(--accent-glow)", transition: "all .2s"
 };
 const cardStyle: React.CSSProperties = {
   background: "var(--surface)", border: "1px solid var(--border)",
-  borderRadius: "var(--r-lg)", padding: "24px", marginBottom: "24px", boxShadow: "var(--shadow-1)"
+  borderRadius: "var(--r-lg)", padding: "28px", marginBottom: "24px", boxShadow: "var(--shadow-1)"
 };
-const labelStyle: React.CSSProperties = { fontSize: "13px", color: "var(--text-2)", fontWeight: 600, display: "block", marginBottom: 4 };
+const labelStyle: React.CSSProperties = { fontSize: "13px", color: "var(--text-2)", fontWeight: 700, display: "block", marginBottom: 6, letterSpacing: "0.01em" };
 
 type SourceType = "url" | "paste" | "telegram";
 
@@ -261,55 +265,59 @@ export function ApplicationWorkflow() {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "40px auto" }}>
-      <h1 style={{ marginBottom: "8px" }}>Prepare Application</h1>
-      <p style={{ color: "var(--text-2)", marginBottom: "32px" }}>Where did you receive this opportunity?</p>
+    <div style={{ maxWidth: 640, margin: "0 auto", animation: 'aaUp .4s var(--ease) both' }}>
+      <h1 style={{ margin: "0 0 10px 0", font: '800 24px/1.1 var(--font)', letterSpacing: '-.03em' }}>Import Opportunity</h1>
+      <p style={{ color: "var(--text-3)", margin: "0 0 24px 0", font: '500 13px/1.4 var(--font)' }}>Provide a link or paste a description to let the agent analyze the role and evaluate your match.</p>
       
-      <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "24px" }}>
-        <button style={tabStyle(source === "url")} onClick={() => {setSource("url"); setInputText(""); setError(null);}}>
-          URL
-        </button>
-        <button style={tabStyle(source === "paste")} onClick={() => {setSource("paste"); setInputText(""); setError(null);}}>
-          Paste Text
-        </button>
-        <button style={tabStyle(source === "telegram")} onClick={() => {setSource("telegram"); setInputText(""); setError(null);}}>
-          Telegram
-        </button>
-      </div>
-      
-      {source === "telegram" ? (
-        <TelegramSelector onSelect={handleTelegramSelect} />
-      ) : (
-        <div style={cardStyle}>
-          {source === "url" ? (
-            <>
-              <label style={labelStyle}>Job URL</label>
-              <input 
-                style={inputStyle} 
-                placeholder="https://..." 
-                value={inputText} onChange={e => setInputText(e.target.value)} 
-              />
-            </>
-          ) : (
-            <>
-              <label style={labelStyle}>Job Description / Text</label>
-              <textarea 
-                style={{ ...inputStyle, minHeight: "150px", resize: "vertical" }}
-                placeholder="Paste job posting, message, or email text here..."
-                value={inputText} onChange={e => setInputText(e.target.value)}
-              />
-            </>
-          )}
-          
-          {error && <div style={{ color: "var(--danger)", fontSize: "13px", marginBottom: "16px" }}>{error}</div>}
-          
-          <div style={{ textAlign: "right" }}>
-            <button onClick={handleSubmit} disabled={loading} style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}>
-              {loading ? "Ingesting..." : "Process Opportunity"}
-            </button>
-          </div>
+      <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--surface-3)" }}>
+          <button style={tabStyle(source === "url")} onClick={() => {setSource("url"); setInputText(""); setError(null);}}>
+            URL
+          </button>
+          <button style={tabStyle(source === "paste")} onClick={() => {setSource("paste"); setInputText(""); setError(null);}}>
+            Paste Text
+          </button>
+          <button style={tabStyle(source === "telegram")} onClick={() => {setSource("telegram"); setInputText(""); setError(null);}}>
+            Telegram
+          </button>
         </div>
-      )}
+        
+        <div style={{ padding: "28px" }}>
+          {source === "telegram" ? (
+            <TelegramSelector onSelect={handleTelegramSelect} />
+          ) : (
+            <div>
+              {source === "url" ? (
+                <>
+                  <label style={labelStyle}>Job URL</label>
+                  <input 
+                    style={inputStyle} 
+                    placeholder="https://..." 
+                    value={inputText} onChange={e => setInputText(e.target.value)} 
+                  />
+                </>
+              ) : (
+                <>
+                  <label style={labelStyle}>Job Description / Text</label>
+                  <textarea 
+                    style={{ ...inputStyle, minHeight: "150px", resize: "vertical" }}
+                    placeholder="Paste job posting, message, or email text here..."
+                    value={inputText} onChange={e => setInputText(e.target.value)}
+                  />
+                </>
+              )}
+              
+              {error && <div style={{ color: "var(--failed)", fontSize: "12.5px", marginBottom: "16px", background: "var(--failed-soft)", padding: "10px 14px", borderRadius: "var(--r-sm)", border: "1px solid var(--failed)" }}>{error}</div>}
+              
+              <div style={{ textAlign: "right", marginTop: 8 }}>
+                <button onClick={handleSubmit} disabled={loading} style={{ ...buttonStyle, opacity: loading ? 0.7 : 1 }}>
+                  {loading ? "Ingesting..." : "Process Opportunity"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
