@@ -10,7 +10,6 @@ _settings = get_settings()
 
 if _settings.database_url.startswith("sqlite"):
     import os
-    from urllib.parse import urlparse
     db_path = _settings.database_url.split("///")[-1]
     db_dir = os.path.dirname(db_path)
     if db_dir and not os.path.exists(db_dir):
