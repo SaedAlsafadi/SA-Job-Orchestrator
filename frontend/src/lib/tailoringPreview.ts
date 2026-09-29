@@ -88,8 +88,8 @@ function extractStructuredFromPlainText(text: string): StructuredResume {
       const match = line.match(/[\w.+-]+@[\w.-]+\.\w+/);
       if (match) result.email = match[0];
     }
-    if (!result.phone && /[\+\d][\d\s\-\(\)]{7,}/.test(line)) {
-      const match = line.match(/[\+\d][\d\s\-\(\)]{7,}/);
+    if (!result.phone && /[+\d][\d\s\-()]{7,}/.test(line)) {
+      const match = line.match(/[+\d][\d\s\-()]{7,}/);
       if (match) result.phone = match[0].trim();
     }
   }

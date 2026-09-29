@@ -209,7 +209,7 @@ export const CVTailoringWorkbench: React.FC = () => {
     if (!base) return null;
     if (!session) return base;
     return mergeTailoringChanges(base, session.changes);
-  }, [baseResume?.content_text, session, session?.changes]);
+  }, [baseResume?.content_text, session]);
 
   const baseData = useMemo<StructuredResume | null>(() => {
     if (!baseResume?.content_text) return null;
