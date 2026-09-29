@@ -78,7 +78,8 @@ async def _issue_session(
             user_id=user.id,
             token_hash=hash_token(raw_refresh),
             family_id=family_id or generate_uuid(),
-            expires_at=datetime.now(UTC) + timedelta(days=auth.refresh_token_expire_days),
+            expires_at=datetime.now(UTC)
+            + timedelta(days=auth.refresh_token_expire_days),
         )
     )
     await db.commit()
@@ -86,13 +87,17 @@ async def _issue_session(
     return create_access_token(user.id)
 
 
-@router.post("/register", response_model=UserResponse, status_code=201, dependencies=[_AUTH_RATE])
+@router.post(
+    "/register", response_model=UserResponse, status_code=201, dependencies=[_AUTH_RATE]
+)
 async def register(
     data: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserResponse:
     """Create a new user account."""
-    existing = (await db.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
+    existing = (
+        await db.execute(select(User).where(User.email == data.email))
+    ).scalar_one_or_none()
     if existing is not None:
         raise IntegrityError("Email already registered")
     user = User(
@@ -120,7 +125,9 @@ async def login(
     response: Response,
 ) -> TokenResponse:
     """Authenticate (OAuth2 password flow) and return an access token."""
-    user = (await db.execute(select(User).where(User.email == form.username))).scalar_one_or_none()
+    user = (
+        await db.execute(select(User).where(User.email == form.username))
+    ).scalar_one_or_none()
     # Always run the (slow) Argon2 verification — against DUMMY_HASH when the email is
     # unknown — so the response time does not reveal whether an account exists.
     pw_ok = verify_password(form.password, user.hashed_password if user else None)
@@ -132,7 +139,9 @@ async def login(
     return TokenResponse(access_token=access)
 
 
-@router.post("/forgot-password", response_model=MessageResponse, dependencies=[_AUTH_RATE])
+@router.post(
+    "/forgot-password", response_model=MessageResponse, dependencies=[_AUTH_RATE]
+)
 async def forgot_password(
     data: ForgotPasswordRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -148,7 +157,9 @@ async def forgot_password(
     )
 
 
-@router.post("/reset-password", response_model=MessageResponse, dependencies=[_AUTH_RATE])
+@router.post(
+    "/reset-password", response_model=MessageResponse, dependencies=[_AUTH_RATE]
+)
 async def reset_password(
     data: ResetPasswordRequest,
     response: Response,
@@ -176,12 +187,16 @@ async def refresh(
         raise AuthError("Missing refresh token")
 
     row = (
-        await db.execute(select(RefreshToken).where(RefreshToken.token_hash == hash_token(raw)))
+        await db.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == hash_token(raw))
+        )
     ).scalar_one_or_none()
     if row is None:
         raise AuthError("Invalid refresh token")
 
-    expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=UTC)
+    expires = (
+        row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=UTC)
+    )
     if expires < datetime.now(UTC):
         raise AuthError("Refresh token expired")
 
@@ -206,7 +221,9 @@ async def refresh(
         )
         await db.commit()
         _clear_refresh_cookie(response)
-        logger.warning("refresh_token_reuse_detected", user_id=row.user_id, family=row.family_id)
+        logger.warning(
+            "refresh_token_reuse_detected", user_id=row.user_id, family=row.family_id
+        )
         raise AuthError("Refresh token reuse detected")
 
     user = await db.get(User, row.user_id)
@@ -227,7 +244,9 @@ async def logout(
     raw = request.cookies.get(_REFRESH_COOKIE)
     if raw:
         row = (
-            await db.execute(select(RefreshToken).where(RefreshToken.token_hash == hash_token(raw)))
+            await db.execute(
+                select(RefreshToken).where(RefreshToken.token_hash == hash_token(raw))
+            )
         ).scalar_one_or_none()
         if row is not None:
             await db.execute(
@@ -251,7 +270,9 @@ async def delete_account(
     if db_user is not None and db_user.deleted_at is None:
         db_user.deleted_at = datetime.now(UTC)
         await db.execute(
-            update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True)
+            update(RefreshToken)
+            .where(RefreshToken.user_id == user.id)
+            .values(revoked=True)
         )
         await db.commit()
         logger.info("account_soft_deleted", user_id=user.id)

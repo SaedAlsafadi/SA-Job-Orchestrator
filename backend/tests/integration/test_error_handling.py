@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from app.core.exceptions import (
-    AuthenticationError,
-    IntegrityError,
-    LLMRateLimitError,
-)
+from app.core.exceptions import AuthenticationError, IntegrityError, LLMRateLimitError
 
 
 class TestExceptionHandlerMapping:

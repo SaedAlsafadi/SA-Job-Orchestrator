@@ -1,15 +1,19 @@
 """ATS Discovery Providers."""
 
-from typing import Any, Dict, List
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from typing import Any
 
-from app.core.job_discovery.discovery_provider import DiscoveryProvider, ProviderCapabilities
-from app.core.connectors.workable_source import WorkableJobSource
 from app.core.connectors.greenhouse_source import GreenhouseJobSource
 from app.core.connectors.lever_source import LeverJobSource
+from app.core.connectors.workable_source import WorkableJobSource
+from app.core.job_discovery.discovery_provider import (
+    DiscoveryProvider,
+    ProviderCapabilities,
+)
+
 
 class BaseATSProvider(DiscoveryProvider):
-    def __init__(self, ats_source):
+    def __init__(self, ats_source) -> None:
         self.source = ats_source
 
     def name(self) -> str:
@@ -21,21 +25,23 @@ class BaseATSProvider(DiscoveryProvider):
             company_search=True,
             direct_url=True,
             filters=False,
-            pagination=False
+            pagination=False,
         )
 
-    async def search(self, query: str = "", filters: Dict[str, Any] = None, **kwargs) -> List[Dict[str, Any]]:
+    async def search(
+        self, query: str = "", filters: dict[str, Any] | None = None, **kwargs
+    ) -> list[dict[str, Any]]:
         # ATS providers require a direct url to the company board
         url = (filters or {}).get("company_url")
         if not url:
             return []
-        
+
         try:
             return await self.source.discover_jobs(url)
         except Exception:
             return []
 
-    def normalize(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize(self, raw_data: dict[str, Any]) -> dict[str, Any]:
         norm = self.source.normalize_job(raw_data)
         # Ensure new expected fields exist
         norm.setdefault("raw_text", "")
@@ -45,14 +51,17 @@ class BaseATSProvider(DiscoveryProvider):
     async def health_check(self) -> bool:
         return await self.source.health_check()
 
+
 class WorkableProvider(BaseATSProvider):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(WorkableJobSource())
 
+
 class GreenhouseProvider(BaseATSProvider):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(GreenhouseJobSource())
 
+
 class LeverProvider(BaseATSProvider):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(LeverJobSource())

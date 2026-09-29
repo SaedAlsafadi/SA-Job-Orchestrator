@@ -1,30 +1,35 @@
 """Phase 1.2: the Arq apply pipeline — idempotency, status lifecycle, retry classification."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import json
 from datetime import UTC, datetime
 from enum import StrEnum
-import json
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from arq import Retry
 from sqlalchemy import select
 
 from app.models.application import Application
+from app.models.application_route import ApplicationRoute
 from app.models.enums import ApplicationStatus, ApplyMode
 from app.models.job import Job
-from app.models.application_route import ApplicationRoute
 from app.workers import tasks
 from tests.conftest import TEST_USER_ID
 
 CTX = {"job_try": 1, "redis": None}
 
 
-async def _seed_app(db, sample_job_data, status=ApplicationStatus.QUEUED) -> Application:
+async def _seed_app(
+    db, sample_job_data, status=ApplicationStatus.QUEUED
+) -> Application:
     job = Job(**sample_job_data)
     db.add(job)
     await db.flush()
     app = Application(
-        user_id=TEST_USER_ID, job_id=job.id, status=status, apply_mode=ApplyMode.AUTONOMOUS
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        status=status,
+        apply_mode=ApplyMode.AUTONOMOUS,
     )
     db.add(app)
     await db.commit()
@@ -120,7 +125,9 @@ class TestApplyPipeline:
         assert gauge._value.get() == before + 1
 
     async def test_idempotent_when_already_applied(self, db_session, sample_job_data):
-        app = await _seed_app(db_session, sample_job_data, status=ApplicationStatus.APPLIED)
+        app = await _seed_app(
+            db_session, sample_job_data, status=ApplicationStatus.APPLIED
+        )
         with patch.object(tasks, "_submit_application", new=AsyncMock()) as submit:
             await tasks._apply(db_session, CTX, app.id)
             submit.assert_not_awaited()
@@ -160,7 +167,8 @@ class TestApplyPipeline:
         app = await _seed_app(db_session, sample_job_data)
         ctx = {"job_try": tasks.MAX_TRIES, "redis": None}
         with patch.object(
-            tasks, "_submit_application",
+            tasks,
+            "_submit_application",
             new=AsyncMock(side_effect=tasks.TransientApplyError("anti-bot wall")),
         ):
             await tasks._apply(db_session, ctx, app.id)  # must NOT raise Retry
@@ -176,7 +184,9 @@ class TestTransientClassification:
         assert tasks._is_transient(RuntimeError("service temporarily unavailable"))
         assert not tasks._is_transient(RuntimeError("required form field missing"))
 
-    async def test_submit_reclassifies_transient_infra_error(self, db_session, sample_job_data):
+    async def test_submit_reclassifies_transient_infra_error(
+        self, db_session, sample_job_data
+    ):
         app = await _seed_app(db_session, sample_job_data)
         fake_settings = MagicMock()
         fake_settings.browser.live_apply = True
@@ -187,7 +197,9 @@ class TestTransientClassification:
             with pytest.raises(tasks.TransientApplyError):
                 await tasks._submit_application(db_session, app)
 
-    async def test_submit_keeps_terminal_error_terminal(self, db_session, sample_job_data):
+    async def test_submit_keeps_terminal_error_terminal(
+        self, db_session, sample_job_data
+    ):
         app = await _seed_app(db_session, sample_job_data)
         fake_settings = MagicMock()
         fake_settings.browser.live_apply = True
@@ -195,7 +207,9 @@ class TestTransientClassification:
             "app.core.automation.runtime.apply.run_apply",
             new=AsyncMock(side_effect=RuntimeError("required form field missing")),
         ):
-            with pytest.raises(RuntimeError) as exc:  # NOT reclassified to TransientApplyError
+            with pytest.raises(
+                RuntimeError
+            ) as exc:  # NOT reclassified to TransientApplyError
                 await tasks._submit_application(db_session, app)
             assert not isinstance(exc.value, tasks.TransientApplyError)
 

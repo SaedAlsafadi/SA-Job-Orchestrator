@@ -1,10 +1,11 @@
-﻿import structlog
-from enum import StrEnum
-from typing import Any, TypeVar, Optional, Type
+﻿from enum import StrEnum
+from typing import Any, TypeVar
+
+import structlog
 from pydantic import BaseModel
 
-from app.core.llm.client import LLMClient
 from app.config.settings import get_settings
+from app.core.llm.client import LLMClient
 
 logger = structlog.get_logger(__name__)
 
@@ -57,7 +58,7 @@ class LLMTaskRouter:
         LLMTask.APPLICATION_ANSWERS,
     }
 
-    def __init__(self, client: LLMClient):
+    def __init__(self, client: LLMClient) -> None:
         self.client = client
         self.settings = get_settings().llm
 
@@ -78,16 +79,21 @@ class LLMTaskRouter:
         temperature: float | None = None,
         max_tokens: int | None = None,
         response_format: dict[str, Any] | None = None,
-        model_override: Optional[str] = None, # Strictly for tests/dev tooling
+        model_override: str | None = None,  # Strictly for tests/dev tooling
     ):
         model = model_override or self._get_model_for_task(task)
         purpose = self._get_purpose_for_task(task)
-        
-        logger.info("llm_task_router.complete", task=task.value, model=model, is_heavy=task in self.HEAVY_TASKS)
-        
+
+        logger.info(
+            "llm_task_router.complete",
+            task=task.value,
+            model=model,
+            is_heavy=task in self.HEAVY_TASKS,
+        )
+
         # Disable fallback silently overriding the heavy task failure
         # By setting the client's internal fallback logic to empty or passing exact model
-        
+
         return await self.client.complete(
             prompt=prompt,
             system_prompt=system_prompt,
@@ -102,15 +108,20 @@ class LLMTaskRouter:
         self,
         task: LLMTask,
         prompt: str,
-        output_schema: Type[T],
+        output_schema: type[T],
         system_prompt: str = "",
-        model_override: Optional[str] = None,
+        model_override: str | None = None,
         max_tokens: int | None = None,
     ) -> T:
         model = model_override or self._get_model_for_task(task)
         purpose = self._get_purpose_for_task(task)
 
-        logger.info("llm_task_router.complete_with_structured_output", task=task.value, model=model, is_heavy=task in self.HEAVY_TASKS)
+        logger.info(
+            "llm_task_router.complete_with_structured_output",
+            task=task.value,
+            model=model,
+            is_heavy=task in self.HEAVY_TASKS,
+        )
 
         try:
             call_kwargs = dict(
@@ -152,7 +163,9 @@ class LLMTaskRouter:
                 )
                 if max_tokens is not None:
                     repair_kwargs["max_tokens"] = max_tokens
-                return await self.client.complete_with_structured_output(**repair_kwargs)
+                return await self.client.complete_with_structured_output(
+                    **repair_kwargs
+                )
             except Exception:
                 logger.error(
                     "llm_structured_output_failed_closed",

@@ -1,16 +1,18 @@
 """FastAPI application factory and lifespan management."""
 
+import asyncio
 import hmac
+import sys
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-import sys
-import asyncio
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-import structlog
 import os
+
+import structlog
+
 import app
 
 # --- STALE PACKAGE REGRESSION CHECK ---
@@ -68,8 +70,9 @@ def validate_production_settings(cfg: object) -> None:
     if "*" in cfg.cors_origins:  # type: ignore[attr-defined]
         problems.append("CORS_ORIGINS must not contain '*' with credentialed CORS")
     storage = cfg.storage  # type: ignore[attr-defined]
-    if storage.provider == "local" and storage.url_signing_secret.get_secret_value() == (
-        "dev-insecure-change-me"
+    if (
+        storage.provider == "local"
+        and storage.url_signing_secret.get_secret_value() == ("dev-insecure-change-me")
     ):
         problems.append("STORAGE__URL_SIGNING_SECRET must be set for local storage")
     if problems:
@@ -93,8 +96,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await init_redis_pool(settings.redis_url)
     await init_arq_pool()
-    
+
     from app.services.telegram.bot import start_telegram_bot, stop_telegram_bot
+
     await start_telegram_bot()
 
     yield
@@ -129,7 +133,9 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Referrer-Policy", "strict-origin-when-cross-origin"
+        )
         if settings.environment == Environment.PRODUCTION:
             response.headers.setdefault(
                 "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
@@ -145,8 +151,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    import os
     from fastapi.staticfiles import StaticFiles
+
     os.makedirs("data/storage/screenshots", exist_ok=True)
     app.mount("/data/storage", StaticFiles(directory="data/storage"), name="data")
 
@@ -228,4 +234,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

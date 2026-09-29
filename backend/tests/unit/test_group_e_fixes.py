@@ -16,8 +16,12 @@ from tests.conftest import TEST_USER_ID
 
 def _job(platform_job_id: str) -> Job:
     return Job(
-        user_id=TEST_USER_ID, platform="linkedin", platform_job_id=platform_job_id,
-        title="t", company="c", url="https://x",
+        user_id=TEST_USER_ID,
+        platform="linkedin",
+        platform_job_id=platform_job_id,
+        title="t",
+        company="c",
+        url="https://x",
     )
 
 
@@ -33,8 +37,14 @@ class TestActiveApplicationDedup:
             db_session, ApplicationCreate(job_id=job.id), TEST_USER_ID
         )
         rows = (
-            await db_session.execute(select(Application).where(Application.job_id == job.id))
-        ).scalars().all()
+            (
+                await db_session.execute(
+                    select(Application).where(Application.job_id == job.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert len(rows) == 1
 
     async def test_reapply_allowed_after_terminal(self, db_session):
@@ -57,16 +67,22 @@ class TestActiveApplicationDedup:
         await db_session.flush()
         db_session.add(
             Application(
-                user_id=TEST_USER_ID, job_id=job_a.id,
-                status=ApplicationStatus.QUEUED, apply_mode=ApplyMode.REVIEW,
+                user_id=TEST_USER_ID,
+                job_id=job_a.id,
+                status=ApplicationStatus.QUEUED,
+                apply_mode=ApplyMode.REVIEW,
             )
         )
         await db_session.commit()
 
         created = await app_service.create_batch(
-            db_session, ApplicationBatchCreate(job_ids=[job_a.id, job_b.id]), TEST_USER_ID
+            db_session,
+            ApplicationBatchCreate(job_ids=[job_a.id, job_b.id]),
+            TEST_USER_ID,
         )
-        assert {a.job_id for a in created} == {job_b.id}  # job_a skipped (already active)
+        assert {a.job_id for a in created} == {
+            job_b.id
+        }  # job_a skipped (already active)
 
 
 class TestEnqueueSetsQueueDepth:

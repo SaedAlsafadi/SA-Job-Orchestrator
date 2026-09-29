@@ -22,6 +22,7 @@ from app.core.llm.client import LLMClient, LLMResponse
 
 class AnalysisResult(BaseModel):
     """Sample Pydantic model for structured output tests."""
+
     summary: str
     confidence: float
 

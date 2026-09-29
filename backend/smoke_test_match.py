@@ -1,9 +1,11 @@
 ﻿import asyncio
+
 from app.core.llm.client import LLMClient
 from app.core.llm.router import LLMTaskRouter
-from app.services.matching import CandidateJobMatcher
-from app.schemas.candidate_profile import CandidateProfileSchema
 from app.models.job import Job
+from app.schemas.candidate_profile import CandidateProfileSchema
+from app.services.matching import CandidateJobMatcher
+
 
 async def run_smoke_test():
     router = LLMTaskRouter(LLMClient())

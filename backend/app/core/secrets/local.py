@@ -23,7 +23,9 @@ class LocalSecretsProvider(SecretsProvider):
 
     def __init__(self, app_keys: list[str]) -> None:
         if not app_keys:
-            raise ValueError("LocalSecretsProvider requires at least one key (SECRETS__APP_KEYS)")
+            raise ValueError(
+                "LocalSecretsProvider requires at least one key (SECRETS__APP_KEYS)"
+            )
         self._kek = MultiFernet([Fernet(k) for k in app_keys])
         self._current_kek_id = _kek_id(app_keys[0])
 
@@ -31,7 +33,9 @@ class LocalSecretsProvider(SecretsProvider):
     def current_kek_id(self) -> str:
         return self._current_kek_id
 
-    async def encrypt(self, plaintext: bytes, *, context: dict[str, str]) -> EncryptedBlob:
+    async def encrypt(
+        self, plaintext: bytes, *, context: dict[str, str]
+    ) -> EncryptedBlob:
         _ = context  # bound as AAD only by the KMS backend; accepted here for parity
         dek = Fernet.generate_key()
         ciphertext = Fernet(dek).encrypt(plaintext)
@@ -47,6 +51,8 @@ class LocalSecretsProvider(SecretsProvider):
         dek = self._kek.decrypt(blob.wrapped_dek.encode())
         return Fernet(dek).decrypt(blob.ciphertext.encode())
 
-    async def rotate(self, blob: EncryptedBlob, *, context: dict[str, str]) -> EncryptedBlob:
+    async def rotate(
+        self, blob: EncryptedBlob, *, context: dict[str, str]
+    ) -> EncryptedBlob:
         plaintext = await self.decrypt(blob, context=context)
         return await self.encrypt(plaintext, context=context)

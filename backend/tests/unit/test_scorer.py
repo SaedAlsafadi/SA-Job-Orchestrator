@@ -76,7 +76,9 @@ class TestScoreResume:
     def test_returns_score_details_instance(
         self, scorer: ResumeScorer, candidate_profile: dict, job_metadata: dict
     ) -> None:
-        result = scorer.score_resume("resume text", "job desc", candidate_profile, job_metadata)
+        result = scorer.score_resume(
+            "resume text", "job desc", candidate_profile, job_metadata
+        )
         assert isinstance(result, ScoreDetails)
 
     def test_overall_score_between_zero_and_one(
@@ -93,8 +95,12 @@ class TestScoreResume:
         w = ScoringWeights()
         # All skills match -> skill_score = 1.0 (0.7*1.0 + 0.3*1.0)
         # exp = 0.8, edu = 1.0 (bachelor >= bachelor), kw = 0.75
-        expected = w.skills * 1.0 + w.experience * 0.8 + w.education * 1.0 + w.keywords * 0.75
-        assert result.overall_score == pytest.approx(round(min(expected, 1.0), 4), abs=0.01)
+        expected = (
+            w.skills * 1.0 + w.experience * 0.8 + w.education * 1.0 + w.keywords * 0.75
+        )
+        assert result.overall_score == pytest.approx(
+            round(min(expected, 1.0), 4), abs=0.01
+        )
 
     def test_custom_weights_change_overall(
         self,
@@ -104,9 +110,13 @@ class TestScoreResume:
         candidate_profile: dict,
         job_metadata: dict,
     ) -> None:
-        custom_weights = ScoringWeights(skills=0.1, experience=0.1, education=0.1, keywords=0.7)
+        custom_weights = ScoringWeights(
+            skills=0.1, experience=0.1, education=0.1, keywords=0.7
+        )
         scorer = ResumeScorer(
-            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer,
+            mock_skill_matcher,
+            mock_keyword_analyzer,
+            mock_experience_analyzer,
             weights=custom_weights,
         )
         result = scorer.score_resume("resume", "job", candidate_profile, job_metadata)
@@ -125,14 +135,19 @@ class TestSuggestionsGenerated:
         mock_keyword_analyzer.analyze_keywords.return_value = (0.3, {})
         mock_experience_analyzer.analyze_experience.return_value = (0.4, [])
 
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": [], "experience": [], "education": []},
             {"required_skills": ["python", "java"], "preferred_skills": []},
         )
         assert len(result.improvement_suggestions) > 0
-        assert any("required skills" in s.lower() for s in result.improvement_suggestions)
+        assert any(
+            "required skills" in s.lower() for s in result.improvement_suggestions
+        )
 
     def test_suggestions_for_low_keyword_score(
         self,
@@ -141,9 +156,12 @@ class TestSuggestionsGenerated:
         mock_experience_analyzer: MagicMock,
     ) -> None:
         mock_keyword_analyzer.analyze_keywords.return_value = (0.2, {})
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": ["python"], "experience": [], "education": []},
             {"required_skills": ["python"], "preferred_skills": []},
         )
@@ -167,9 +185,12 @@ class TestScoreSkills:
         mock_keyword_analyzer: MagicMock,
         mock_experience_analyzer: MagicMock,
     ) -> None:
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": [], "experience": [], "education": []},
             {"required_skills": [], "preferred_skills": []},
         )
@@ -182,9 +203,12 @@ class TestScoreSkills:
         mock_experience_analyzer: MagicMock,
     ) -> None:
         mock_skill_matcher.has_skill.return_value = True
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": ["react"], "experience": [], "education": []},
             {"required_skills": [], "preferred_skills": ["react"]},
         )
@@ -198,11 +222,22 @@ class TestScoreEducation:
         mock_keyword_analyzer: MagicMock,
         mock_experience_analyzer: MagicMock,
     ) -> None:
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "Bachelor degree required",
-            {"skills": [], "experience": [], "education": [{"degree": "Bachelor of Science"}]},
-            {"required_skills": [], "preferred_skills": [], "education_requirement": "bachelor"},
+            "resume",
+            "Bachelor degree required",
+            {
+                "skills": [],
+                "experience": [],
+                "education": [{"degree": "Bachelor of Science"}],
+            },
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "education_requirement": "bachelor",
+            },
         )
         assert result.education_score == 1.0
 
@@ -212,11 +247,18 @@ class TestScoreEducation:
         mock_keyword_analyzer: MagicMock,
         mock_experience_analyzer: MagicMock,
     ) -> None:
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "PhD required",
+            "resume",
+            "PhD required",
             {"skills": [], "experience": [], "education": [{"degree": "Bachelor"}]},
-            {"required_skills": [], "preferred_skills": [], "education_requirement": "phd"},
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "education_requirement": "phd",
+            },
         )
         assert result.education_score < 1.0
         assert result.education_score > 0.0
@@ -227,9 +269,12 @@ class TestScoreEducation:
         mock_keyword_analyzer: MagicMock,
         mock_experience_analyzer: MagicMock,
     ) -> None:
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "good job",
+            "resume",
+            "good job",
             {"skills": [], "experience": [], "education": []},
             {"required_skills": [], "preferred_skills": []},
         )
@@ -241,11 +286,18 @@ class TestScoreEducation:
         mock_keyword_analyzer: MagicMock,
         mock_experience_analyzer: MagicMock,
     ) -> None:
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "Master degree required",
+            "resume",
+            "Master degree required",
             {"skills": [], "experience": [], "education": [{"degree": "High School"}]},
-            {"required_skills": [], "preferred_skills": [], "education_requirement": "master"},
+            {
+                "required_skills": [],
+                "preferred_skills": [],
+                "education_requirement": "master",
+            },
         )
         assert result.education_score < 1.0
 
@@ -262,11 +314,18 @@ class TestSuggestionCoverage:
         mock_experience_analyzer.analyze_experience.return_value = (0.9, [])
         mock_skill_matcher.has_skill.return_value = True
 
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": ["python"], "experience": [], "education": []},
-            {"required_skills": ["python"], "preferred_skills": [], "education_requirement": ""},
+            {
+                "required_skills": ["python"],
+                "preferred_skills": [],
+                "education_requirement": "",
+            },
         )
         assert any("well-aligned" in s.lower() for s in result.improvement_suggestions)
 
@@ -277,9 +336,12 @@ class TestSuggestionCoverage:
         mock_experience_analyzer: MagicMock,
     ) -> None:
         mock_experience_analyzer.analyze_experience.return_value = (0.3, [])
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": [], "experience": [], "education": []},
             {"required_skills": [], "preferred_skills": []},
         )
@@ -292,9 +354,12 @@ class TestSuggestionCoverage:
         mock_experience_analyzer: MagicMock,
     ) -> None:
         mock_skill_matcher.has_skill.return_value = False
-        scorer = ResumeScorer(mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer)
+        scorer = ResumeScorer(
+            mock_skill_matcher, mock_keyword_analyzer, mock_experience_analyzer
+        )
         result = scorer.score_resume(
-            "resume", "job",
+            "resume",
+            "job",
             {"skills": [], "experience": [], "education": []},
             {"required_skills": [], "preferred_skills": ["react", "vue", "angular"]},
         )

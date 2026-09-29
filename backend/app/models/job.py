@@ -2,10 +2,25 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.base import (
+    Base,
+    TenantMixin,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+    pg_enum,
+)
 from app.models.enums import JobStatus
 
 
@@ -14,7 +29,9 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
 
     __tablename__ = "jobs"
     __table_args__ = (
-        UniqueConstraint("user_id", "platform", "platform_job_id", name="uq_job_platform_id"),
+        UniqueConstraint(
+            "user_id", "platform", "platform_job_id", name="uq_job_platform_id"
+        ),
         Index("ix_job_status", "status"),
         Index("ix_job_match_score", "match_score"),
     )
@@ -26,7 +43,9 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     # Monitoring tracking
     canonical_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Provenance and ingestion metadata
     source_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -37,7 +56,9 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     is_normalized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     extraction_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     data_quality_flags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     detected_language: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Job details
@@ -77,19 +98,18 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     )
 
     # Relationships
-    applications: Mapped[list["Application"]] = relationship(  # noqa: F821
+    applications: Mapped[list["Application"]] = relationship(
         back_populates="job",
         cascade="all, delete-orphan",
     )
-    routes: Mapped[list["ApplicationRoute"]] = relationship(  # noqa: F821
+    routes: Mapped[list["ApplicationRoute"]] = relationship(
         back_populates="job",
         cascade="all, delete-orphan",
     )
-    discovery_events: Mapped[list["DiscoveryEvent"]] = relationship(  # noqa: F821
+    discovery_events: Mapped[list["DiscoveryEvent"]] = relationship(
         back_populates="job",
         cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
         return f"<Job(id={self.id}, title='{self.title}', company='{self.company}')>"
-

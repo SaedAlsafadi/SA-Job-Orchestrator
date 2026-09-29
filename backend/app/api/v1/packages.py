@@ -57,7 +57,9 @@ async def create_package(
 ) -> PackageResponse:
     try:
         package = await package_service.create_or_update_package(
-            db, app_id, user.id,
+            db,
+            app_id,
+            user.id,
             route_id=data.route_id,
             resume_id=data.resume_id,
             cover_letter_text=data.cover_letter_text,
@@ -98,7 +100,9 @@ async def get_readiness(
 ) -> ReadinessResponse:
     package = await package_service.get_current_package(db, app_id, user.id)
     if package is None:
-        raise HTTPException(status_code=404, detail="No package created for this application yet.")
+        raise HTTPException(
+            status_code=404, detail="No package created for this application yet."
+        )
     readiness = await package_service.build_readiness(db, package)
     return ReadinessResponse(**readiness)
 
@@ -115,15 +119,20 @@ async def gen_cover_letter(
     db: AsyncSession = Depends(get_tenant_db),
 ) -> PackageResponse:
     llm_router = await build_llm_router_for_user(db, user.id)
-    current = await package_service.get_current_package(db, app_id, user.id)
+    await package_service.get_current_package(db, app_id, user.id)
     try:
         generated = await package_generation.generate_package_cover_letter(
-            db, app_id, user.id, llm_router,
+            db,
+            app_id,
+            user.id,
+            llm_router,
             match_summary=data.match_summary,
             language=data.language,
         )
         package = await package_service.create_or_update_package(
-            db, app_id, user.id,
+            db,
+            app_id,
+            user.id,
             cover_letter_text=generated.body,
             language=data.language,
         )
@@ -157,13 +166,18 @@ async def gen_email(
             route_email = route.email if route else None
         llm_router = await build_llm_router_for_user(db, user.id)
         generated = await package_generation.generate_package_email(
-            db, app_id, user.id, llm_router,
+            db,
+            app_id,
+            user.id,
+            llm_router,
             route_email=route_email,
             cover_letter_text=current.cover_letter_text if current else None,
             language=data.language,
         )
         package = await package_service.create_or_update_package(
-            db, app_id, user.id,
+            db,
+            app_id,
+            user.id,
             email_to=generated.recipient,
             email_subject=generated.subject,
             email_body=generated.body,
@@ -188,13 +202,20 @@ async def gen_answers(
     llm_router = await build_llm_router_for_user(db, user.id)
     try:
         generated = await package_generation.generate_package_answers(
-            db, app_id, user.id, llm_router,
+            db,
+            app_id,
+            user.id,
+            llm_router,
             questions=data.questions,
             language=data.language,
         )
         answers = [a.model_dump() for a in generated.answers]
         package = await package_service.create_or_update_package(
-            db, app_id, user.id, answers=answers, language=data.language,
+            db,
+            app_id,
+            user.id,
+            answers=answers,
+            language=data.language,
         )
     except package_service.PackageError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -213,7 +234,9 @@ async def run_qa(
 ) -> PackageResponse:
     package = await package_service.get_current_package(db, app_id, user.id)
     if package is None:
-        raise HTTPException(status_code=404, detail="No package created for this application yet.")
+        raise HTTPException(
+            status_code=404, detail="No package created for this application yet."
+        )
     package = await package_service.normalize_current_package_for_route(db, package)
     llm_router = await build_llm_router_for_user(db, user.id)
     try:
@@ -236,7 +259,9 @@ async def approve(
 ) -> PackageResponse:
     package = await package_service.get_current_package(db, app_id, user.id)
     if package is None:
-        raise HTTPException(status_code=404, detail="No package created for this application yet.")
+        raise HTTPException(
+            status_code=404, detail="No package created for this application yet."
+        )
     try:
         await package_send.approve_package(db, app_id, package.id, user.id)
     except package_send.PackageError as exc:
@@ -257,7 +282,9 @@ async def send(
 ) -> SendResultResponse:
     package = await package_service.get_current_package(db, app_id, user.id)
     if package is None:
-        raise HTTPException(status_code=404, detail="No package created for this application yet.")
+        raise HTTPException(
+            status_code=404, detail="No package created for this application yet."
+        )
     try:
         result = await package_send.send_package_email(db, app_id, package.id, user.id)
     except package_send.PackageError as exc:

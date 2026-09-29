@@ -102,9 +102,7 @@ class TestTfidfOverlap:
         assert per_kw["docker"] == 0.0
 
     def test_empty_job_keywords_returns_zero(self, analyzer):
-        score, per_kw = analyzer._tfidf_overlap(
-            ["python"], [], "python"
-        )
+        score, per_kw = analyzer._tfidf_overlap(["python"], [], "python")
         assert score == 0.0
         assert per_kw == {}
 
@@ -143,6 +141,7 @@ class TestPhraseMatchScore:
 
     def test_industry_term_phrase_match(self, mock_nlp):
         """If job description contains an industry term, and resume does too."""
+
         def _nlp_with_chunks(text):
             doc = MagicMock()
             doc.__iter__ = lambda self: iter([])
@@ -156,7 +155,7 @@ class TestPhraseMatchScore:
         # "system design" is in software_engineering INDUSTRY_TERMS
         score = analyzer._phrase_match_score(
             "experienced in system design and architecture",
-            "requires system design and architecture skills"
+            "requires system design and architecture skills",
         )
         assert score > 0.0
 

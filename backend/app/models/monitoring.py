@@ -16,8 +16,10 @@ class MonitoringSchedule(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base)
     interval_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    match_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=.75)
-    max_preparations_per_cycle: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    match_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.75)
+    max_preparations_per_cycle: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=3
+    )
 
     runs: Mapped[list["MonitoringRun"]] = relationship(
         back_populates="schedule", cascade="all, delete-orphan"
@@ -28,7 +30,9 @@ class MonitoringRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     __tablename__ = "monitoring_runs"
 
     schedule_id: Mapped[str] = mapped_column(
-        String(32), ForeignKey("monitoring_schedules.id", ondelete="CASCADE"), nullable=False
+        String(32),
+        ForeignKey("monitoring_schedules.id", ondelete="CASCADE"),
+        nullable=False,
     )
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     duration: Mapped[float | None] = mapped_column(Float)

@@ -48,8 +48,16 @@ MAX_TRIES = 3  # shared by WorkerSettings.max_tries and the retry-exhaustion che
 
 # Substrings marking a retryable infrastructure failure (vs a terminal non-submission).
 _TRANSIENT_HINTS = (
-    "rate limit", "timeout", "timed out", "429", "503", "502",
-    "connection", "temporarily", "unavailable", "network",
+    "rate limit",
+    "timeout",
+    "timed out",
+    "429",
+    "503",
+    "502",
+    "connection",
+    "temporarily",
+    "unavailable",
+    "network",
 )
 
 
@@ -64,7 +72,11 @@ def _is_transient(exc: Exception) -> bool:
 
 
 async def _publish(
-    ctx: dict[str, Any], user_id: str, application_id: str, status: str, detail: str = ""
+    ctx: dict[str, Any],
+    user_id: str,
+    application_id: str,
+    status: str,
+    detail: str = "",
 ) -> None:
     """Publish a progress event over the Redis bus (no-op if no redis in ctx)."""
     redis = ctx.get("redis")
@@ -75,7 +87,11 @@ async def _publish(
         user_id,
         {
             "type": "application_progress",
-            "payload": {"application_id": application_id, "status": status, "detail": detail},
+            "payload": {
+                "application_id": application_id,
+                "status": status,
+                "detail": detail,
+            },
         },
     )
 
@@ -129,7 +145,9 @@ async def _ats_gate_ok(db: AsyncSession, app: Application) -> tuple[bool, float]
         )
         score = resp.overall_score
     except Exception as exc:
-        logger.warning("apply.ats_score_unavailable", application_id=app.id, error=str(exc))
+        logger.warning(
+            "apply.ats_score_unavailable", application_id=app.id, error=str(exc)
+        )
         return True, 0.0
     threshold = get_settings().min_ats_score
     return not (0.0 < score < threshold), score
@@ -177,7 +195,10 @@ async def _apply(db: AsyncSession, ctx: dict[str, Any], application_id: str) -> 
         gate_ok, score = await _ats_gate_ok(db, app)
         if not gate_ok:
             await _mark_failed(
-                db, ctx, app, platform,
+                db,
+                ctx,
+                app,
+                platform,
                 f"ATS score {score:.2f} below threshold {get_settings().min_ats_score}",
             )
             return
@@ -185,7 +206,9 @@ async def _apply(db: AsyncSession, ctx: dict[str, Any], application_id: str) -> 
         # In-flight marker, committed before the (non-transactional) submit.
         app.status = ApplicationStatus.APPLYING
         await db.commit()
-        await _publish(ctx, app.user_id, application_id, ApplicationStatus.APPLYING.value)
+        await _publish(
+            ctx, app.user_id, application_id, ApplicationStatus.APPLYING.value
+        )
 
         try:
             confirmation = await _submit_application(db, app, ctx.get("redis"))
@@ -194,7 +217,11 @@ async def _apply(db: AsyncSession, ctx: dict[str, Any], application_id: str) -> 
                 # Retries exhausted — transition to terminal FAILED rather than leaving
                 # the row stuck in APPLYING forever (Arq won't re-invoke after this).
                 await _mark_failed(
-                    db, ctx, app, platform, f"Apply failed after {job_try} attempts: {exc}"
+                    db,
+                    ctx,
+                    app,
+                    platform,
+                    f"Apply failed after {job_try} attempts: {exc}",
                 )
                 return
             logger.warning(
@@ -218,8 +245,12 @@ async def _apply(db: AsyncSession, ctx: dict[str, Any], application_id: str) -> 
         app.applied_at = datetime.now(UTC)
         await db.commit()
         applications_total.labels(status="applied", platform=platform).inc()
-        await _publish(ctx, app.user_id, application_id, ApplicationStatus.APPLIED.value)
-        logger.info("apply.applied", application_id=application_id, confirmation=confirmation)
+        await _publish(
+            ctx, app.user_id, application_id, ApplicationStatus.APPLIED.value
+        )
+        logger.info(
+            "apply.applied", application_id=application_id, confirmation=confirmation
+        )
     finally:
         current_user_id.reset(token)
 
@@ -283,7 +314,9 @@ async def review_application_run(
         current_user_id.reset(token)
 
 
-async def _score_skills_from_verdict(db: AsyncSession, traj: RunTrajectory, verdict: Any) -> None:
+async def _score_skills_from_verdict(
+    db: AsyncSession, traj: RunTrajectory, verdict: Any
+) -> None:
     """Close the self-evolving loop: +1 to every skill used on a success, -1 otherwise.
 
     Skills that repeatedly correlate with failure drift below the retire threshold and are
@@ -294,7 +327,9 @@ async def _score_skills_from_verdict(db: AsyncSession, traj: RunTrajectory, verd
         return
     delta = 1 if verdict == RunVerdictResult.SUCCESS else -1
     for skill_id in skill_ids:
-        await add_feedback(db, skill_id, delta, reason=f"run verdict={verdict}", run_id=traj.id)
+        await add_feedback(
+            db, skill_id, delta, reason=f"run verdict={verdict}", run_id=traj.id
+        )
 
 
 async def monitor_system_health(ctx: dict[str, Any]) -> None:
@@ -316,10 +351,16 @@ async def purge_deleted_accounts(ctx: dict[str, Any]) -> None:
     cutoff = datetime.now(UTC) - timedelta(days=PURGE_GRACE_DAYS)
     async with async_session_factory() as db:
         user_ids = (
-            await db.execute(
-                select(User.id).where(User.deleted_at.isnot(None), User.deleted_at < cutoff)
+            (
+                await db.execute(
+                    select(User.id).where(
+                        User.deleted_at.isnot(None), User.deleted_at < cutoff
+                    )
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         purged = 0
         for user_id in user_ids:
             result = await delete_user_data(db, user_id)
@@ -339,89 +380,135 @@ async def _on_shutdown(ctx: dict[str, Any]) -> None:
     logger.info("worker.shutdown")
 
 
-async def run_monitoring_cron(ctx: dict):
+async def run_monitoring_cron(ctx: dict) -> None:
     """Cron job that iterates through active monitoring schedules and spawns a cycle."""
-    from app.db.session import async_session_factory
-    from app.services.monitoring.monitoring_service import MonitoringService
-    from app.models.monitoring import MonitoringSchedule
+    from datetime import UTC, datetime, timedelta
+
     from sqlalchemy import select
-    from datetime import datetime, UTC, timedelta
+
+    from app.db.session import async_session_factory
+    from app.models.monitoring import MonitoringSchedule
+    from app.services.monitoring.monitoring_service import MonitoringService
 
     async with async_session_factory() as session:
-        stmt = select(MonitoringSchedule).where(MonitoringSchedule.is_active == True)
+        stmt = select(MonitoringSchedule).where(MonitoringSchedule.is_active)
         result = await session.execute(stmt)
         schedules = result.scalars().all()
-        
+
         service = MonitoringService(session)
         now = datetime.now(UTC)
-        
+
         for schedule in schedules:
             interval = timedelta(minutes=schedule.interval_minutes)
-            if not schedule.last_checked_at or now - schedule.last_checked_at >= interval:
+            if (
+                not schedule.last_checked_at
+                or now - schedule.last_checked_at >= interval
+            ):
                 try:
                     await service.run_monitoring_cycle(schedule.id, dry_run=False)
-                except Exception as e:
-                    logger.exception(f"Cron monitoring failed for schedule {schedule.id}")
+                except Exception:
+                    logger.exception(
+                        f"Cron monitoring failed for schedule {schedule.id}"
+                    )
 
 
-
-async def prepare_application_run(ctx: dict, application_id: str):
-    from app.db.session import async_session_factory
+async def prepare_application_run(ctx: dict, application_id: str) -> None:
     from sqlalchemy import select
+
+    from app.db.session import async_session_factory
     from app.models.application import Application
-    from app.models.job import Job
     from app.models.candidate_profile import CandidateProfile
+    from app.models.job import Job
     from app.schemas.candidate_profile import CandidateProfileSchema
     from app.services.application_runner import run_application_preparation
-    
+
     async with async_session_factory() as db:
-        app = (await db.execute(select(Application).where(Application.id == application_id))).scalar_one_or_none()
-        if not app: return
-        job = (await db.execute(select(Job).where(Job.id == app.job_id))).scalar_one_or_none()
-        if not job: return
-        candidate = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == app.user_id))).scalar_one_or_none()
-        profile_data = CandidateProfileSchema.model_validate(candidate, from_attributes=True).model_dump() if candidate else {}
-        
+        app = (
+            await db.execute(
+                select(Application).where(Application.id == application_id)
+            )
+        ).scalar_one_or_none()
+        if not app:
+            return
+        job = (
+            await db.execute(select(Job).where(Job.id == app.job_id))
+        ).scalar_one_or_none()
+        if not job:
+            return
+        candidate = (
+            await db.execute(
+                select(CandidateProfile).where(CandidateProfile.user_id == app.user_id)
+            )
+        ).scalar_one_or_none()
+        profile_data = (
+            CandidateProfileSchema.model_validate(
+                candidate, from_attributes=True
+            ).model_dump()
+            if candidate
+            else {}
+        )
+
         # We need a dummy run_id for now, or create one.
         # DiscoveryOrchestrator creates an ApplicationRun already! We should pass it or query it.
         from app.models.application import ApplicationRun
-        run = (await db.execute(select(ApplicationRun).where(ApplicationRun.application_id == app.id).order_by(ApplicationRun.created_at.desc()).limit(1))).scalar_one_or_none()
-        if not run: return
-        
+
+        run = (
+            await db.execute(
+                select(ApplicationRun)
+                .where(ApplicationRun.application_id == app.id)
+                .order_by(ApplicationRun.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if not run:
+            return
+
         # We need resume path. Assuming basic extraction
-        resume_path = None # Provide dummy path for now or from resume
-        
+        resume_path = None  # Provide dummy path for now or from resume
+
         # Wait, the application preparation logic inside application_runner requires a valid DB session factory.
-        await run_application_preparation(run.id, app.id, job.url or '', async_session_factory, profile_data, resume_path or '')
+        await run_application_preparation(
+            run.id,
+            app.id,
+            job.url or "",
+            async_session_factory,
+            profile_data,
+            resume_path or "",
+        )
 
 
 async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
-    from app.db.session import async_session_factory
+
     from sqlalchemy import select
-    from app.models.job import Job
+
+    from app.db.session import async_session_factory
     from app.models.enums import JobStatus
-    from datetime import datetime, UTC
-    
+    from app.models.job import Job
+
     async with async_session_factory() as db:
-        job = (await db.execute(select(Job).where(Job.id == job_id))).scalar_one_or_none()
+        job = (
+            await db.execute(select(Job).where(Job.id == job_id))
+        ).scalar_one_or_none()
         if not job:
             return
-            
+
         try:
             # 1. Choose Provider
             if job.source_type == "url":
                 from app.core.job_discovery.url_provider import UrlProvider
+
                 provider = UrlProvider()
                 input_data = job.raw_text  # Will be the URL
             else:
                 from app.core.job_discovery.manual_provider import ManualProvider
+
                 provider = ManualProvider()
                 input_data = job.raw_text
-                
+
             # 2. Extract & Normalize
             raw_data = await provider.ingest(input_data)
             normalized = provider.normalize(raw_data)
-            
+
             # 3. Update Job
             job.title = normalized.get("title", "Unknown")
             job.company = normalized.get("company", "Unknown")
@@ -435,21 +522,24 @@ async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
             job.employment_type = normalized.get("employment_type")
             job.raw_source_payload = raw_data
             job.is_normalized = True
-            
+
             from app.services.monitoring.utils import compute_content_hash
+
             job.content_hash = compute_content_hash(normalized)
             job.platform_job_id = job.content_hash
-            
+
             # 4. Resolve Route
             from app.services.application_route_resolver import ApplicationRouteResolver
+
             resolver = ApplicationRouteResolver()
             routes = await resolver.resolve(job)
             await _merge_application_routes(db, job, routes)
-                
+
             await db.commit()
-            
+
             # 5. Matching & Eligibility (Phase 15 logic)
             from app.services.job_search import analyze_job
+
             try:
                 match_result = await analyze_job(db, job.id)
                 # Ensure the job's match result is stored in raw_data so the frontend can read it!
@@ -460,7 +550,7 @@ async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
                 # datetimes and verdict/status fields are enums in Python mode.
                 raw_data_copy["match_result"] = match_result.model_dump(mode="json")
                 job.raw_data = raw_data_copy
-                
+
             except Exception as match_err:
                 # If matching fails, we still want to save the normalized job
                 if job.raw_data is None:
@@ -468,10 +558,10 @@ async def process_opportunity(ctx: dict[str, Any], job_id: str) -> None:
                 raw_data_copy = dict(job.raw_data)
                 raw_data_copy["match_error"] = str(match_err)
                 job.raw_data = raw_data_copy
-                
+
             job.status = JobStatus.READY
             await db.commit()
-            
+
         except Exception as e:
             # A flush/commit error leaves the session unusable and may expire
             # ``job``. Roll back first, then reload it before persisting the
@@ -520,7 +610,11 @@ async def _merge_application_routes(
         ).scalars()
     )
     user_preferred = next(
-        (route for route in existing_routes if route.user_overridden and route.is_preferred),
+        (
+            route
+            for route in existing_routes
+            if route.user_overridden and route.is_preferred
+        ),
         None,
     )
     if user_preferred is None and any(route.is_preferred for route in resolved_routes):
@@ -562,7 +656,12 @@ class WorkerSettings:
     """Arq worker configuration."""
 
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
-    functions: ClassVar = [apply_to_job, review_application_run, prepare_application_run, process_opportunity]
+    functions: ClassVar = [
+        apply_to_job,
+        review_application_run,
+        prepare_application_run,
+        process_opportunity,
+    ]
     cron_jobs: ClassVar = [
         cron(monitor_system_health, minute={0, 15, 30, 45}),
         cron(purge_deleted_accounts, hour={3}, minute={30}),  # daily 03:30

@@ -1,6 +1,6 @@
 """Telegram integration models."""
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, Integer, Index
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -12,7 +12,10 @@ class TelegramConnection(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base)
     __tablename__ = "telegram_connections"
 
     user_id: Mapped[str] = mapped_column(
-        String(32), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
     )
     chat_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -28,7 +31,9 @@ class TelegramLinkToken(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
         String(32), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
@@ -39,21 +44,32 @@ class TelegramCallbackReference(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin
 
     # We use the UUIDPrimaryKeyMixin, so id is a 32-char hex string.
     user_id: Mapped[str] = mapped_column(String(32), nullable=False)
-    application_id: Mapped[str] = mapped_column(String(32), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False)
+    application_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+    )
     action: Mapped[str] = mapped_column(String(64), nullable=False)
-    expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
 
 class NotificationLog(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     """Logs sent notifications to prevent duplicates."""
 
     __tablename__ = "notification_logs"
     __table_args__ = (
-        Index("ix_notification_logs_app_type", "application_id", "notification_type", unique=True),
+        Index(
+            "ix_notification_logs_app_type",
+            "application_id",
+            "notification_type",
+            unique=True,
+        ),
     )
 
     user_id: Mapped[str] = mapped_column(String(32), nullable=False)
     application_id: Mapped[str] = mapped_column(String(32), nullable=False)
     notification_type: Mapped[str] = mapped_column(String(64), nullable=False)
     telegram_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    delivery_status: Mapped[str] = mapped_column(String(32), default="sent", nullable=False)
-
+    delivery_status: Mapped[str] = mapped_column(
+        String(32), default="sent", nullable=False
+    )

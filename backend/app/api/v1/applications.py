@@ -16,11 +16,11 @@ from app.schemas.application import (
     ApplicationBulkApprove,
     ApplicationCreate,
     ApplicationIntervention,
-    ManualSubmissionConfirm,
     ApplicationListResponse,
     ApplicationResponse,
     ApplicationStatusUpdate,
     CoverLetterResponse,
+    ManualSubmissionConfirm,
 )
 from app.services import application as app_service
 from app.services import cover_letter as cover_letter_service
@@ -34,7 +34,10 @@ _COSTLY = Depends(rate_limit(30, 60))
 
 
 @router.post(
-    "/", response_model=ApplicationResponse, status_code=201, dependencies=[_COSTLY],
+    "/",
+    response_model=ApplicationResponse,
+    status_code=201,
+    dependencies=[_COSTLY],
     summary="Create an application",
 )
 async def create_application(
@@ -95,7 +98,9 @@ async def bulk_approve(
     return {"approved": count}
 
 
-@router.get("/{app_id}", response_model=ApplicationResponse, summary="Get a single application")
+@router.get(
+    "/{app_id}", response_model=ApplicationResponse, summary="Get a single application"
+)
 async def get_application(
     app_id: str,
     db: AsyncSession = Depends(get_tenant_db),
@@ -134,7 +139,9 @@ async def generate_cover_letter(
 ) -> CoverLetterResponse:
     """Generate (LLM) and store a cover letter for the application's job + resume."""
     app = await cover_letter_service.generate_cover_letter(db, app_id, user.id)
-    return CoverLetterResponse(application_id=app.id, cover_letter_path=app.cover_letter_path)
+    return CoverLetterResponse(
+        application_id=app.id, cover_letter_path=app.cover_letter_path
+    )
 
 
 @router.post(
@@ -198,7 +205,9 @@ async def confirm_manual_submission(
     db: AsyncSession = Depends(get_tenant_db),
 ) -> ApplicationResponse:
     if not data.confirmed:
-        raise HTTPException(status_code=400, detail="Explicit submission confirmation is required.")
+        raise HTTPException(
+            status_code=400, detail="Explicit submission confirmation is required."
+        )
     try:
         app = await app_service.confirm_manual_submission(db, app_id)
     except ValueError as exc:

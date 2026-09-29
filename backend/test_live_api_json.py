@@ -1,5 +1,10 @@
-﻿import httpx, asyncio, json
+﻿import asyncio
+import json
+
+import httpx
+
 from app.core.security import create_access_token
+
 
 async def run():
     token = create_access_token('f9305c63796d4430bcdb178025ea6d64')

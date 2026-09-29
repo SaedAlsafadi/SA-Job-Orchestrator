@@ -23,11 +23,37 @@ logger = structlog.get_logger(__name__)
 
 # Instructions that ask the candidate for money, sensitive data, or off-platform contact.
 _SUSPICIOUS_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("asks for payment/fees", re.compile(r"\b(pay|payment|fee|fees|deposit|transfer)\b[^.]{0,40}\b(application|registration|training|processing)\b", re.I)),
-    ("asks for financial details", re.compile(r"\b(bank account|credit card|iban|wire transfer)\b", re.I)),
-    ("recruits via personal chat app for money", re.compile(r"\b(whatsapp|telegram)\b[^.]{0,60}\b(pay|fee|transfer|send money)\b", re.I)),
-    ("asks for identity documents upfront", re.compile(r"\b(send|provide|upload)\b[^.]{0,40}\b(passport|national id|bank details)\b", re.I)),
-    ("too-good-to-be-true earnings claim", re.compile(r"\b(earn|make)\b\s+\$?\d[\d,.]*\s*(per day|daily|per week|weekly|a day)", re.I)),
+    (
+        "asks for payment/fees",
+        re.compile(
+            r"\b(pay|payment|fee|fees|deposit|transfer)\b[^.]{0,40}\b(application|registration|training|processing)\b",
+            re.I,
+        ),
+    ),
+    (
+        "asks for financial details",
+        re.compile(r"\b(bank account|credit card|iban|wire transfer)\b", re.I),
+    ),
+    (
+        "recruits via personal chat app for money",
+        re.compile(
+            r"\b(whatsapp|telegram)\b[^.]{0,60}\b(pay|fee|transfer|send money)\b", re.I
+        ),
+    ),
+    (
+        "asks for identity documents upfront",
+        re.compile(
+            r"\b(send|provide|upload)\b[^.]{0,40}\b(passport|national id|bank details)\b",
+            re.I,
+        ),
+    ),
+    (
+        "too-good-to-be-true earnings claim",
+        re.compile(
+            r"\b(earn|make)\b\s+\$?\d[\d,.]*\s*(per day|daily|per week|weekly|a day)",
+            re.I,
+        ),
+    ),
 ]
 
 _PLACEHOLDER_COMPANY = re.compile(r"^\s*(company|employer|unknown|n/?a|test)\s*$", re.I)

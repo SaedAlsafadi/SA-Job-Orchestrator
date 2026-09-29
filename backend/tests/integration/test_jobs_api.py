@@ -38,7 +38,11 @@ class TestSearchJobs:
         monkeypatch.setattr(
             job_service,
             "search_jobs",
-            AsyncMock(return_value=JobListResponse(items=[], total=0, page=1, page_size=20, has_next=False)),
+            AsyncMock(
+                return_value=JobListResponse(
+                    items=[], total=0, page=1, page_size=20, has_next=False
+                )
+            ),
         )
         response = await client.post(
             f"{API_PREFIX}/search",
@@ -77,7 +81,9 @@ class TestListJobs:
         assert body["has_next"] is False
 
     async def test_list_with_pagination_params(self, client):
-        response = await client.get(f"{API_PREFIX}/", params={"page": 2, "page_size": 5})
+        response = await client.get(
+            f"{API_PREFIX}/", params={"page": 2, "page_size": 5}
+        )
 
         assert response.status_code == 200
         body = response.json()
@@ -145,7 +151,9 @@ class TestAnalyzeJob:
 
         assert response.status_code == 404
 
-    async def test_analyze_existing_job(self, client, db_session, job_data, monkeypatch):
+    async def test_analyze_existing_job(
+        self, client, db_session, job_data, monkeypatch
+    ):
         job = Job(**job_data)
         db_session.add(job)
         await db_session.commit()

@@ -56,7 +56,9 @@ class LLMClient:
     """
 
     def __init__(
-        self, credentials: ResolvedLLMCredentials | None = None, user_id: str | None = None
+        self,
+        credentials: ResolvedLLMCredentials | None = None,
+        user_id: str | None = None,
     ) -> None:
         settings = get_settings()
         self._llm = settings.llm
@@ -81,6 +83,7 @@ class LLMClient:
     def _configure_api_keys(self) -> None:
         """Push provider API keys into litellm's key registry and OS env."""
         import os
+
         key_map: dict[str, str] = {
             "openai_api_key": self._llm.openai_api_key.get_secret_value(),
             "groq_api_key": self._llm.groq_api_key.get_secret_value(),
@@ -93,9 +96,7 @@ class LLMClient:
                 # Also set in os.environ for providers that strictly read from env
                 os.environ[attr.upper()] = value
 
-    def _build_messages(
-        self, prompt: str, system_prompt: str
-    ) -> list[dict[str, str]]:
+    def _build_messages(self, prompt: str, system_prompt: str) -> list[dict[str, str]]:
         """Build the messages list for a chat completion request."""
         messages: list[dict[str, str]] = []
         if system_prompt:
@@ -258,9 +259,7 @@ class LLMClient:
                     status="rate_limited",
                     latency_s=(time.perf_counter() - start),
                 )
-                logger.warning(
-                    "llm_rate_limited", model=attempt_model, error=str(exc)
-                )
+                logger.warning("llm_rate_limited", model=attempt_model, error=str(exc))
                 continue
 
             except litellm.Timeout as exc:
@@ -272,9 +271,7 @@ class LLMClient:
                     status="timeout",
                     latency_s=(time.perf_counter() - start),
                 )
-                logger.warning(
-                    "llm_timeout", model=attempt_model, error=str(exc)
-                )
+                logger.warning("llm_timeout", model=attempt_model, error=str(exc))
                 continue
 
             except litellm.APIError as exc:
@@ -286,9 +283,7 @@ class LLMClient:
                     status="error",
                     latency_s=(time.perf_counter() - start),
                 )
-                logger.error(
-                    "llm_api_error", model=attempt_model, error=str(exc)
-                )
+                logger.error("llm_api_error", model=attempt_model, error=str(exc))
                 continue
 
             except Exception as exc:
@@ -303,7 +298,9 @@ class LLMClient:
                     status="error",
                     latency_s=(time.perf_counter() - start),
                 )
-                logger.error("llm_unexpected_error", model=attempt_model, error=str(exc))
+                logger.error(
+                    "llm_unexpected_error", model=attempt_model, error=str(exc)
+                )
                 continue
 
         # All models exhausted — raise the appropriate typed error
@@ -364,7 +361,9 @@ class LLMClient:
             # DeepSeek V4 can spend the entire completion budget on hidden
             # reasoning and truncate the final JSON. Structured transforms need
             # concise reasoning so the schema-bearing answer can finish.
-            reasoning_effort="low" if model and "deepseek" in model.casefold() else None,
+            reasoning_effort=(
+                "low" if model and "deepseek" in model.casefold() else None
+            ),
         )
 
         try:
@@ -374,8 +373,12 @@ class LLMClient:
             return result
         except (json.JSONDecodeError, ValueError) as exc:
             await self._persist_usage(
-                response, purpose, status="failure", error=str(exc),
-                attempt=attempt, parse_failure=True,
+                response,
+                purpose,
+                status="failure",
+                error=str(exc),
+                attempt=attempt,
+                parse_failure=True,
             )
             logger.error(
                 "structured_output_parse_failed",
@@ -388,8 +391,14 @@ class LLMClient:
             ) from exc
 
     async def _persist_usage(
-        self, response: LLMResponse, purpose: str, *, status: str = "success",
-        error: str | None = None, attempt: int = 1, parse_failure: bool = False,
+        self,
+        response: LLMResponse,
+        purpose: str,
+        *,
+        status: str = "success",
+        error: str | None = None,
+        attempt: int = 1,
+        parse_failure: bool = False,
     ) -> None:
         """Persist a per-user usage row after a successful call (no-op when unbound)."""
         if not self._user_id:
@@ -398,8 +407,13 @@ class LLMClient:
         from app.core.llm.usage_tracker import persist_usage_for_user
 
         await persist_usage_for_user(
-            self._user_id, response, purpose, status=status, error=error,
-            attempt=attempt, parse_failure=parse_failure,
+            self._user_id,
+            response,
+            purpose,
+            status=status,
+            error=error,
+            attempt=attempt,
+            parse_failure=parse_failure,
         )
 
     def _record_metrics(
@@ -415,9 +429,7 @@ class LLMClient:
         cost: float | None = None,
     ) -> None:
         """Record Prometheus metrics for an LLM call."""
-        llm_requests_total.labels(
-            provider=provider, model=model, status=status
-        ).inc()
+        llm_requests_total.labels(provider=provider, model=model, status=status).inc()
         llm_latency_seconds.labels(
             provider=provider, model=model, purpose=purpose
         ).observe(latency_s)

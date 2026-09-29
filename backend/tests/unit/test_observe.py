@@ -26,8 +26,18 @@ class FakeHistory:
     """Duck-typed stand-in for browser-use AgentHistoryList."""
 
     def __init__(
-        self, *, errors=None, urls=None, actions=None, thoughts=None, done=True,
-        successful=True, steps=None, duration=2.5, usage=None, final="Applied successfully",
+        self,
+        *,
+        errors=None,
+        urls=None,
+        actions=None,
+        thoughts=None,
+        done=True,
+        successful=True,
+        steps=None,
+        duration=2.5,
+        usage=None,
+        final="Applied successfully",
         screenshots=None,
     ):
         self._errors = errors if errors is not None else []
@@ -82,9 +92,12 @@ class TestExtractSignals:
         assert sig["consecutive_failures"] == 2
 
     def test_consecutive_resets_after_a_clean_step(self):
-        assert observe.extract_run_signals(FakeHistory(errors=["boom", None]))[
-            "consecutive_failures"
-        ] == 0
+        assert (
+            observe.extract_run_signals(FakeHistory(errors=["boom", None]))[
+                "consecutive_failures"
+            ]
+            == 0
+        )
 
     def test_final_url_and_loop_detection(self):
         sig = observe.extract_run_signals(
@@ -100,9 +113,12 @@ class TestExtractSignals:
         assert sig["loop_detected"] is False
 
     def test_timed_out_from_error_text(self):
-        assert observe.extract_run_signals(FakeHistory(errors=["step timeout exceeded"]))[
-            "timed_out"
-        ] is True
+        assert (
+            observe.extract_run_signals(FakeHistory(errors=["step timeout exceeded"]))[
+                "timed_out"
+            ]
+            is True
+        )
 
 
 class TestExtractTrajectory:
@@ -125,9 +141,12 @@ class TestExtractTrajectory:
         assert t["steps"][1]["next_goal"] == "done"
 
     def test_status_failed_when_not_successful(self):
-        assert observe.extract_trajectory(FakeHistory(done=True, successful=False))[
-            "status"
-        ] == "failed"
+        assert (
+            observe.extract_trajectory(FakeHistory(done=True, successful=False))[
+                "status"
+            ]
+            == "failed"
+        )
 
     def test_handles_minimal_history_without_raising(self):
         t = observe.extract_trajectory(object())
@@ -139,7 +158,9 @@ class TestStepObserver:
         redis = fakeredis.aioredis.FakeRedis()
         agent = MagicMock()
         agent.history = FakeHistory(actions=["click_element"], steps=1)
-        gauge = observe.browser_actions_total.labels(platform="linkedin", action="click_element")
+        gauge = observe.browser_actions_total.labels(
+            platform="linkedin", action="click_element"
+        )
         before = gauge._value.get()
 
         hook = observe.make_step_observer(redis, "u1", "app1", "linkedin")
@@ -154,8 +175,12 @@ class TestStepObserver:
     async def test_multi_action_step_increments_per_action(self):
         agent = MagicMock()
         agent.history = _ActionHistory([[{"input_text": {}}, {"click_element": {}}]])
-        it = observe.browser_actions_total.labels(platform="indeed", action="input_text")
-        cl = observe.browser_actions_total.labels(platform="indeed", action="click_element")
+        it = observe.browser_actions_total.labels(
+            platform="indeed", action="input_text"
+        )
+        cl = observe.browser_actions_total.labels(
+            platform="indeed", action="click_element"
+        )
         b_it, b_cl = it._value.get(), cl._value.get()
 
         await observe.make_step_observer(None, "u", "a", "indeed")(agent)
@@ -238,11 +263,18 @@ class TestStepAlignment:
         items = [
             _Item("u0", _ModelOutput([_Action("go_to_url")], _Brain("ok", "g0"))),
             _Item("u1", model_output=None),  # transient LLM-parse failure mid-run
-            _Item("u2", _ModelOutput([_Action("input_text"), _Action("click")], _Brain("e2", "g2"))),
+            _Item(
+                "u2",
+                _ModelOutput(
+                    [_Action("input_text"), _Action("click")], _Brain("e2", "g2")
+                ),
+            ),
         ]
         steps = observe.extract_trajectory(RawHistory(items))["steps"]
 
         assert [s["url"] for s in steps] == ["u0", "u1", "u2"]  # per-step urls intact
-        assert steps[1]["action"] is None and steps[1]["evaluation"] is None  # not borrowed
+        assert (
+            steps[1]["action"] is None and steps[1]["evaluation"] is None
+        )  # not borrowed
         assert steps[2]["action"] == "input_text"  # first action of its own step
         assert steps[2]["next_goal"] == "g2"

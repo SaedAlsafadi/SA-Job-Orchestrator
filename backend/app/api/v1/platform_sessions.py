@@ -37,7 +37,9 @@ async def import_session(
 
 
 @router.get(
-    "/", response_model=list[PlatformSessionResponse], summary="List connected platform sessions"
+    "/",
+    response_model=list[PlatformSessionResponse],
+    summary="List connected platform sessions",
 )
 async def list_sessions(
     user: CurrentUser,

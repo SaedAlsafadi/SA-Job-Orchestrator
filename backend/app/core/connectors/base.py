@@ -1,15 +1,18 @@
 from abc import ABC, abstractmethod
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, Optional, Dict, List
-from enum import Enum
+from enum import StrEnum
+from typing import Any
 
-class QuestionCategory(str, Enum):
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class QuestionCategory(StrEnum):
     A_PREFILLED_PLATFORM_PROFILE = "A"
     B_DETERMINISTIC_CANDIDATE_DATA = "B"
     C_STORED_USER_PREFERENCE = "C"
     D_AI_EVIDENCE_GROUNDED = "D"
     E_UNKNOWN_HIGH_RISK = "E"
     F_OPTIONAL_EMPTY = "F"
+
 
 class ConnectorCapabilities(BaseModel):
     discovery: bool
@@ -22,6 +25,7 @@ class ConnectorCapabilities(BaseModel):
     submission: bool
     status_monitoring: bool
 
+
 class ApplicationQuestion(BaseModel):
     model_config = ConfigDict(frozen=False)
 
@@ -29,24 +33,25 @@ class ApplicationQuestion(BaseModel):
     label: str
     input_type: str  # text, select, file, radio, checkbox
     required: bool = False
-    options: List[str] = Field(default_factory=list)
-    
+    options: list[str] = Field(default_factory=list)
+
     # State inspection fields
-    current_value: Optional[str] = None
+    current_value: str | None = None
     prefilled: bool = False
     editable: bool = True
     visible: bool = True
-    
+
     # Engine resolution fields
-    category: Optional[QuestionCategory] = None
-    answer: Optional[str] = None
-    confidence: Optional[float] = None
-    evidence_ids: List[str] = Field(default_factory=list)
+    category: QuestionCategory | None = None
+    answer: str | None = None
+    confidence: float | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
     requires_human: bool = False
+
 
 class JobSource(ABC):
     """Generic interface for discovering and fetching jobs from external platforms."""
-    
+
     @abstractmethod
     def name(self) -> str:
         pass
@@ -56,17 +61,17 @@ class JobSource(ABC):
         pass
 
     @abstractmethod
-    async def discover_jobs(self, url: str) -> List[Dict[str, Any]]:
+    async def discover_jobs(self, url: str) -> list[dict[str, Any]]:
         """Given a URL (e.g., career page), return list of raw job dicts."""
         pass
 
     @abstractmethod
-    async def fetch_job(self, external_job_id: str) -> Dict[str, Any]:
+    async def fetch_job(self, external_job_id: str) -> dict[str, Any]:
         """Fetch raw details for a specific job ID."""
         pass
 
     @abstractmethod
-    def normalize_job(self, raw_job: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize_job(self, raw_job: dict[str, Any]) -> dict[str, Any]:
         """Convert a raw job payload to our canonical Job schema dict."""
         pass
 
@@ -74,6 +79,7 @@ class JobSource(ABC):
     async def health_check(self) -> bool:
         """Verify the integration is operational."""
         pass
+
 
 class ApplicationConnector(ABC):
     """Generic interface for automating job applications."""
@@ -93,7 +99,7 @@ class ApplicationConnector(ABC):
         pass
 
     @abstractmethod
-    async def inspect_form(self, page) -> List[ApplicationQuestion]:
+    async def inspect_form(self, page) -> list[ApplicationQuestion]:
         """Parse the page to extract questions."""
         pass
 
@@ -113,7 +119,7 @@ class ApplicationConnector(ABC):
         pass
 
     @abstractmethod
-    async def capture_state(self, page) -> Dict[str, Any]:
+    async def capture_state(self, page) -> dict[str, Any]:
         """Capture DOM snapshot, screenshot paths, and current values."""
         pass
 

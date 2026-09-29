@@ -20,7 +20,9 @@ from app.models.application import Application
 logger = structlog.get_logger(__name__)
 
 
-async def generate_cover_letter(db: AsyncSession, application_id: str, user_id: str) -> Application:
+async def generate_cover_letter(
+    db: AsyncSession, application_id: str, user_id: str
+) -> Application:
     """Generate a cover letter for an application and persist its path."""
     app = (
         await db.execute(
@@ -32,7 +34,9 @@ async def generate_cover_letter(db: AsyncSession, application_id: str, user_id: 
     if app is None:
         raise RecordNotFoundError("Application", application_id)
     if app.job is None or app.resume is None:
-        raise GenerationError("Application needs both a job and a resume for a cover letter")
+        raise GenerationError(
+            "Application needs both a job and a resume for a cover letter"
+        )
 
     llm = await build_llm_client_for_user(db, user_id)
     generator = DocumentGenerator(llm_client=llm)

@@ -1,23 +1,22 @@
 """API v1 router aggregating all sub-routers."""
 
 from fastapi import APIRouter, Depends
-from app.config.settings import get_settings
 
 from app.api.deps import get_current_user, require_superuser
+from app.api.v1 import candidate_profile, workflow
 from app.api.v1.admin import router as admin_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.applications import router as applications_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.dev import router as dev_router
 from app.api.v1.jobs import router as jobs_router
+from app.api.v1.packages import router as packages_router
 from app.api.v1.platform_sessions import router as platform_sessions_router
 from app.api.v1.resumes import router as resumes_router
 from app.api.v1.settings import router as settings_router
-from app.api.v1.dev import router as dev_router
-from app.api.v1.packages import router as packages_router
-from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.tailoring import router as tailoring_router
-from app.api.v1 import candidate_profile
-from app.api.v1 import workflow
+from app.config.settings import get_settings
 
 v1_router = APIRouter()
 
@@ -25,20 +24,29 @@ v1_router = APIRouter()
 v1_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
 
 # Core Domain
-v1_router.include_router(candidate_profile.router, prefix="/candidate-profile", tags=["candidate-profile"])
+v1_router.include_router(
+    candidate_profile.router, prefix="/candidate-profile", tags=["candidate-profile"]
+)
 v1_router.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 
 # All other routers require an authenticated user (router-level guard).
 _auth = [Depends(get_current_user)]
 v1_router.include_router(jobs_router, prefix="/jobs", tags=["Jobs"], dependencies=_auth)
 v1_router.include_router(
-    applications_router, prefix="/applications", tags=["Applications"], dependencies=_auth
+    applications_router,
+    prefix="/applications",
+    tags=["Applications"],
+    dependencies=_auth,
 )
-v1_router.include_router(resumes_router, prefix="/resumes", tags=["Resumes"], dependencies=_auth)
+v1_router.include_router(
+    resumes_router, prefix="/resumes", tags=["Resumes"], dependencies=_auth
+)
 v1_router.include_router(
     analytics_router, prefix="/analytics", tags=["Analytics"], dependencies=_auth
 )
-v1_router.include_router(settings_router, prefix="/settings", tags=["Settings"], dependencies=_auth)
+v1_router.include_router(
+    settings_router, prefix="/settings", tags=["Settings"], dependencies=_auth
+)
 v1_router.include_router(
     platform_sessions_router,
     prefix="/platform-sessions",
@@ -50,18 +58,26 @@ from app.api.v1.opportunities import router as opportunities_router
 from app.api.v1.telegram import router as telegram_router
 
 v1_router.include_router(
-    opportunities_router, prefix="/opportunities", tags=["Opportunities"], dependencies=_auth
+    opportunities_router,
+    prefix="/opportunities",
+    tags=["Opportunities"],
+    dependencies=_auth,
 )
 v1_router.include_router(
     telegram_router, prefix="/telegram", tags=["Telegram"], dependencies=_auth
 )
 v1_router.include_router(packages_router, tags=["Packages"], dependencies=_auth)
-v1_router.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"], dependencies=_auth)
+v1_router.include_router(
+    dashboard_router, prefix="/dashboard", tags=["Dashboard"], dependencies=_auth
+)
 v1_router.include_router(tailoring_router, dependencies=_auth)
 
 # Admin/health routes require a superuser.
 v1_router.include_router(
-    admin_router, prefix="/admin", tags=["Admin"], dependencies=[Depends(require_superuser)]
+    admin_router,
+    prefix="/admin",
+    tags=["Admin"],
+    dependencies=[Depends(require_superuser)],
 )
 
 # Dev routes for local testing

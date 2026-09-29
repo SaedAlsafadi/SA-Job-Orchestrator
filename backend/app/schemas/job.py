@@ -29,7 +29,9 @@ class JobSearchRequest(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=500)
     location: str = ""
-    platforms: list[str] = Field(default_factory=lambda: ["linkedin", "indeed", "glassdoor"])
+    platforms: list[str] = Field(
+        default_factory=lambda: ["linkedin", "indeed", "glassdoor"]
+    )
     filters: dict[str, Any] = Field(default_factory=dict)
     limit: int = Field(default=20, ge=1, le=100)
 
@@ -53,10 +55,12 @@ class JobListingResponse(BaseModel):
     posted_date: datetime | None = None
     experience_level: str | None = None
     match_score: float | None = None
-    operational_state: OpportunityOperationalState = Field(default_factory=OpportunityOperationalState)
+    operational_state: OpportunityOperationalState = Field(
+        default_factory=OpportunityOperationalState
+    )
     skills_required: dict | None = None
     status: str
-    
+
     # Phase 18 fields
     source_type: str | None = None
     raw_data: dict | None = None
@@ -77,6 +81,7 @@ class JobListingResponse(BaseModel):
 
 class JobDetailResponse(JobListingResponse):
     """Single job detail response — includes eagerly-loaded routes."""
+
     routes: list["ApplicationRouteResponse"] | None = None
 
 

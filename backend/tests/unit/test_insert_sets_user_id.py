@@ -23,7 +23,14 @@ def _scope_to_uid():
 
 
 async def _job(db) -> Job:
-    job = Job(user_id=UID, platform="linkedin", platform_job_id="j", title="t", company="c", url="u")
+    job = Job(
+        user_id=UID,
+        platform="linkedin",
+        platform_job_id="j",
+        title="t",
+        company="c",
+        url="u",
+    )
     db.add(job)
     await db.commit()
     await db.refresh(job)
@@ -46,7 +53,9 @@ class TestInsertSetsUserId:
         db_session.add(User(id=UID, email="i@x.com", hashed_password="x"))
         job = await _job(db_session)
 
-        app = await app_service.create_application(db_session, ApplicationCreate(job_id=job.id), UID)
+        app = await app_service.create_application(
+            db_session, ApplicationCreate(job_id=job.id), UID
+        )
 
         row = await _read_unscoped(db_session, app.id)
         assert row.user_id == UID

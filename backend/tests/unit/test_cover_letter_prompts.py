@@ -62,7 +62,9 @@ class TestTemplatePrompts:
     def test_all_prompts_contain_placeholders(self) -> None:
         for template, prompt in TEMPLATE_PROMPTS.items():
             assert "{job_description}" in prompt, f"{template} missing job_description"
-            assert "{candidate_resume}" in prompt, f"{template} missing candidate_resume"
+            assert (
+                "{candidate_resume}" in prompt
+            ), f"{template} missing candidate_resume"
 
 
 # ---------------------------------------------------------------------------

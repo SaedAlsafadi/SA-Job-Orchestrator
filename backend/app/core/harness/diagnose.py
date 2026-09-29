@@ -23,7 +23,9 @@ class Diagnosis:
 
 def diagnose(signals: dict) -> Diagnosis:
     """Classify a failed run from its trajectory signals."""
-    haystack = " ".join([*signals.get("errors", []), *signals.get("evaluations", [])]).lower()
+    haystack = " ".join(
+        [*signals.get("errors", []), *signals.get("evaluations", [])]
+    ).lower()
     url = (signals.get("final_url") or "").lower()
 
     def has(*words: str) -> bool:
@@ -37,15 +39,21 @@ def diagnose(signals: dict) -> Diagnosis:
         )
     if has("captcha", "are you a robot", "verify you are human", "recaptcha"):
         return Diagnosis(
-            FailureClass.CAPTCHA_WALL, "CAPTCHA challenge encountered", "request human intervention"
+            FailureClass.CAPTCHA_WALL,
+            "CAPTCHA challenge encountered",
+            "request human intervention",
         )
     if has("two-factor", "2fa", "verification code", "one-time code", "authenticator"):
         return Diagnosis(
-            FailureClass.TWOFA_REQUIRED, "2FA prompt encountered", "request human intervention"
+            FailureClass.TWOFA_REQUIRED,
+            "2FA prompt encountered",
+            "request human intervention",
         )
     if has("unusual traffic", "access denied", "datadome", "are you human", "blocked"):
         return Diagnosis(
-            FailureClass.ANTIBOT_BLOCK, "Anti-bot block detected", "rotate proxy/UA and back off"
+            FailureClass.ANTIBOT_BLOCK,
+            "Anti-bot block detected",
+            "rotate proxy/UA and back off",
         )
     if has("rate limit", "too many requests", "429"):
         return Diagnosis(
@@ -53,7 +61,10 @@ def diagnose(signals: dict) -> Diagnosis:
             "Platform rate-limited the session",
             "back off and retry later",
         )
-    if has("session expired", "logged out", "please sign in", "please log in") or "login" in url:
+    if (
+        has("session expired", "logged out", "please sign in", "please log in")
+        or "login" in url
+    ):
         return Diagnosis(
             FailureClass.SESSION_EXPIRED,
             "Login/session wall hit",
@@ -65,7 +76,13 @@ def diagnose(signals: dict) -> Diagnosis:
             "Agent looped without progress",
             "reload domain skill / revise prompt",
         )
-    if has("element not found", "selector", "could not find", "no such element", "not visible"):
+    if has(
+        "element not found",
+        "selector",
+        "could not find",
+        "no such element",
+        "not visible",
+    ):
         return Diagnosis(
             FailureClass.DOM_DRIFT,
             "Expected element missing (page changed)",
@@ -89,4 +106,6 @@ def diagnose(signals: dict) -> Diagnosis:
             "Repeated step failures",
             "simplify the task or add guidance",
         )
-    return Diagnosis(FailureClass.UNKNOWN, "Unclassified failure", "review the trajectory manually")
+    return Diagnosis(
+        FailureClass.UNKNOWN, "Unclassified failure", "review the trajectory manually"
+    )

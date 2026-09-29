@@ -27,14 +27,16 @@ BULLET = "\u2022"
 
 # Mojibake / variant bullet forms observed in extracted PDF text.
 _BULLET_FORMS = [
-    "\u00b7",                # middle dot
-    "\u2023", "\u25aa",      # triangle / small square bullets
-    "\u00f2",                # PDF-extraction mangling of the bullet glyph
-    "\u00e2\u20ac\u00a2",    # UTF-8 bullet read as CP1252
+    "\u00b7",  # middle dot
+    "\u2023",
+    "\u25aa",  # triangle / small square bullets
+    "\u00f2",  # PDF-extraction mangling of the bullet glyph
+    "\u00e2\u20ac\u00a2",  # UTF-8 bullet read as CP1252
     "\u00c3\u00a2\u20ac\u00a2",
-    "\u0393\u00c7\u00a2",    # UTF-8 bullet read as CP1251-style
-    "\u252c\u00a7",          # middle-dot mojibake variant
-    "\u00c2\u2022", "\u00c2\u00b7",
+    "\u0393\u00c7\u00a2",  # UTF-8 bullet read as CP1251-style
+    "\u252c\u00a7",  # middle-dot mojibake variant
+    "\u00c2\u2022",
+    "\u00c2\u00b7",
 ]
 
 # Characters that can introduce a bullet line after normalization.
@@ -81,12 +83,7 @@ def _collapse_letter_spaced(segment: str) -> str:
         return segment
     fixed: list[str] = []
     for tok in tokens:
-        if (
-            fixed
-            and re.match(r"^.*\.[A-Z]$", fixed[-1])
-            and tok
-            and tok[0].islower()
-        ):
+        if fixed and re.match(r"^.*\.[A-Z]$", fixed[-1]) and tok and tok[0].islower():
             # "lifecycle.T" + "echnology" -> "lifecycle." + "Technology"
             moved = fixed[-1][-1]
             fixed[-1] = fixed[-1][:-1]
@@ -149,7 +146,8 @@ def _split_glued_headers(line: str) -> list[str]:
         pieces: list[str] = []
         for seg in results:
             matches = [
-                m for m in pattern.finditer(seg)
+                m
+                for m in pattern.finditer(seg)
                 if not _preceded_by_lowercase_word(seg, m.start())
             ]
             if not matches:
@@ -157,10 +155,10 @@ def _split_glued_headers(line: str) -> list[str]:
                 continue
             cursor = 0
             for m in matches:
-                pre = seg[cursor:m.start()].strip()
+                pre = seg[cursor : m.start()].strip()
                 if pre:
                     pieces.append(pre)
-                pieces.append(seg[m.start():m.end()].strip().rstrip(":").strip())
+                pieces.append(seg[m.start() : m.end()].strip().rstrip(":").strip())
                 cursor = m.end()
             post = seg[cursor:].strip()
             if post:
@@ -235,9 +233,16 @@ def normalize_resume_text(text: str) -> str:
 
 _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 _INSTITUTION_HINTS = (
-    "university", "institute", "college", "school", "academy", "polytechnic",
+    "university",
+    "institute",
+    "college",
+    "school",
+    "academy",
+    "polytechnic",
 )
-_PHONE_FALLBACK_RE = re.compile(r"\+\d{1,3}[\s\-]\d{2,3}[\s\-]\d{3,4}(?:[\s\-]\d{2,4})?")
+_PHONE_FALLBACK_RE = re.compile(
+    r"\+\d{1,3}[\s\-]\d{2,3}[\s\-]\d{3,4}(?:[\s\-]\d{2,4})?"
+)
 
 
 def _is_bullet_line(stripped: str) -> bool:
@@ -336,7 +341,9 @@ def parse_experience_section(text: str) -> list[dict]:
             len(stripped) <= 60 and not stripped.endswith((".", "!", "?"))
         )
         if current is not None and (
-            not looks_like_title or stripped[0].islower() or (desc_open and "|" not in stripped)
+            not looks_like_title
+            or stripped[0].islower()
+            or (desc_open and "|" not in stripped)
         ):
             _append_description(current, stripped)
             continue
@@ -350,7 +357,12 @@ def parse_experience_section(text: str) -> list[dict]:
                 company = parts[1]
                 if len(parts) >= 3:
                     duration = parts[2]
-        current = {"title": title, "company": company, "duration": duration, "description": ""}
+        current = {
+            "title": title,
+            "company": company,
+            "duration": duration,
+            "description": "",
+        }
     if current is not None:
         entries.append(current)
     return entries
@@ -381,8 +393,10 @@ def parse_education_section(text: str) -> list[dict]:
         if is_year_line and entries:
             entries[-1]["year"] = stripped
             continue
-        if entries and not entries[-1]["institution"] and any(
-            hint in stripped.lower() for hint in _INSTITUTION_HINTS
+        if (
+            entries
+            and not entries[-1]["institution"]
+            and any(hint in stripped.lower() for hint in _INSTITUTION_HINTS)
         ):
             entries[-1]["institution"] = stripped
             continue
@@ -414,10 +428,10 @@ def parse_projects_section(text: str) -> list[dict]:
         # entry's dates landing after the header), never a project name.
         if _YEAR_RE.search(stripped) and len(stripped) <= 40:
             continue
-        looks_like_name = len(stripped) <= 60 and not stripped.endswith((".", "!", "?", ","))
-        if current is not None and (
-            not looks_like_name or not current["description"]
-        ):
+        looks_like_name = len(stripped) <= 60 and not stripped.endswith(
+            (".", "!", "?", ",")
+        )
+        if current is not None and (not looks_like_name or not current["description"]):
             # Long prose / comma-ending lines are description text, not names -
             # including the FIRST description line of a fresh project.
             if not looks_like_name:
@@ -481,7 +495,11 @@ def build_resume_data_from_text(content_text: str) -> dict:
     prose.extend(pre_header[6:])
 
     skills_text = _first(
-        sections, "skills", "technical skills", "core competencies", "competencies",
+        sections,
+        "skills",
+        "technical skills",
+        "core competencies",
+        "competencies",
     )
     skills = [
         s.strip()
@@ -490,7 +508,11 @@ def build_resume_data_from_text(content_text: str) -> dict:
     ]
 
     exp_text = _first(
-        sections, "experience", "work experience", "professional experience", "employment",
+        sections,
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment",
     )
     experience = parse_experience_section(exp_text) if exp_text else []
 
@@ -533,7 +555,11 @@ def build_resume_data_from_text(content_text: str) -> dict:
     # right before it are that job's bullets.
     pre_experience: list[dict] = []
     title_idx = next(
-        (i for i, line in enumerate(pre_header) if "|" in line and _YEAR_RE.search(line)),
+        (
+            i
+            for i, line in enumerate(pre_header)
+            if "|" in line and _YEAR_RE.search(line)
+        ),
         None,
     )
     if title_idx is not None:
@@ -547,20 +573,33 @@ def build_resume_data_from_text(content_text: str) -> dict:
             parts[0] = parts[0].strip()
         else:
             prefix = ""
+
         def _is_contact(l: str) -> bool:
             low = l.lower()
-            return "@" in l or low.startswith("address:") or "phone:" in low or "linkedin" in low or "github:" in low
-        bullets = [l for l in pre_header[:title_idx] if len(l) > 40 and not _is_contact(l)]
+            return (
+                "@" in l
+                or low.startswith("address:")
+                or "phone:" in low
+                or "linkedin" in low
+                or "github:" in low
+            )
+
+        bullets = [
+            l for l in pre_header[:title_idx] if len(l) > 40 and not _is_contact(l)
+        ]
         if prefix:
             bullets.append(prefix + ".")
-        pre_experience.append({
-            "title": parts[0],
-            "company": parts[1] if len(parts) > 1 else "",
-            "duration": parts[2] if len(parts) > 2 else "",
-            "description": "\n".join(bullets) + ("\n" if bullets else ""),
-        })
+        pre_experience.append(
+            {
+                "title": parts[0],
+                "company": parts[1] if len(parts) > 1 else "",
+                "duration": parts[2] if len(parts) > 2 else "",
+                "description": "\n".join(bullets) + ("\n" if bullets else ""),
+            }
+        )
         pre_header = [
-            l for i, l in enumerate(pre_header)
+            l
+            for i, l in enumerate(pre_header)
             if i > title_idx or (i < title_idx and len(l) <= 40)
         ]
     experience = pre_experience + experience
@@ -592,7 +631,9 @@ def build_resume_data_from_text(content_text: str) -> dict:
         is_skill_pair = (
             len(proj["name"]) <= 40
             and len(desc_lines) <= 2
-            and all(len(d) <= 40 and not d.endswith((".", "!", "?")) for d in desc_lines)
+            and all(
+                len(d) <= 40 and not d.endswith((".", "!", "?")) for d in desc_lines
+            )
             and not _YEAR_RE.search(proj["name"])
         )
         if is_skill_pair and skills:
@@ -608,13 +649,14 @@ def build_resume_data_from_text(content_text: str) -> dict:
     # Readability: un-glue concatenated category phrases. Only tokens that
     # already contain a space are split, so single CamelCase tech terms
     # ("JavaScript", "TensorFlow") stay intact.
-    skills = [
-        re.sub(r"(?<=[a-z])(?=[A-Z])", " ", s) if " " in s else s
-        for s in skills
-    ]
+    skills = [re.sub(r"(?<=[a-z])(?=[A-Z])", " ", s) if " " in s else s for s in skills]
 
     summary = _first(
-        sections, "summary", "professional summary", "objective", "profile",
+        sections,
+        "summary",
+        "professional summary",
+        "objective",
+        "profile",
     )
     if not summary:
         # Recompute from pre-header lines that survived the job salvage.

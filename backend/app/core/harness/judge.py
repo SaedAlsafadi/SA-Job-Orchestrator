@@ -28,7 +28,12 @@ class JudgeOutput(BaseModel):
 
 class _StructuredLLM(Protocol):
     async def complete_with_structured_output(
-        self, *, prompt: str, output_schema: type[BaseModel], system_prompt: str, purpose: str
+        self,
+        *,
+        prompt: str,
+        output_schema: type[BaseModel],
+        system_prompt: str,
+        purpose: str,
     ) -> Any: ...
 
 
@@ -46,4 +51,8 @@ async def judge_run(llm: _StructuredLLM, summary: dict) -> JudgeOutput:
         system_prompt=_JUDGE_SYSTEM,
         purpose="harness_judge",
     )
-    return result if isinstance(result, JudgeOutput) else JudgeOutput.model_validate(result)
+    return (
+        result
+        if isinstance(result, JudgeOutput)
+        else JudgeOutput.model_validate(result)
+    )

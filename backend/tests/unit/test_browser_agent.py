@@ -12,6 +12,7 @@ from app.core.exceptions import BrowserError
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_agent(task="search jobs", llm=None):
     """Create a BrowserAgent with mocked settings."""
     mock_browser_settings = MagicMock()
@@ -26,6 +27,7 @@ def _make_agent(task="search jobs", llm=None):
 
     with patch("app.core.automation.agent.get_settings", return_value=mock_settings):
         from app.core.automation.agent import BrowserAgent
+
         agent = BrowserAgent(task=task, llm=llm, sensitive_data={"user": "test"})
     return agent
 

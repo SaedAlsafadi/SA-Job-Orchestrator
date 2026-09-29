@@ -1,8 +1,12 @@
 ﻿"""Tests for application settings configuration."""
 
-
-
-from app.config.settings import ApplyMode, BrowserSettings, Environment, LLMSettings, Settings
+from app.config.settings import (
+    ApplyMode,
+    BrowserSettings,
+    Environment,
+    LLMSettings,
+    Settings,
+)
 
 
 class TestSettings:
@@ -75,4 +79,3 @@ class TestBrowserSettings:
         """Browser should default to headless mode."""
         settings = BrowserSettings()
         assert settings.headless is True
-

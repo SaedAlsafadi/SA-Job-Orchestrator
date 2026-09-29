@@ -53,26 +53,34 @@ class TestSuggestImprovements:
     def test_returns_list_of_strings(self, optimizer):
         sd = _make_score_details()
         result = optimizer.suggest_improvements(
-            sd, "experienced python developer with experience education skills", "python developer"
+            sd,
+            "experienced python developer with experience education skills",
+            "python developer",
         )
         assert isinstance(result, list)
         assert all(isinstance(s, str) for s in result)
 
     def test_missing_required_skills_produces_suggestion(self, optimizer):
         sd = _make_score_details(missing_required_skills=["python", "java"])
-        result = optimizer.suggest_improvements(sd, "experience education skills", "python java developer")
+        result = optimizer.suggest_improvements(
+            sd, "experience education skills", "python java developer"
+        )
         assert any("required skills" in s.lower() for s in result)
 
     def test_many_missing_skills_shows_count(self, optimizer):
         sd = _make_score_details(
             missing_required_skills=["python", "java", "go", "rust"]
         )
-        result = optimizer.suggest_improvements(sd, "experience education skills", "developer")
+        result = optimizer.suggest_improvements(
+            sd, "experience education skills", "developer"
+        )
         assert any("more" in s.lower() for s in result)
 
     def test_missing_preferred_skills_suggestion(self, optimizer):
         sd = _make_score_details(missing_preferred_skills=["react", "vue", "angular"])
-        result = optimizer.suggest_improvements(sd, "experience education skills", "frontend")
+        result = optimizer.suggest_improvements(
+            sd, "experience education skills", "frontend"
+        )
         assert any("preferred" in s.lower() for s in result)
 
     def test_low_keyword_score_suggestion(self, optimizer):
@@ -94,10 +102,14 @@ class TestSuggestImprovements:
         result = optimizer.suggest_improvements(
             sd, "experience education skills", "developer"
         )
-        assert any("education" in s.lower() or "certification" in s.lower() for s in result)
+        assert any(
+            "education" in s.lower() or "certification" in s.lower() for s in result
+        )
 
     def test_carries_over_scorer_suggestions(self, optimizer):
-        sd = _make_score_details(improvement_suggestions=["Custom suggestion from scorer"])
+        sd = _make_score_details(
+            improvement_suggestions=["Custom suggestion from scorer"]
+        )
         result = optimizer.suggest_improvements(
             sd, "experience education skills", "developer"
         )

@@ -48,7 +48,10 @@ def test_sqlite_upgrade_head_from_clean(tmp_path):
 
     con = sqlite3.connect(str(db))
     try:
-        tables = {r[0] for r in con.execute("select name from sqlite_master where type='table'")}
+        tables = {
+            r[0]
+            for r in con.execute("select name from sqlite_master where type='table'")
+        }
     finally:
         con.close()
     assert tables >= EXPECTED_TABLES, f"missing: {EXPECTED_TABLES - tables}"

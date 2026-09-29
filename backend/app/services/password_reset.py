@@ -33,7 +33,9 @@ async def request_password_reset(db: AsyncSession, email: str) -> None:
         )
     ).scalar_one_or_none()
     if user is None:
-        logger.info("password_reset_requested_unknown")  # no enumeration in logs or response
+        logger.info(
+            "password_reset_requested_unknown"
+        )  # no enumeration in logs or response
         return
 
     raw = generate_reset_token()
@@ -57,13 +59,17 @@ async def reset_password(db: AsyncSession, token: str, new_password: str) -> Non
     """
     row = (
         await db.execute(
-            select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(token))
+            select(PasswordResetToken).where(
+                PasswordResetToken.token_hash == hash_token(token)
+            )
         )
     ).scalar_one_or_none()
     if row is None or row.used_at is not None:
         raise AuthError("Invalid or expired reset token")
 
-    expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=UTC)
+    expires = (
+        row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=UTC)
+    )
     if expires < datetime.now(UTC):
         raise AuthError("Invalid or expired reset token")
 
@@ -78,7 +84,9 @@ async def reset_password(db: AsyncSession, token: str, new_password: str) -> Non
     # so a password reset (which may be a compromise response) invalidates all existing logins.
     await db.execute(
         update(PasswordResetToken)
-        .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+        .where(
+            PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)
+        )
         .values(used_at=now)
     )
     await db.execute(

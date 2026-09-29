@@ -38,7 +38,9 @@ async def request_intervention(
     return value.decode() if isinstance(value, bytes) else value
 
 
-async def resolve_intervention(redis: Redis, application_id: str, response: str) -> None:
+async def resolve_intervention(
+    redis: Redis, application_id: str, response: str
+) -> None:
     """Deliver the user's intervention response to the waiting worker."""
     key = intervention_key(application_id)
     await redis.rpush(key, response)

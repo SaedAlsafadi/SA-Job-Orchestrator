@@ -31,7 +31,9 @@ class TestLocalFileStorage:
 
     async def test_put_creates_nested_dirs(self, tmp_path):
         store = _storage(tmp_path)
-        await store.put("users/u1/resumes/deep/r.pdf", b"x", content_type="application/pdf")
+        await store.put(
+            "users/u1/resumes/deep/r.pdf", b"x", content_type="application/pdf"
+        )
         assert (tmp_path / "users" / "u1" / "resumes" / "deep" / "r.pdf").exists()
 
     async def test_exists_and_delete(self, tmp_path):
@@ -79,7 +81,9 @@ class TestLocalFileStorage:
         import hashlib
         import hmac
 
-        expected = hmac.new(SECRET.encode(), b"users/u1/a.txt:1300", hashlib.sha256).hexdigest()
+        expected = hmac.new(
+            SECRET.encode(), b"users/u1/a.txt:1300", hashlib.sha256
+        ).hexdigest()
         assert url.endswith(expected)
 
     async def test_url_signature_changes_with_key(self, tmp_path):
@@ -96,7 +100,9 @@ class TestLocalFileStorage:
 class TestStorageServiceTenantScoping:
     async def test_allows_own_prefix(self, tmp_path):
         svc = StorageService(_storage(tmp_path), "u1")
-        meta = await svc.put("users/u1/resumes/r.pdf", b"x", content_type="application/pdf")
+        meta = await svc.put(
+            "users/u1/resumes/r.pdf", b"x", content_type="application/pdf"
+        )
         assert meta.key == "users/u1/resumes/r.pdf"
         assert await svc.get("users/u1/resumes/r.pdf") == b"x"
 
@@ -133,8 +139,14 @@ class TestKeyBuilders:
         assert keys.user_prefix(uid) == "users/abc"
         assert keys.resume_key(uid, "r1", "pdf") == "users/abc/resumes/r1.pdf"
         assert keys.upload_key(uid, "up1", "docx") == "users/abc/uploads/up1.docx"
-        assert keys.cover_letter_key(uid, "app1", "pdf") == "users/abc/cover_letters/app1.pdf"
-        assert keys.screenshot_key(uid, "app1", "s.png") == "users/abc/screenshots/app1/s.png"
+        assert (
+            keys.cover_letter_key(uid, "app1", "pdf")
+            == "users/abc/cover_letters/app1.pdf"
+        )
+        assert (
+            keys.screenshot_key(uid, "app1", "s.png")
+            == "users/abc/screenshots/app1/s.png"
+        )
         assert keys.trajectory_key(uid, "run1") == "users/abc/trajectories/run1.json"
         for builder in (keys.resume_key, keys.upload_key, keys.cover_letter_key):
             assert builder(uid, "x", "y").startswith(keys.user_prefix(uid) + "/")

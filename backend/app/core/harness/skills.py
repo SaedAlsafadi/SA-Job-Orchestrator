@@ -27,7 +27,9 @@ _VERSION_RETRIES = 3  # retry the read-max+insert on a concurrent version collis
 _PII_PATTERNS = [
     re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"),  # email
     re.compile(r"\b\+?\d[\d\-\s().]{7,}\d\b"),  # phone
-    re.compile(r"(?:sk-|ghp_|xox[baprs]-|AKIA|Bearer\s)[A-Za-z0-9_\-]{8,}"),  # keys/tokens
+    re.compile(
+        r"(?:sk-|ghp_|xox[baprs]-|AKIA|Bearer\s)[A-Za-z0-9_\-]{8,}"
+    ),  # keys/tokens
     # street address (capitalized street name required, to avoid matching skill prose)
     re.compile(
         r"\b\d{1,5}\s+(?:[A-Z][a-z]+\s+){1,3}"
@@ -55,7 +57,9 @@ def _contains_person_name(content: str) -> bool:
         doc = get_nlp()(content)
     except Exception:
         return False
-    return any(ent.label_ == "PERSON" and len(ent.text.split()) >= 2 for ent in doc.ents)
+    return any(
+        ent.label_ == "PERSON" and len(ent.text.split()) >= 2 for ent in doc.ents
+    )
 
 
 def pii_clean(content: str) -> bool:
@@ -97,7 +101,9 @@ async def record_skill(
     for _ in range(_VERSION_RETRIES):
         max_version = (
             await db.execute(
-                select(func.max(DomainSkill.version)).where(DomainSkill.domain == domain)
+                select(func.max(DomainSkill.version)).where(
+                    DomainSkill.domain == domain
+                )
             )
         ).scalar()
         skill = DomainSkill(
@@ -144,13 +150,18 @@ async def add_feedback(
     return skill
 
 
-async def load_skills(db: AsyncSession, domain: str, *, limit: int = 5) -> list[DomainSkill]:
+async def load_skills(
+    db: AsyncSession, domain: str, *, limit: int = 5
+) -> list[DomainSkill]:
     """Return the active, highest-scored skills for ``domain`` (for prompt injection)."""
     rows = (
         (
             await db.execute(
                 select(DomainSkill)
-                .where(DomainSkill.domain == domain, DomainSkill.status == SkillStatus.ACTIVE)
+                .where(
+                    DomainSkill.domain == domain,
+                    DomainSkill.status == SkillStatus.ACTIVE,
+                )
                 .order_by(DomainSkill.score.desc(), DomainSkill.version.desc())
                 .limit(limit)
             )
@@ -168,6 +179,10 @@ def build_skill_guidance(skills: list[DomainSkill]) -> str:
     """
     if not skills:
         return ""
-    lines = ["Learned guidance for this site (from past runs — treat as hints, verify live):"]
-    lines.extend(f"- {skill.content.strip()}" for skill in skills if skill.content.strip())
+    lines = [
+        "Learned guidance for this site (from past runs — treat as hints, verify live):"
+    ]
+    lines.extend(
+        f"- {skill.content.strip()}" for skill in skills if skill.content.strip()
+    )
     return "\n".join(lines) if len(lines) > 1 else ""

@@ -11,10 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.core.automation.platforms.base import JobListing
-from app.core.job_discovery.exa_search import (
-    DEFAULT_NUM_RESULTS,
-    ExaJobSearch,
-)
+from app.core.job_discovery.exa_search import DEFAULT_NUM_RESULTS, ExaJobSearch
 
 
 def _result(
@@ -128,7 +125,9 @@ class TestParseResults:
 
     def test_company_falls_back_to_domain(self):
         listings = ExaJobSearch()._parse_results(
-            _results([_result(title="Backend Engineer", url="https://www.umbrella.com/x")])
+            _results(
+                [_result(title="Backend Engineer", url="https://www.umbrella.com/x")]
+            )
         )
         # www. stripped, first domain label title-cased.
         assert listings[0].company == "Umbrella"
@@ -170,9 +169,7 @@ class TestParseResults:
         assert listings[0].platform_job_id == "https://x/fallback"
 
     def test_description_truncated_to_3000_chars(self):
-        listings = ExaJobSearch()._parse_results(
-            _results([_result(text="x" * 5000)])
-        )
+        listings = ExaJobSearch()._parse_results(_results([_result(text="x" * 5000)]))
         assert len(listings[0].description) == 3000
 
     def test_handles_none_title_and_url(self):
@@ -308,9 +305,7 @@ class TestSearchJobs:
         search = ExaJobSearch(api_key="sk-test")
         with (
             patch.object(ExaJobSearch, "available", property(lambda self: True)),
-            patch.object(
-                search, "_get_client", side_effect=RuntimeError("no exa_py")
-            ),
+            patch.object(search, "_get_client", side_effect=RuntimeError("no exa_py")),
         ):
             listings = await search.search_jobs("python dev")
 

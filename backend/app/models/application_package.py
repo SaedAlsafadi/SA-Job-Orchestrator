@@ -17,7 +17,13 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.base import (
+    Base,
+    TenantMixin,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+    pg_enum,
+)
 from app.models.enums import EmailSendState, QAVerdict
 
 
@@ -40,7 +46,9 @@ class ApplicationPackage(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base)
     # Selected route (EMAIL / WORKABLE / ...) — SET NULL: a deleted route must not
     # destroy the historical package record.
     route_id: Mapped[str | None] = mapped_column(
-        String(32), ForeignKey("application_routes.id", ondelete="SET NULL"), nullable=True
+        String(32),
+        ForeignKey("application_routes.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     # --- Immutable component references (version locking) ---
@@ -89,9 +97,9 @@ class ApplicationPackage(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base)
     sender_address: Mapped[str | None] = mapped_column(String(320), nullable=True)
 
     # Relationships
-    application: Mapped["Application"] = relationship()  # noqa: F821
-    resume: Mapped["Resume | None"] = relationship()  # noqa: F821
-    route: Mapped["ApplicationRoute | None"] = relationship()  # noqa: F821
+    application: Mapped["Application"] = relationship()
+    resume: Mapped["Resume | None"] = relationship()
+    route: Mapped["ApplicationRoute | None"] = relationship()
 
     def __repr__(self) -> str:
         return (

@@ -8,7 +8,7 @@ from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMix
 
 class CandidateProfile(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     """The authoritative domain model for a user's professional profile.
-    
+
     Nested complex data (skills, experience, etc.) is stored as JSON and validated
     by the Pydantic schemas in the application layer before persistence.
     """
@@ -21,7 +21,7 @@ class CandidateProfile(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
         unique=True,
         nullable=False,
     )
-    
+
     # Audit versioning
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
@@ -58,10 +58,9 @@ class CandidateProfileVersion(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, 
     user_id: Mapped[str] = mapped_column(String(32), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
-    
+
     # Store the entire snapshot as JSON
     profile_data: Mapped[dict] = mapped_column(JSON, nullable=False)
 
     def __repr__(self) -> str:
         return f"<CandidateProfileVersion(profile_id={self.profile_id}, version={self.version})>"
-

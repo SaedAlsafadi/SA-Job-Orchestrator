@@ -24,12 +24,16 @@ class UserSettings(TimestampMixin, Base):
     )
 
     # Application behavior
-    apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="review")
+    apply_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="review"
+    )
     max_parallel: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     min_ats_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.75)
 
     # LLM preferences
-    preferred_provider: Mapped[str] = mapped_column(String(50), nullable=False, default="openai")
+    preferred_provider: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="openai"
+    )
 
     # Platform config
     platforms_enabled: Mapped[list[str]] = mapped_column(
@@ -39,7 +43,9 @@ class UserSettings(TimestampMixin, Base):
     )
 
     # Candidate profile
-    candidate_profile: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    candidate_profile: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
 
     def __repr__(self) -> str:
         return (

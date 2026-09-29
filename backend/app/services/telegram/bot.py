@@ -23,7 +23,9 @@ def _safe_startup_error(exc: Exception) -> str:
         return str(exc)
     if type(exc).__name__ == "InvalidToken":
         return "Telegram rejected TELEGRAM_BOT_TOKEN. Verify the token in BotFather."
-    return "Telegram bot startup failed. Verify the bot configuration and network access."
+    return (
+        "Telegram bot startup failed. Verify the bot configuration and network access."
+    )
 
 
 async def start_telegram_bot() -> None:
@@ -37,7 +39,11 @@ async def start_telegram_bot() -> None:
         logger.info("telegram_bot.disabled")
         return
 
-    token = settings.telegram_bot_token.get_secret_value() if settings.telegram_bot_token else ""
+    token = (
+        settings.telegram_bot_token.get_secret_value()
+        if settings.telegram_bot_token
+        else ""
+    )
     configured_username = (settings.telegram_bot_username or "").lstrip("@").strip()
     missing = [
         name
@@ -112,7 +118,9 @@ async def stop_telegram_bot() -> None:
         except Exception as exc:
             # Provider exception text can contain request URLs (and therefore the bot
             # token). Record only the exception class at this trust boundary.
-            logger.error("telegram_bot.shutdown_error", exception_type=type(exc).__name__)
+            logger.error(
+                "telegram_bot.shutdown_error", exception_type=type(exc).__name__
+            )
         finally:
             _telegram_app = None
             _runtime_username = None
@@ -128,11 +136,14 @@ def get_telegram_runtime_state() -> dict[str, str | bool | None]:
     """Return safe public runtime state; the token is never included."""
     settings = get_settings()
     token_present = bool(
-        settings.telegram_bot_token
-        and settings.telegram_bot_token.get_secret_value()
+        settings.telegram_bot_token and settings.telegram_bot_token.get_secret_value()
     )
-    configured_username = (settings.telegram_bot_username or "").lstrip("@").strip() or None
-    configured = bool(settings.telegram_enabled and token_present and configured_username)
+    configured_username = (settings.telegram_bot_username or "").lstrip(
+        "@"
+    ).strip() or None
+    configured = bool(
+        settings.telegram_enabled and token_present and configured_username
+    )
     running = bool(_telegram_app and _runtime_username and not _startup_error)
     return {
         "bot_username": _runtime_username or configured_username,

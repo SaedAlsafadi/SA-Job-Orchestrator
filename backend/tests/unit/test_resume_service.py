@@ -47,7 +47,9 @@ class TestGenerateTailoredResume:
             job_id=job.id,
             template_id="classic",
         )
-        result = await resume_service.generate_tailored_resume(db_session, request, TEST_USER_ID)
+        result = await resume_service.generate_tailored_resume(
+            db_session, request, TEST_USER_ID
+        )
 
         assert result.type == "tailored"
         assert result.base_resume_id == base.id
@@ -102,10 +104,14 @@ class TestUploadResume:
     async def test_upload_resume_creates_record(self, db_session, tmp_path):
         mock_file = MagicMock()
         mock_file.filename = "my_resume.pdf"
-        mock_file.read = AsyncMock(return_value=b"fake pdf content here with enough words to count")
+        mock_file.read = AsyncMock(
+            return_value=b"fake pdf content here with enough words to count"
+        )
 
         with patch.object(resume_service, "UPLOAD_DIR", tmp_path):
-            result = await resume_service.upload_resume(db_session, mock_file, TEST_USER_ID)
+            result = await resume_service.upload_resume(
+                db_session, mock_file, TEST_USER_ID
+            )
 
         assert result.name == "my_resume.pdf"
         assert result.file_format == "pdf"
@@ -118,7 +124,9 @@ class TestUploadResume:
         mock_file.read = AsyncMock(return_value=b"fake docx content")
 
         with patch.object(resume_service, "UPLOAD_DIR", tmp_path):
-            result = await resume_service.upload_resume(db_session, mock_file, TEST_USER_ID)
+            result = await resume_service.upload_resume(
+                db_session, mock_file, TEST_USER_ID
+            )
 
         assert result.file_format == "docx"
 
@@ -128,7 +136,9 @@ class TestUploadResume:
         mock_file.read = AsyncMock(return_value=b"content")
 
         with patch.object(resume_service, "UPLOAD_DIR", tmp_path):
-            result = await resume_service.upload_resume(db_session, mock_file, TEST_USER_ID)
+            result = await resume_service.upload_resume(
+                db_session, mock_file, TEST_USER_ID
+            )
 
         assert result.name == "Untitled Resume"
         assert result.file_format == "pdf"

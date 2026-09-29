@@ -21,14 +21,20 @@ class TestAuthFlow:
         assert r.status_code == 200, r.text
         token = r.json()["access_token"]
 
-        r = await anon_client.get(f"{API}/me", headers={"Authorization": f"Bearer {token}"})
+        r = await anon_client.get(
+            f"{API}/me", headers={"Authorization": f"Bearer {token}"}
+        )
         assert r.status_code == 200
         assert r.json()["email"] == "u@x.com"
 
     async def test_ws_ticket_issued_for_authed_user(self, anon_client):
         await anon_client.post(f"{API}/register", json=CREDS)
-        token = (await anon_client.post(f"{API}/login", data=FORM)).json()["access_token"]
-        r = await anon_client.get(f"{API}/ws-ticket", headers={"Authorization": f"Bearer {token}"})
+        token = (await anon_client.post(f"{API}/login", data=FORM)).json()[
+            "access_token"
+        ]
+        r = await anon_client.get(
+            f"{API}/ws-ticket", headers={"Authorization": f"Bearer {token}"}
+        )
         assert r.status_code == 200
         assert r.json()["ticket"]
 
@@ -39,11 +45,15 @@ class TestAuthFlow:
 
     async def test_wrong_password_returns_401(self, anon_client):
         await anon_client.post(f"{API}/register", json=CREDS)
-        r = await anon_client.post(f"{API}/login", data={"username": "u@x.com", "password": "nope"})
+        r = await anon_client.post(
+            f"{API}/login", data={"username": "u@x.com", "password": "nope"}
+        )
         assert r.status_code == 401
 
     async def test_bad_token_returns_401(self, anon_client):
-        r = await anon_client.get(f"{API}/me", headers={"Authorization": "Bearer garbage"})
+        r = await anon_client.get(
+            f"{API}/me", headers={"Authorization": "Bearer garbage"}
+        )
         assert r.status_code == 401
 
 

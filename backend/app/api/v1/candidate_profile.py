@@ -1,25 +1,31 @@
-import uuid
-import json
-import tempfile
-import os
 import logging
+import os
+import tempfile
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import APIRouter, Depends, File, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_tenant_db
-from app.models.candidate_profile import CandidateProfile, CandidateProfileVersion
-from app.schemas.candidate_profile import (
-    CandidateProfileSchema, CandidateProfileResponse, CandidateProfileDraft,
-    DraftValue, DraftIdentity, DraftLocation,
-    DraftEducationEntry, DraftExperienceEntry, DraftProjectEntry, DraftCertificationEntry,
-    generate_evidence_id,
-)
 from app.core.documents.parser import DocumentParser
 from app.core.llm.client import LLMClient
-from app.core.llm.router import LLMTaskRouter, LLMTask
-from pydantic import BaseModel, Field
+from app.core.llm.router import LLMTask, LLMTaskRouter
+from app.models.candidate_profile import CandidateProfile, CandidateProfileVersion
+from app.schemas.candidate_profile import (
+    CandidateProfileDraft,
+    CandidateProfileResponse,
+    CandidateProfileSchema,
+    DraftCertificationEntry,
+    DraftEducationEntry,
+    DraftExperienceEntry,
+    DraftIdentity,
+    DraftLocation,
+    DraftProjectEntry,
+    DraftValue,
+    generate_evidence_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +37,7 @@ router = APIRouter()
 # Even a small free model can reliably produce this format.
 # --------------------------------------------------------------------------- #
 
+
 class _LLMIdentity(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
@@ -41,15 +48,18 @@ class _LLMIdentity(BaseModel):
     portfolio: str | None = None
     professional_summary: str | None = None
 
+
 class _LLMLocation(BaseModel):
     country: str | None = None
     city: str | None = None
+
 
 class _LLMEducation(BaseModel):
     degree: str | None = None
     institution: str | None = None
     field_of_study: str | None = None
     graduation_year: str | None = None
+
 
 class _LLMExperience(BaseModel):
     company: str | None = None
@@ -58,18 +68,22 @@ class _LLMExperience(BaseModel):
     end_date: str | None = None
     description: str | None = None
 
+
 class _LLMProject(BaseModel):
     name: str | None = None
     description: str | None = None
     url: str | None = None
+
 
 class _LLMCertification(BaseModel):
     name: str | None = None
     issuer: str | None = None
     date: str | None = None
 
+
 class _LLMExtraction(BaseModel):
     """Simplified flat schema the LLM fills. We transform it into DraftValue after."""
+
     identity: _LLMIdentity = Field(default_factory=_LLMIdentity)
     location: _LLMLocation = Field(default_factory=_LLMLocation)
     education: list[_LLMEducation] = Field(default_factory=list)
@@ -188,15 +202,19 @@ def _fallback_from_parsed(parsed_doc) -> CandidateProfileDraft:
 # Routes
 # --------------------------------------------------------------------------- #
 
+
 @router.get("", response_model=CandidateProfileResponse)
 async def get_profile(
-    user: CurrentUser,
-    db: AsyncSession = Depends(get_tenant_db)
+    user: CurrentUser, db: AsyncSession = Depends(get_tenant_db)
 ) -> CandidateProfileResponse:
-    profile = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user.id))).scalar_one_or_none()
+    profile = (
+        await db.execute(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        )
+    ).scalar_one_or_none()
     if not profile:
         return CandidateProfileResponse(id="none", user_id=user.id, version=0)
-        
+
     return CandidateProfileResponse(
         id=profile.id,
         user_id=profile.user_id,
@@ -210,19 +228,24 @@ async def get_profile(
         skills=profile.skills,
         projects=profile.projects,
         certifications=profile.certifications,
-        languages=getattr(profile, 'languages', []),
-        preferences=profile.preferences
+        languages=getattr(profile, "languages", []),
+        preferences=profile.preferences,
     )
+
 
 @router.put("", response_model=CandidateProfileResponse)
 @router.post("/verify", response_model=CandidateProfileResponse)
 async def update_profile(
     data: CandidateProfileSchema,
     user: CurrentUser,
-    db: AsyncSession = Depends(get_tenant_db)
+    db: AsyncSession = Depends(get_tenant_db),
 ) -> CandidateProfileResponse:
-    profile = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user.id))).scalar_one_or_none()
-    
+    profile = (
+        await db.execute(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+
     if not profile:
         profile = CandidateProfile(
             user_id=user.id,
@@ -237,7 +260,7 @@ async def update_profile(
             projects=[p.model_dump() for p in data.projects],
             certifications=[c.model_dump() for c in data.certifications],
             languages=data.languages,
-            preferences=data.preferences.model_dump()
+            preferences=data.preferences.model_dump(),
         )
         db.add(profile)
     else:
@@ -253,7 +276,7 @@ async def update_profile(
         profile.certifications = [c.model_dump() for c in data.certifications]
         profile.languages = data.languages
         profile.preferences = data.preferences.model_dump()
-        
+
     await db.commit()
     await db.refresh(profile)
 
@@ -263,37 +286,38 @@ async def update_profile(
         user_id=user.id,
         version=profile.version,
         source="manual",
-        profile_data=data.model_dump()
+        profile_data=data.model_dump(),
     )
     db.add(version_record)
     await db.commit()
-    
+
     return CandidateProfileResponse(
         id=profile.id,
         user_id=profile.user_id,
         version=profile.version,
-        **data.model_dump()
+        **data.model_dump(),
     )
+
 
 @router.post("/import-resume", response_model=CandidateProfileDraft)
 async def import_resume(
     user: CurrentUser,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_tenant_db)
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     import shutil
-    
+
     # Save uploaded file to temp file for parser
     ext = os.path.splitext(file.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
         shutil.copyfileobj(file.file, temp_file)
         temp_path = Path(temp_file.name)
-        
+
     try:
         # Parse document
         parser = DocumentParser()
         parsed_doc = await parser.parse(temp_path)
-        
+
         # LLM Extraction — use simplified flat schema, then transform
         llm = LLMTaskRouter(LLMClient())
         system_prompt = """You are an expert resume parser. Read the resume text and extract ALL information into JSON.
@@ -330,13 +354,13 @@ RULES:
 - List EVERY skill mentioned anywhere in the resume in the skills array.
 - For experience: extract company, title, dates, and combine bullet points into the description.
 - Set null for fields NOT found in the resume. Do NOT invent data."""
-        
+
         try:
             llm_result = await llm.complete_with_structured_output(
                 task=LLMTask.METADATA_EXTRACTION,
                 prompt=f"Resume Text:\n{parsed_doc.raw_text}",
                 output_schema=_LLMExtraction,
-                system_prompt=system_prompt
+                system_prompt=system_prompt,
             )
             # Transform flat LLM output → DraftValue-wrapped draft
             draft = _llm_to_draft(llm_result)
@@ -361,10 +385,11 @@ RULES:
             return draft
 
         except Exception as llm_exc:
-            logger.error(f"LLM extraction failed, using deterministic fallback: {llm_exc}")
+            logger.error(
+                f"LLM extraction failed, using deterministic fallback: {llm_exc}"
+            )
             return _fallback_from_parsed(parsed_doc)
-            
+
     finally:
         if temp_path.exists():
             os.remove(temp_path)
-

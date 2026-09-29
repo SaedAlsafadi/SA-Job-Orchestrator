@@ -32,7 +32,9 @@ class UserCredential(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    kind: Mapped[str] = mapped_column(String(32), nullable=False)  # llm_key | platform_cookies
+    kind: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # llm_key | platform_cookies
     provider: Mapped[str] = mapped_column(String(50), nullable=False)
     blob: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     kek_id: Mapped[str] = mapped_column(String(64), nullable=False)

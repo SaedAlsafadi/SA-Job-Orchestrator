@@ -50,7 +50,10 @@ class TestDiagnose:
         assert d.failure_class == FailureClass.DOM_DRIFT
 
     def test_offtrack(self):
-        assert diagnose({"consecutive_failures": 4}).failure_class == FailureClass.AGENT_OFFTRACK
+        assert (
+            diagnose({"consecutive_failures": 4}).failure_class
+            == FailureClass.AGENT_OFFTRACK
+        )
 
     def test_unknown(self):
         assert diagnose({}).failure_class == FailureClass.UNKNOWN
@@ -58,7 +61,9 @@ class TestDiagnose:
 
 class TestPiiGate:
     def test_clean_content_passes(self):
-        assert pii_clean("On LinkedIn, build search URLs directly; never type in the homepage box.")
+        assert pii_clean(
+            "On LinkedIn, build search URLs directly; never type in the homepage box."
+        )
 
     def test_email_rejected(self):
         assert not pii_clean("Use login jane@example.com to apply")
@@ -69,7 +74,9 @@ class TestPiiGate:
 
 class TestSkillRegistry:
     async def test_record_versions_and_pii_gate(self, db_session):
-        s1 = await record_skill(db_session, "linkedin", "Easy Apply lives at .jobs-apply-button")
+        s1 = await record_skill(
+            db_session, "linkedin", "Easy Apply lives at .jobs-apply-button"
+        )
         assert s1 is not None and s1.version == 1
         s2 = await record_skill(db_session, "linkedin", "Pagination reloads the page")
         assert s2 is not None and s2.version == 2
@@ -77,7 +84,9 @@ class TestSkillRegistry:
         assert rejected is None
 
     async def test_feedback_auto_retires(self, db_session):
-        skill = await record_skill(db_session, "indeed", "Indeed jobs have data-jk attributes")
+        skill = await record_skill(
+            db_session, "indeed", "Indeed jobs have data-jk attributes"
+        )
         assert skill is not None
         updated = await add_feedback(db_session, skill.id, -3, reason="stale selector")
         assert updated is not None
@@ -97,7 +106,9 @@ class TestSkillGuidance:
         assert build_skill_guidance([]) == ""
 
     async def test_renders_skill_content(self, db_session):
-        s1 = await record_skill(db_session, "linkedin", "Easy Apply is at .jobs-apply-button")
+        s1 = await record_skill(
+            db_session, "linkedin", "Easy Apply is at .jobs-apply-button"
+        )
         s2 = await record_skill(db_session, "linkedin", "Pagination reloads the page")
         guidance = build_skill_guidance([s1, s2])
         assert "Easy Apply is at .jobs-apply-button" in guidance
@@ -110,15 +121,24 @@ class TestAnomalyDetection:
         db.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         for i in range(total):
             job = Job(
-                user_id=TEST_USER_ID, platform="linkedin", platform_job_id=f"j{i}",
-                title="t", company="c", url="https://x",
+                user_id=TEST_USER_ID,
+                platform="linkedin",
+                platform_job_id=f"j{i}",
+                title="t",
+                company="c",
+                url="https://x",
             )
             db.add(job)
             await db.flush()
-            status = ApplicationStatus.FAILED if i < failed else ApplicationStatus.APPLIED
+            status = (
+                ApplicationStatus.FAILED if i < failed else ApplicationStatus.APPLIED
+            )
             db.add(
                 Application(
-                    user_id=TEST_USER_ID, job_id=job.id, status=status, apply_mode=ApplyMode.AUTONOMOUS
+                    user_id=TEST_USER_ID,
+                    job_id=job.id,
+                    status=status,
+                    apply_mode=ApplyMode.AUTONOMOUS,
                 )
             )
         await db.commit()
@@ -139,8 +159,12 @@ class TestReviewOrchestrator:
         db.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         await db.commit()
         return await record.record_trajectory(
-            db, user_id=TEST_USER_ID, application_id="app-1", platform="linkedin",
-            agent_self_report="I submitted the application", status="completed",
+            db,
+            user_id=TEST_USER_ID,
+            application_id="app-1",
+            platform="linkedin",
+            agent_self_report="I submitted the application",
+            status="completed",
         )
 
     async def test_failed_run_judged_diagnosed_and_skill_saved(self, db_session):
@@ -148,8 +172,12 @@ class TestReviewOrchestrator:
         llm = AsyncMock()
         llm.complete_with_structured_output = AsyncMock(
             side_effect=[
-                JudgeOutput(verdict=RunVerdictResult.FAILED, confidence=0.9, reason="login wall"),
-                DistilledSkill(worth_saving=True, content="Easy Apply is at .jobs-apply-button"),
+                JudgeOutput(
+                    verdict=RunVerdictResult.FAILED, confidence=0.9, reason="login wall"
+                ),
+                DistilledSkill(
+                    worth_saving=True, content="Easy Apply is at .jobs-apply-button"
+                ),
             ]
         )
 
@@ -161,11 +189,23 @@ class TestReviewOrchestrator:
         assert result["failure_class"] == FailureClass.SESSION_EXPIRED
         assert result["skill_id"] is not None
         verdicts = (
-            await db_session.execute(select(RunVerdict).where(RunVerdict.run_id == traj.id))
-        ).scalars().all()
+            (
+                await db_session.execute(
+                    select(RunVerdict).where(RunVerdict.run_id == traj.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
         diags = (
-            await db_session.execute(select(RunDiagnosis).where(RunDiagnosis.run_id == traj.id))
-        ).scalars().all()
+            (
+                await db_session.execute(
+                    select(RunDiagnosis).where(RunDiagnosis.run_id == traj.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert len(verdicts) == 1 and len(diags) == 1
 
     async def test_success_run_no_diagnosis_no_skill(self, db_session):
@@ -173,7 +213,11 @@ class TestReviewOrchestrator:
         llm = AsyncMock()
         llm.complete_with_structured_output = AsyncMock(
             side_effect=[
-                JudgeOutput(verdict=RunVerdictResult.SUCCESS, confidence=0.95, reason="confirmed"),
+                JudgeOutput(
+                    verdict=RunVerdictResult.SUCCESS,
+                    confidence=0.95,
+                    reason="confirmed",
+                ),
                 DistilledSkill(worth_saving=False, content=""),
             ]
         )
@@ -184,6 +228,12 @@ class TestReviewOrchestrator:
         assert result["failure_class"] is None
         assert result["skill_id"] is None
         diags = (
-            await db_session.execute(select(RunDiagnosis).where(RunDiagnosis.run_id == traj.id))
-        ).scalars().all()
+            (
+                await db_session.execute(
+                    select(RunDiagnosis).where(RunDiagnosis.run_id == traj.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert len(diags) == 0

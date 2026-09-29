@@ -1,9 +1,10 @@
 """Discovery Run models."""
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin
+
 
 class DiscoveryRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     """An execution instance of a SearchProfile or CompanyWatch."""
@@ -18,7 +19,9 @@ class DiscoveryRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
         ForeignKey("company_watches.id", ondelete="CASCADE"), nullable=True
     )
 
-    status: Mapped[str] = mapped_column(String(50), nullable=False)  # running, success, failed, partial_success
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # running, success, failed, partial_success
     duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     provider_errors: Mapped[dict | None] = mapped_column(JSON, nullable=True)

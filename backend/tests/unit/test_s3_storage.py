@@ -11,11 +11,11 @@ import pytest
 pytest.importorskip("aioboto3")
 pytest.importorskip("moto")
 
-import boto3  # noqa: E402
-from moto.server import ThreadedMotoServer  # noqa: E402
+import boto3
+from moto.server import ThreadedMotoServer
 
-from app.core.storage.s3 import S3FileStorage  # noqa: E402
-from app.core.storage.service import StorageService  # noqa: E402
+from app.core.storage.s3 import S3FileStorage
+from app.core.storage.service import StorageService
 
 _BUCKET = "test-bucket"
 
@@ -27,8 +27,11 @@ def moto_s3():
     _, port = server.get_host_and_port()
     endpoint = f"http://127.0.0.1:{port}"
     boto3.client(
-        "s3", endpoint_url=endpoint, region_name="us-east-1",
-        aws_access_key_id="test", aws_secret_access_key="test",
+        "s3",
+        endpoint_url=endpoint,
+        region_name="us-east-1",
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
     ).create_bucket(Bucket=_BUCKET)
     yield endpoint
     server.stop()
@@ -36,8 +39,11 @@ def moto_s3():
 
 def _store(endpoint: str) -> S3FileStorage:
     return S3FileStorage(
-        bucket=_BUCKET, region="us-east-1", endpoint_url=endpoint,
-        access_key_id="test", secret_access_key="test",
+        bucket=_BUCKET,
+        region="us-east-1",
+        endpoint_url=endpoint,
+        access_key_id="test",
+        secret_access_key="test",
     )
 
 
@@ -62,7 +68,9 @@ class TestS3FileStorage:
     async def test_presigned_url_for_download(self, moto_s3):
         s = _store(moto_s3)
         await s.put("users/u3/a.pdf", b"PDF", content_type="application/pdf")
-        url = await s.url_for("users/u3/a.pdf", expires_in=60, download_name="resume.pdf")
+        url = await s.url_for(
+            "users/u3/a.pdf", expires_in=60, download_name="resume.pdf"
+        )
         assert "users/u3/a.pdf" in url
         assert "X-Amz-Signature" in url or "Signature" in url
 
@@ -74,6 +82,8 @@ class TestS3FileStorage:
 
     async def test_storage_service_enforces_tenant_prefix(self, moto_s3):
         svc = StorageService(_store(moto_s3), "u5")
-        await svc.put("users/u5/ok.txt", b"x", content_type="text/plain")  # own prefix OK
+        await svc.put(
+            "users/u5/ok.txt", b"x", content_type="text/plain"
+        )  # own prefix OK
         with pytest.raises(PermissionError):
             await svc.put("users/other/x.txt", b"x", content_type="text/plain")

@@ -43,6 +43,7 @@ def application_to_response(app: Application) -> ApplicationResponse:
         item.company = app.job.company
     return item
 
+
 # States that DON'T block a fresh application for the same (user, job) — mirrors the
 # partial-unique ``uq_app_active_job`` index.
 _TERMINAL_STATES = (
@@ -109,7 +110,9 @@ async def create_application(
             )
         ).scalar_one_or_none()
         if existing is not None:
-            logger.info("application_create_idempotent", app_id=existing.id, job_id=data.job_id)
+            logger.info(
+                "application_create_idempotent", app_id=existing.id, job_id=data.job_id
+            )
             return existing
         raise
     await db.commit()
@@ -151,7 +154,9 @@ async def create_batch(
                     Application.status.notin_(_TERMINAL_STATES),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     applications: list[Application] = []
@@ -203,7 +208,9 @@ async def list_applications(
         query = query.where(Application.status == status)
         count_query = count_query.where(Application.status == status)
 
-    query = query.order_by(Application.created_at.desc()).offset(offset).limit(page_size)
+    query = (
+        query.order_by(Application.created_at.desc()).offset(offset).limit(page_size)
+    )
 
     result = await db.execute(query)
     apps = list(result.scalars().all())
@@ -312,20 +319,40 @@ async def record_external_route_opened(db: AsyncSession, app_id: str) -> Applica
     from app.models.application_route import ApplicationRoute
 
     app = await get_application(db, app_id)
-    package = (await db.execute(select(ApplicationPackage).where(
-        ApplicationPackage.application_id == app.id,
-        ApplicationPackage.is_current.is_(True),
-    ))).scalars().first()
-    route = await db.get(ApplicationRoute, package.route_id) if package and package.route_id else None
-    if app.status != ApplicationStatus.APPROVED or not package or not package.approval_id or not route or not route.url:
+    package = (
+        (
+            await db.execute(
+                select(ApplicationPackage).where(
+                    ApplicationPackage.application_id == app.id,
+                    ApplicationPackage.is_current.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    route = (
+        await db.get(ApplicationRoute, package.route_id)
+        if package and package.route_id
+        else None
+    )
+    if (
+        app.status != ApplicationStatus.APPROVED
+        or not package
+        or not package.approval_id
+        or not route
+        or not route.url
+    ):
         raise ValueError("Only an approved external-route package can be opened.")
     metadata = dict(app.audit_metadata or {})
     timeline = list(metadata.get("timeline") or [])
-    timeline.append({
-        "event": "USER_OPENED_APPLICATION",
-        "at": datetime.now(UTC).isoformat(),
-        "route": route.route_type,
-    })
+    timeline.append(
+        {
+            "event": "USER_OPENED_APPLICATION",
+            "at": datetime.now(UTC).isoformat(),
+            "route": route.route_type,
+        }
+    )
     metadata["timeline"] = timeline
     app.audit_metadata = metadata
     await db.commit()
@@ -339,31 +366,54 @@ async def confirm_manual_submission(db: AsyncSession, app_id: str) -> Applicatio
     from app.models.application_route import ApplicationRoute
 
     app = await get_application(db, app_id)
-    package = (await db.execute(select(ApplicationPackage).where(
-        ApplicationPackage.application_id == app.id,
-        ApplicationPackage.is_current.is_(True),
-    ))).scalars().first()
-    route = await db.get(ApplicationRoute, package.route_id) if package and package.route_id else None
-    if app.status != ApplicationStatus.APPROVED or not package or not package.approval_id or not route:
-        raise ValueError("Only an approved current package can be confirmed as submitted.")
+    package = (
+        (
+            await db.execute(
+                select(ApplicationPackage).where(
+                    ApplicationPackage.application_id == app.id,
+                    ApplicationPackage.is_current.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    route = (
+        await db.get(ApplicationRoute, package.route_id)
+        if package and package.route_id
+        else None
+    )
+    if (
+        app.status != ApplicationStatus.APPROVED
+        or not package
+        or not package.approval_id
+        or not route
+    ):
+        raise ValueError(
+            "Only an approved current package can be confirmed as submitted."
+        )
     if route.route_type.upper() == "EMAIL":
         raise ValueError("EMAIL applications must use the reviewed send flow.")
     now = datetime.now(UTC)
     metadata = dict(app.audit_metadata or {})
     timeline = list(metadata.get("timeline") or [])
-    timeline.append({
-        "event": "USER_CONFIRMED_SUBMITTED",
-        "at": now.isoformat(),
-        "route": route.route_type,
-        "submission_method": "USER_CONFIRMED",
-        "verification": "MANUAL",
-    })
-    metadata.update({
-        "timeline": timeline,
-        "submission_method": "USER_CONFIRMED",
-        "submission_route": route.route_type,
-        "submission_verification": "MANUAL",
-    })
+    timeline.append(
+        {
+            "event": "USER_CONFIRMED_SUBMITTED",
+            "at": now.isoformat(),
+            "route": route.route_type,
+            "submission_method": "USER_CONFIRMED",
+            "verification": "MANUAL",
+        }
+    )
+    metadata.update(
+        {
+            "timeline": timeline,
+            "submission_method": "USER_CONFIRMED",
+            "submission_route": route.route_type,
+            "submission_verification": "MANUAL",
+        }
+    )
     app.audit_metadata = metadata
     app.status = ApplicationStatus.APPLIED
     app.applied_at = now

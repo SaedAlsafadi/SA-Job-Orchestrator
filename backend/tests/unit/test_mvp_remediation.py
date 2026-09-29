@@ -42,7 +42,9 @@ class _FakeWS:
         if self.busy:  # a concurrent unlocked sender would see this
             self.violation = True
         self.busy = True
-        await asyncio.sleep(0)  # yield so an unlocked concurrent sender could interleave
+        await asyncio.sleep(
+            0
+        )  # yield so an unlocked concurrent sender could interleave
         self.busy = False
         self.sent.append(text)
 
@@ -68,18 +70,27 @@ class TestWebSocketSendRaw:
 # --- M2 / M3: anomaly detector windows the rate and dedups the open issue -----------------
 
 
-async def _seed_apps(db, *, total: int, failed: int, created_at: datetime | None = None) -> None:
+async def _seed_apps(
+    db, *, total: int, failed: int, created_at: datetime | None = None
+) -> None:
     db.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
     for i in range(total):
         job = Job(
-            user_id=TEST_USER_ID, platform="linkedin", platform_job_id=f"j{i}",
-            title="t", company="c", url="https://x",
+            user_id=TEST_USER_ID,
+            platform="linkedin",
+            platform_job_id=f"j{i}",
+            title="t",
+            company="c",
+            url="https://x",
         )
         db.add(job)
         await db.flush()
         status = ApplicationStatus.FAILED if i < failed else ApplicationStatus.APPLIED
         app = Application(
-            user_id=TEST_USER_ID, job_id=job.id, status=status, apply_mode=ApplyMode.AUTONOMOUS
+            user_id=TEST_USER_ID,
+            job_id=job.id,
+            status=status,
+            apply_mode=ApplyMode.AUTONOMOUS,
         )
         if created_at is not None:
             app.created_at = created_at
@@ -94,7 +105,9 @@ class TestAnomalyWindowAndDedup:
         issues = await detect_anomalies(db_session)
         assert all(i.category != "apply_failure_rate" for i in issues)
 
-    async def test_recent_failures_trip_once_without_duplicates(self, db_session) -> None:
+    async def test_recent_failures_trip_once_without_duplicates(
+        self, db_session
+    ) -> None:
         await _seed_apps(db_session, total=6, failed=4)  # created_at defaults to ~now
         first = await detect_anomalies(db_session)
         assert any(i.category == "apply_failure_rate" for i in first)
@@ -102,10 +115,16 @@ class TestAnomalyWindowAndDedup:
         # A second tick for the same ongoing condition must refresh, not insert a duplicate.
         await detect_anomalies(db_session)
         rows = (
-            await db_session.execute(
-                select(SystemIssue).where(SystemIssue.category == "apply_failure_rate")
+            (
+                await db_session.execute(
+                    select(SystemIssue).where(
+                        SystemIssue.category == "apply_failure_rate"
+                    )
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(rows) == 1
 
 
@@ -168,16 +187,28 @@ class TestReviewTransientRetry:
         db.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         await db.commit()
         return await record.record_trajectory(
-            db, user_id=TEST_USER_ID, application_id="app-1", platform="linkedin",
-            agent_self_report="done", status="completed",
+            db,
+            user_id=TEST_USER_ID,
+            application_id="app-1",
+            platform="linkedin",
+            agent_self_report="done",
+            status="completed",
         )
 
     async def test_transient_error_propagates_for_retry(self, db_session) -> None:
         traj = await self._trajectory(db_session)
         with (
-            patch.object(tasks, "async_session_factory", lambda: _SessionCM(db_session)),
-            patch.object(tasks, "build_llm_client_for_user", AsyncMock(return_value=AsyncMock())),
-            patch.object(tasks, "review_run", AsyncMock(side_effect=LLMRateLimitError(provider="x"))),
+            patch.object(
+                tasks, "async_session_factory", lambda: _SessionCM(db_session)
+            ),
+            patch.object(
+                tasks, "build_llm_client_for_user", AsyncMock(return_value=AsyncMock())
+            ),
+            patch.object(
+                tasks,
+                "review_run",
+                AsyncMock(side_effect=LLMRateLimitError(provider="x")),
+            ),
         ):
             with pytest.raises(LLMRateLimitError):
                 await tasks.review_application_run({}, traj.id)
@@ -185,9 +216,15 @@ class TestReviewTransientRetry:
     async def test_permanent_error_is_swallowed(self, db_session) -> None:
         traj = await self._trajectory(db_session)
         with (
-            patch.object(tasks, "async_session_factory", lambda: _SessionCM(db_session)),
-            patch.object(tasks, "build_llm_client_for_user", AsyncMock(return_value=AsyncMock())),
-            patch.object(tasks, "review_run", AsyncMock(side_effect=ValueError("bad data"))),
+            patch.object(
+                tasks, "async_session_factory", lambda: _SessionCM(db_session)
+            ),
+            patch.object(
+                tasks, "build_llm_client_for_user", AsyncMock(return_value=AsyncMock())
+            ),
+            patch.object(
+                tasks, "review_run", AsyncMock(side_effect=ValueError("bad data"))
+            ),
         ):
             # Non-transient errors are logged and swallowed (no infinite retry).
             await tasks.review_application_run({}, traj.id)
@@ -225,12 +262,15 @@ class TestRegisterRace:
         db = MagicMock()
         db.execute = AsyncMock(return_value=precheck)
         db.add = MagicMock()
-        db.commit = AsyncMock(side_effect=DBIntegrityError("INSERT", {}, Exception("unique")))
+        db.commit = AsyncMock(
+            side_effect=DBIntegrityError("INSERT", {}, Exception("unique"))
+        )
         db.rollback = AsyncMock()
 
         with pytest.raises(AppIntegrityError):
             await auth.register(
-                RegisterRequest(email="x@y.com", password="password123", full_name="X"), db
+                RegisterRequest(email="x@y.com", password="password123", full_name="X"),
+                db,
             )
         db.rollback.assert_awaited()
 
@@ -258,8 +298,11 @@ class TestJobSearchDedup:
         # All ids blank (the browser agent returned no id) but distinct URLs — must stay distinct.
         listings = [
             JobListing(
-                platform="linkedin", platform_job_id="", title=f"Job {i}",
-                company="C", url=f"https://x/{i}",
+                platform="linkedin",
+                platform_job_id="",
+                title=f"Job {i}",
+                company="C",
+                url=f"https://x/{i}",
             )
             for i in range(3)
         ]
@@ -287,15 +330,29 @@ class TestSkillContentDedup:
         from app.core.harness.skills import record_skill
         from app.models.harness import DomainSkill
 
-        first = await record_skill(db_session, "linkedin", "Easy Apply at .jobs-apply-button")
-        again = await record_skill(db_session, "linkedin", "Easy Apply at .jobs-apply-button")
-        other = await record_skill(db_session, "linkedin", "Pagination reloads the page")
+        first = await record_skill(
+            db_session, "linkedin", "Easy Apply at .jobs-apply-button"
+        )
+        again = await record_skill(
+            db_session, "linkedin", "Easy Apply at .jobs-apply-button"
+        )
+        other = await record_skill(
+            db_session, "linkedin", "Pagination reloads the page"
+        )
 
         assert again is not None and again.id == first.id  # deduped
-        assert other is not None and other.id != first.id  # distinct content still inserted
+        assert (
+            other is not None and other.id != first.id
+        )  # distinct content still inserted
         rows = (
-            await db_session.execute(_select(DomainSkill).where(DomainSkill.domain == "linkedin"))
-        ).scalars().all()
+            (
+                await db_session.execute(
+                    _select(DomainSkill).where(DomainSkill.domain == "linkedin")
+                )
+            )
+            .scalars()
+            .all()
+        )
         assert len(rows) == 2
 
 
@@ -316,7 +373,10 @@ class TestPiiNameGate:
     def test_selector_guidance_accepted(self) -> None:
         from app.core.harness.skills import pii_clean
 
-        assert pii_clean("Easy Apply lives at .jobs-apply-button; paginate via ?start=") is True
+        assert (
+            pii_clean("Easy Apply lives at .jobs-apply-button; paginate via ?start=")
+            is True
+        )
 
 
 # --- L8: loop detection ignores same-URL modal progress ----------------------------------
@@ -374,11 +434,13 @@ class TestLoopDetection:
     def test_same_url_progressing_modal_is_not_a_loop(self) -> None:
         from app.core.automation.runtime import observe
 
-        hist = _RawHistory([
-            _Item("https://x/apply", "click_button", "open form"),
-            _Item("https://x/apply", "input_text", "fill name"),
-            _Item("https://x/apply", "click_button", "submit application"),
-        ])
+        hist = _RawHistory(
+            [
+                _Item("https://x/apply", "click_button", "open form"),
+                _Item("https://x/apply", "input_text", "fill name"),
+                _Item("https://x/apply", "click_button", "submit application"),
+            ]
+        )
         assert observe.extract_run_signals(hist)["loop_detected"] is False
 
     def test_truly_stuck_run_is_a_loop(self) -> None:

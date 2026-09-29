@@ -59,7 +59,10 @@ class TestParsePDF:
         mock_reader = MagicMock()
         mock_reader.pages = [mock_page]
 
-        with patch("app.core.documents.parser.DocumentParser._parse_pdf_sync", return_value=SAMPLE_RESUME):
+        with patch(
+            "app.core.documents.parser.DocumentParser._parse_pdf_sync",
+            return_value=SAMPLE_RESUME,
+        ):
             result = await parser.parse(pdf_file)
 
         assert isinstance(result, ParsedResume)
@@ -86,7 +89,10 @@ class TestParseDocx:
         docx_file = tmp_path / "resume.docx"
         docx_file.touch()
 
-        with patch("app.core.documents.parser.DocumentParser._parse_docx_sync", return_value=SAMPLE_RESUME):
+        with patch(
+            "app.core.documents.parser.DocumentParser._parse_docx_sync",
+            return_value=SAMPLE_RESUME,
+        ):
             result = await parser.parse(docx_file)
 
         assert isinstance(result, ParsedResume)
@@ -115,7 +121,9 @@ class TestUnsupportedFormat:
 
 class TestContactExtraction:
     def test_extracts_email(self, parser: DocumentParser) -> None:
-        info = parser._extract_contact_info("Contact me at john@example.com for details.")
+        info = parser._extract_contact_info(
+            "Contact me at john@example.com for details."
+        )
         assert info["email"] == "john@example.com"
 
     def test_extracts_phone(self, parser: DocumentParser) -> None:
@@ -199,7 +207,9 @@ class TestSkillExtraction:
 
 
 class TestParseSyncEdgeCases:
-    def test_pdf_no_text_raises_parse_error(self, parser: DocumentParser, tmp_path: Path) -> None:
+    def test_pdf_no_text_raises_parse_error(
+        self, parser: DocumentParser, tmp_path: Path
+    ) -> None:
         pdf_file = tmp_path / "empty.pdf"
         pdf_file.touch()
 
@@ -212,7 +222,9 @@ class TestParseSyncEdgeCases:
             with pytest.raises(ParseError, match="No text content"):
                 parser._parse_pdf_sync(pdf_file)
 
-    def test_docx_no_text_raises_parse_error(self, parser: DocumentParser, tmp_path: Path) -> None:
+    def test_docx_no_text_raises_parse_error(
+        self, parser: DocumentParser, tmp_path: Path
+    ) -> None:
         docx_file = tmp_path / "empty.docx"
         docx_file.touch()
 
@@ -225,7 +237,9 @@ class TestParseSyncEdgeCases:
             with pytest.raises(ParseError, match="No text content"):
                 parser._parse_docx_sync(docx_file)
 
-    async def test_parse_catches_generic_exception(self, parser: DocumentParser, tmp_path: Path) -> None:
+    async def test_parse_catches_generic_exception(
+        self, parser: DocumentParser, tmp_path: Path
+    ) -> None:
         pdf_file = tmp_path / "bad.pdf"
         pdf_file.touch()
 

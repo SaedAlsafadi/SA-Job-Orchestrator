@@ -26,18 +26,24 @@ class TestRequestPasswordReset:
         async def _capture(to: str, reset_link: str) -> None:
             sent.append(reset_link)
 
-        monkeypatch.setattr(password_reset.mailer, "send_password_reset_email", _capture)
+        monkeypatch.setattr(
+            password_reset.mailer, "send_password_reset_email", _capture
+        )
         await password_reset.request_password_reset(db_session, "ghost@x.com")
         assert sent == []
 
-    async def test_creates_single_use_token_and_emails_link(self, db_session, monkeypatch):
+    async def test_creates_single_use_token_and_emails_link(
+        self, db_session, monkeypatch
+    ):
         user = await _make_user(db_session)
         links: list[str] = []
 
         async def _capture(to: str, reset_link: str) -> None:
             links.append(reset_link)
 
-        monkeypatch.setattr(password_reset.mailer, "send_password_reset_email", _capture)
+        monkeypatch.setattr(
+            password_reset.mailer, "send_password_reset_email", _capture
+        )
         await password_reset.request_password_reset(db_session, user.email)
         assert len(links) == 1 and "token=" in links[0]
 

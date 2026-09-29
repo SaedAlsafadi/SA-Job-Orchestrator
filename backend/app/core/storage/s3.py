@@ -61,7 +61,8 @@ class S3FileStorage:
                 return await stream.read()  # type: ignore[no-any-return]
 
     async def exists(self, key: str) -> bool:
-        from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+        from botocore.exceptions import \
+            ClientError  # type: ignore[import-untyped]
 
         async with self._client() as s3:
             try:

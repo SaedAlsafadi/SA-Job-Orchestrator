@@ -5,7 +5,13 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.base import (
+    Base,
+    TenantMixin,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+    pg_enum,
+)
 from app.models.enums import ApplicationStatus, ApplyMode
 
 
@@ -66,12 +72,18 @@ class Application(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     audit_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
-    job: Mapped["Job"] = relationship(back_populates="applications")  # noqa: F821
-    resume: Mapped["Resume | None"] = relationship(back_populates="applications")  # noqa: F821
-    runs: Mapped[list["ApplicationRun"]] = relationship(back_populates="application", cascade="all, delete-orphan")
+    job: Mapped["Job"] = relationship(back_populates="applications")
+    resume: Mapped["Resume | None"] = relationship(
+        back_populates="applications"
+    )
+    runs: Mapped[list["ApplicationRun"]] = relationship(
+        back_populates="application", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
-        return f"<Application(id={self.id}, job_id={self.job_id}, status='{self.status}')>"
+        return (
+            f"<Application(id={self.id}, job_id={self.job_id}, status='{self.status}')>"
+        )
 
 
 class ApplicationRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
@@ -84,7 +96,7 @@ class ApplicationRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
         ForeignKey("applications.id", ondelete="CASCADE"),
         nullable=False,
     )
-    
+
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     state_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     artifacts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -93,7 +105,9 @@ class ApplicationRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     application: Mapped["Application"] = relationship(back_populates="runs")
-    approvals: Mapped[list["ApplicationApproval"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    approvals: Mapped[list["ApplicationApproval"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<ApplicationRun(id={self.id}, app_id={self.application_id}, status='{self.status}')>"
@@ -101,20 +115,28 @@ class ApplicationRun(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
 
 class ApplicationApproval(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     """A single-use explicit human approval record for application submission."""
-    
+
     __tablename__ = "application_approvals"
     __table_args__ = (
         Index("ix_app_approval_run", "application_run_id"),
         Index("idx_app_approval_application", "application_id"),
     )
 
-    application_id: Mapped[str] = mapped_column(String(32), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False)
-    application_run_id: Mapped[str] = mapped_column(String(32), ForeignKey("application_runs.id", ondelete="CASCADE"), nullable=False)
-    job_id: Mapped[str] = mapped_column(String(32), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False)
-    
+    application_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+    )
+    application_run_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("application_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False
+    )
+
     candidate_profile_version: Mapped[int] = mapped_column(nullable=False)
     platform: Mapped[str] = mapped_column(String(100), nullable=False)
-    
+
     # Phase 19: package binding. When set, this approval authorizes ONLY the exact
     # package version identified by (package_id, package_hash). A changed component
     # produces a new package hash, which this approval can never match.
@@ -124,9 +146,8 @@ class ApplicationApproval(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base
 
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    
+
     run: Mapped["ApplicationRun"] = relationship(back_populates="approvals")
 
     def __repr__(self) -> str:
         return f"<ApplicationApproval(id={self.id}, app_id={self.application_id})>"
-

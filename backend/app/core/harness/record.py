@@ -44,7 +44,12 @@ async def record_trajectory(
 
 
 async def record_verdict(
-    db: AsyncSession, *, user_id: str, run_id: str, judge: JudgeOutput, model: str | None = None
+    db: AsyncSession,
+    *,
+    user_id: str,
+    run_id: str,
+    judge: JudgeOutput,
+    model: str | None = None,
 ) -> RunVerdict:
     verdict = RunVerdict(
         user_id=user_id,

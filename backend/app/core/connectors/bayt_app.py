@@ -1,8 +1,11 @@
-﻿import structlog
-from typing import List, Dict, Any
+﻿from typing import Any
+
+import structlog
+
 from app.core.connectors.base import ApplicationConnector, ApplicationQuestion
 
 logger = structlog.get_logger(__name__)
+
 
 class BaytApplicationConnector(ApplicationConnector):
     def name(self) -> str:
@@ -19,7 +22,7 @@ class BaytApplicationConnector(ApplicationConnector):
         except Exception as e:
             logger.warning("bayt_app.navigation_failed", error=str(e))
 
-    async def inspect_form(self, page) -> List[ApplicationQuestion]:
+    async def inspect_form(self, page) -> list[ApplicationQuestion]:
         # Bayt application is highly protected. We fall back to manual preparation.
         return []
 
@@ -31,18 +34,18 @@ class BaytApplicationConnector(ApplicationConnector):
 
     async def answer_question(self, page, question: ApplicationQuestion) -> None:
         pass
-        
+
     async def detect_cv_presence(self, page) -> bool:
         return False
 
-    async def capture_state(self, page) -> Dict[str, Any]:
+    async def capture_state(self, page) -> dict[str, Any]:
         return {
             "status": "WAITING_FOR_REVIEW",
             "warnings": [
                 "BAYT_PREPARATION=MANUAL_REQUIRED",
-                "Bayt applications require an authenticated session. Automated submission is disabled."
+                "Bayt applications require an authenticated session. Automated submission is disabled.",
             ],
-            "unresolved_fields": ["resume", "questions"]
+            "unresolved_fields": ["resume", "questions"],
         }
 
     async def submit(self, page) -> None:

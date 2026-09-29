@@ -12,8 +12,9 @@ layer verifies the extracted TEXT against the structured expectations:
 """
 
 import re
-import structlog
 from pathlib import Path
+
+import structlog
 from pydantic import BaseModel
 
 logger = structlog.get_logger(__name__)
@@ -50,22 +51,18 @@ def check_document_integrity(
     problems: list[str] = []
     lower = text.lower()
 
-    missing_sections = [
-        s for s in (expected_sections or []) if s.lower() not in lower
-    ]
+    missing_sections = [s for s in (expected_sections or []) if s.lower() not in lower]
     if missing_sections:
         problems.append(f"missing sections: {', '.join(missing_sections)}")
 
     missing_texts = [
-        t for t in (required_texts or [])
-        if t and t.strip()[:60].lower() not in lower
+        t for t in (required_texts or []) if t and t.strip()[:60].lower() not in lower
     ]
     if missing_texts:
         problems.append("accepted changes missing from document")
 
     forbidden_texts_found = [
-        t for t in (forbidden_texts or [])
-        if t and t.strip()[:60].lower() in lower
+        t for t in (forbidden_texts or []) if t and t.strip()[:60].lower() in lower
     ]
     if forbidden_texts_found:
         problems.append("rejected/blocked changes present in document")
@@ -117,6 +114,7 @@ def verify_pdf_document(
 
     try:
         from PyPDF2 import PdfReader
+
         reader = PdfReader(str(path))
 
         num_pages = len(reader.pages)

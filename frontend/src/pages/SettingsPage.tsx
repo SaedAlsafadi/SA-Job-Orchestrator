@@ -32,11 +32,11 @@ function TelegramSettings() {
     try {
       await disconnectTelegram();
       qc.invalidateQueries({ queryKey: ['telegramStatus'] });
-    } catch(e) {}
+    } catch(e) { /* ignore */ }
   };
 
   const testNotif = async () => {
-    try { await testTelegramNotification(); } catch(e) {}
+    try { await testTelegramNotification(); } catch(e) { /* ignore */ }
   };
 
   if (isLoading) return <div style={{...card, marginBottom: 14}}><p>Loading Telegram status...</p></div>;

@@ -12,9 +12,14 @@ from tests.conftest import TEST_USER_ID
 
 def _resp() -> LLMResponse:
     return LLMResponse(
-        content="x", model="gpt-4o", provider="openai",
-        prompt_tokens=10, completion_tokens=20, total_tokens=30,
-        cost_usd=0.001, latency_ms=12.0,
+        content="x",
+        model="gpt-4o",
+        provider="openai",
+        prompt_tokens=10,
+        completion_tokens=20,
+        total_tokens=30,
+        cost_usd=0.001,
+        latency_ms=12.0,
     )
 
 
@@ -38,7 +43,11 @@ class TestRecordUsage:
     async def test_writes_row(self, db_session):
         await self._user(db_session)
         row = await record_usage(
-            db_session, _resp(), user_id=TEST_USER_ID, purpose="harness_judge", trace_id="t-1"
+            db_session,
+            _resp(),
+            user_id=TEST_USER_ID,
+            purpose="harness_judge",
+            trace_id="t-1",
         )
         assert row.id is not None
 
@@ -52,5 +61,7 @@ class TestRecordUsage:
 
     async def test_coerces_unknown_purpose(self, db_session):
         await self._user(db_session)
-        row = await record_usage(db_session, _resp(), user_id=TEST_USER_ID, purpose="structured")
+        row = await record_usage(
+            db_session, _resp(), user_id=TEST_USER_ID, purpose="structured"
+        )
         assert row.purpose == LLMPurpose.GENERAL

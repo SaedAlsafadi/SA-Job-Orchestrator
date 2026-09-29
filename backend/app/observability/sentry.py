@@ -40,5 +40,9 @@ def init_sentry(component: str) -> bool:
     )
     sentry_sdk.set_tag("component", component)
     _initialized = True
-    logger.info("sentry_initialized", component=component, environment=settings.environment.value)
+    logger.info(
+        "sentry_initialized",
+        component=component,
+        environment=settings.environment.value,
+    )
     return True

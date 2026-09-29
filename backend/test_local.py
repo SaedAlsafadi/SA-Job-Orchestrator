@@ -1,8 +1,10 @@
 ﻿import asyncio
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import engine, async_sessionmaker
-from app.services.discovery_service import DiscoveryService
+
 from app.core.connectors.workable_source import WorkableJobSource
+from app.db.session import async_sessionmaker, engine
+from app.services.discovery_service import DiscoveryService
 
 SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

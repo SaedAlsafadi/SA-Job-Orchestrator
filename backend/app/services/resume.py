@@ -6,8 +6,8 @@ Uses DocumentParser for real file parsing and SkillMatcher for skill extraction.
 
 import asyncio
 import contextlib
-import re
 import uuid
+from datetime import UTC
 from pathlib import Path
 
 import structlog
@@ -146,7 +146,9 @@ async def upload_resume(
     # local temp path); then drop the temp file used only for parsing.
     upload_key = keys.upload_key(user_id, file_id, file_ext.lstrip("."))
     content_type = PDF_CONTENT_TYPE if file_ext == ".pdf" else DOCX_CONTENT_TYPE
-    await StorageService(get_storage(), user_id).put(upload_key, content, content_type=content_type)
+    await StorageService(get_storage(), user_id).put(
+        upload_key, content, content_type=content_type
+    )
     with contextlib.suppress(OSError):
         dest.unlink()
 
@@ -174,7 +176,9 @@ async def upload_resume(
     )
 
 
-async def list_resumes(db: AsyncSession, include_archived: bool = False) -> ResumeListResponse:
+async def list_resumes(
+    db: AsyncSession, include_archived: bool = False
+) -> ResumeListResponse:
     """List all resumes.
 
     Args:
@@ -203,11 +207,11 @@ async def get_resume(db: AsyncSession, resume_id: str) -> Resume:
 
 async def archive_resume(db: AsyncSession, resume_id: str) -> ResumeResponse:
     """Archive a resume without invalidating immutable historical references."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     resume = await get_resume(db, resume_id)
     if resume.archived_at is None:
-        resume.archived_at = datetime.now(timezone.utc)
+        resume.archived_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(resume)
     return ResumeResponse.model_validate(resume)
@@ -356,7 +360,10 @@ async def score_resume(
             error=str(exc),
         )
         return _score_with_text_fallback(
-            resume_id, request.job_id, resume_text, job_description,
+            resume_id,
+            request.job_id,
+            resume_text,
+            job_description,
         )
 
 
@@ -400,7 +407,10 @@ def _score_with_full_engine(
     }
 
     details = scorer.score_resume(
-        resume_text, job_description, candidate_profile, job_metadata,
+        resume_text,
+        job_description,
+        candidate_profile,
+        job_metadata,
     )
 
     return ResumeScoreResponse(
@@ -437,8 +447,27 @@ def _score_with_text_fallback(
     # Simple keyword overlap
     resume_words = set(resume_text.lower().split())
     job_words = set(job_description.lower().split()) - {
-        "the", "a", "an", "is", "are", "and", "or", "to", "in", "of", "for",
-        "with", "on", "at", "by", "from", "as", "we", "you", "your", "our",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "and",
+        "or",
+        "to",
+        "in",
+        "of",
+        "for",
+        "with",
+        "on",
+        "at",
+        "by",
+        "from",
+        "as",
+        "we",
+        "you",
+        "your",
+        "our",
     }
     keyword_score = len(resume_words & job_words) / len(job_words) if job_words else 0.0
 
@@ -446,9 +475,7 @@ def _score_with_text_fallback(
 
     suggestions: list[str] = []
     if missing:
-        suggestions.append(
-            f"Add these skills to your resume: {', '.join(missing[:5])}"
-        )
+        suggestions.append(f"Add these skills to your resume: {', '.join(missing[:5])}")
     if keyword_score < 0.4:
         suggestions.append(
             "Mirror more terminology from the job description in your resume."
@@ -498,7 +525,9 @@ async def optimize_resume(
 
     # Score the resume to get detailed breakdown
     score_result = await score_resume(
-        db, resume_id, ResumeScoreRequest(job_id=target_job_id),
+        db,
+        resume_id,
+        ResumeScoreRequest(job_id=target_job_id),
     )
 
     # Get optimizer suggestions
@@ -518,6 +547,7 @@ async def optimize_resume(
 
         optimizer = ATSOptimizer(skill_matcher=SkillMatcher(get_nlp()))
         from app.core.ats.scorer import ScoreDetails
+
         # Build a minimal ScoreDetails for the optimizer
         details = ScoreDetails(
             overall_score=score_result.overall_score,
@@ -529,7 +559,9 @@ async def optimize_resume(
             improvement_suggestions=score_result.suggestions,
         )
         suggestions = optimizer.suggest_improvements(
-            details, resume_text, job_description,
+            details,
+            resume_text,
+            job_description,
         )
     except Exception:
         logger.warning("ats_optimizer_unavailable", exc_info=True)
@@ -544,7 +576,10 @@ async def optimize_resume(
 
     llm = await build_llm_client_for_user(db, user_id)
     prompt = render_ats_optimize_prompt(
-        resume_text, job_description, score_breakdown, suggestions,
+        resume_text,
+        job_description,
+        score_breakdown,
+        suggestions,
     )
     optimized_data = await llm.complete_with_structured_output(
         prompt=prompt,
@@ -583,7 +618,9 @@ async def optimize_resume(
     # Re-score the optimized resume
     try:
         new_score = await score_resume(
-            db, optimized.id, ResumeScoreRequest(job_id=target_job_id),
+            db,
+            optimized.id,
+            ResumeScoreRequest(job_id=target_job_id),
         )
         optimized.ats_score = new_score.overall_score
         await db.commit()

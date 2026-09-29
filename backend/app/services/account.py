@@ -58,7 +58,9 @@ async def delete_user_data(db: AsyncSession, user_id: str) -> dict[str, int]:
             keys.user_prefix(user_id) + "/"
         )
     except Exception as exc:
-        logger.warning("purge.storage_failed_will_retry", user_id=user_id, error=str(exc))
+        logger.warning(
+            "purge.storage_failed_will_retry", user_id=user_id, error=str(exc)
+        )
         return {"rows_deleted": 0, "files_removed": 0, "purged": 0}
 
     # 2. DB rows — explicit, child-first, tenant filter bypassed (admin op).
@@ -73,5 +75,10 @@ async def delete_user_data(db: AsyncSession, user_id: str) -> dict[str, int]:
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()
 
-    logger.info("purge.user_data_deleted", user_id=user_id, rows=rows_deleted, files=files_removed)
+    logger.info(
+        "purge.user_data_deleted",
+        user_id=user_id,
+        rows=rows_deleted,
+        files=files_removed,
+    )
     return {"rows_deleted": rows_deleted, "files_removed": files_removed, "purged": 1}

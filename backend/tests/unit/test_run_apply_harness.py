@@ -24,20 +24,30 @@ from tests.unit.test_observe import FakeHistory
 async def _seed_app(db) -> Application:
     db.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
     job = Job(
-        user_id=TEST_USER_ID, platform="linkedin", platform_job_id="j1",
-        title="t", company="c", url="https://x",
+        user_id=TEST_USER_ID,
+        platform="linkedin",
+        platform_job_id="j1",
+        title="t",
+        company="c",
+        url="https://x",
     )
     db.add(job)
     await db.flush()
     resume = Resume(
-        user_id=TEST_USER_ID, name="r", type="base", template_id="modern",
+        user_id=TEST_USER_ID,
+        name="r",
+        type="base",
+        template_id="modern",
         file_path_pdf="/tmp/r.pdf",
     )
     db.add(resume)
     await db.flush()
     app = Application(
-        user_id=TEST_USER_ID, job_id=job.id, resume_id=resume.id,
-        status="applying", apply_mode="autonomous",
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        resume_id=resume.id,
+        status="applying",
+        apply_mode="autonomous",
     )
     db.add(app)
     await db.commit()
@@ -72,7 +82,9 @@ def _mock_browser(db, history=None, *, run_side_effect=None):
         fake_agent.run = AsyncMock(return_value=history)
     # The resume is materialized from storage to a temp path for the browser.
     storage_service = MagicMock(
-        return_value=MagicMock(materialize_to_temp=AsyncMock(return_value="/tmp/resume.pdf"))
+        return_value=MagicMock(
+            materialize_to_temp=AsyncMock(return_value="/tmp/resume.pdf")
+        )
     )
     return patch.multiple(
         apply_mod,
@@ -105,10 +117,14 @@ class TestRunApplyHarness:
 
         assert result.submitted is True
         trajs = (
-            await db_session.execute(
-                select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+            (
+                await db_session.execute(
+                    select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(trajs) == 1
         redis.enqueue_job.assert_awaited_once()
         call = redis.enqueue_job.await_args
@@ -120,23 +136,33 @@ class TestRunApplyHarness:
         with _mock_browser(db_session, FakeHistory()):
             await apply_mod.run_apply(db_session, app, redis=None)
         trajs = (
-            await db_session.execute(
-                select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+            (
+                await db_session.execute(
+                    select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(trajs) == 1
 
     async def test_malformed_structured_output_does_not_abort(self, db_session):
         """A raising structured_output property must fall back, not crash + skip recording."""
         app = await _seed_app(db_session)
-        with _mock_browser(db_session, _RaisingStructured(final="Submitted, confirmation #42")):
+        with _mock_browser(
+            db_session, _RaisingStructured(final="Submitted, confirmation #42")
+        ):
             result = await apply_mod.run_apply(db_session, app, redis=None)
         assert result.submitted is True  # fell back to final_result()
         trajs = (
-            await db_session.execute(
-                select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+            (
+                await db_session.execute(
+                    select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(trajs) == 1  # trajectory still persisted
 
     async def test_run_failure_records_failed_trajectory_and_reraises(self, db_session):
@@ -145,15 +171,21 @@ class TestRunApplyHarness:
         redis = MagicMock()
         redis.enqueue_job = AsyncMock()
 
-        with _mock_browser(db_session, run_side_effect=RuntimeError("CDP Connection refused")):
+        with _mock_browser(
+            db_session, run_side_effect=RuntimeError("CDP Connection refused")
+        ):
             with pytest.raises(RuntimeError, match="Connection refused"):
                 await apply_mod.run_apply(db_session, app, redis=redis)
 
         trajs = (
-            await db_session.execute(
-                select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+            (
+                await db_session.execute(
+                    select(RunTrajectory).where(RunTrajectory.application_id == app.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(trajs) == 1 and trajs[0].status == "failed"
         redis.enqueue_job.assert_awaited_once()
         signals = redis.enqueue_job.await_args.args[2]
@@ -165,21 +197,35 @@ class TestReviewTask:
         db_session.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         await db_session.commit()
         traj = await record.record_trajectory(
-            db_session, user_id=TEST_USER_ID, application_id="app1",
-            platform="linkedin", status="completed",
+            db_session,
+            user_id=TEST_USER_ID,
+            application_id="app1",
+            platform="linkedin",
+            status="completed",
         )
 
         session_cm = MagicMock()
         session_cm.__aenter__ = AsyncMock(return_value=db_session)
         session_cm.__aexit__ = AsyncMock(return_value=False)
 
-        with patch.object(tasks, "async_session_factory", return_value=session_cm), patch.object(
+        with patch.object(
+            tasks, "async_session_factory", return_value=session_cm
+        ), patch.object(
             tasks, "build_llm_client_for_user", new=AsyncMock(return_value=MagicMock())
         ), patch.object(
-            tasks, "review_run",
-            new=AsyncMock(return_value={"verdict": "success", "failure_class": None, "skill_id": None}),
+            tasks,
+            "review_run",
+            new=AsyncMock(
+                return_value={
+                    "verdict": "success",
+                    "failure_class": None,
+                    "skill_id": None,
+                }
+            ),
         ) as review:
-            await tasks.review_application_run({"redis": None}, traj.id, {"final_url": "x"})
+            await tasks.review_application_run(
+                {"redis": None}, traj.id, {"final_url": "x"}
+            )
 
         review.assert_awaited_once()
         assert review.await_args.args[2].id == traj.id
@@ -188,8 +234,8 @@ class TestReviewTask:
         session_cm = MagicMock()
         session_cm.__aenter__ = AsyncMock(return_value=db_session)
         session_cm.__aexit__ = AsyncMock(return_value=False)
-        with patch.object(tasks, "async_session_factory", return_value=session_cm), patch.object(
-            tasks, "review_run", new=AsyncMock()
-        ) as review:
+        with patch.object(
+            tasks, "async_session_factory", return_value=session_cm
+        ), patch.object(tasks, "review_run", new=AsyncMock()) as review:
             await tasks.review_application_run({"redis": None}, "nonexistent-id")
         review.assert_not_awaited()

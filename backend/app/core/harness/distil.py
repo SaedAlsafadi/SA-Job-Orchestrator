@@ -26,11 +26,18 @@ class DistilledSkill(BaseModel):
 
 class _StructuredLLM(Protocol):
     async def complete_with_structured_output(
-        self, *, prompt: str, output_schema: type[BaseModel], system_prompt: str, purpose: str
+        self,
+        *,
+        prompt: str,
+        output_schema: type[BaseModel],
+        system_prompt: str,
+        purpose: str,
     ) -> Any: ...
 
 
-async def distil_skill(llm: _StructuredLLM, domain: str, summary: dict) -> DistilledSkill:
+async def distil_skill(
+    llm: _StructuredLLM, domain: str, summary: dict
+) -> DistilledSkill:
     """Propose a durable domain skill from a run trajectory (PII-gated by the caller)."""
     prompt = (
         f"Review this automation run on '{domain}'. What durable site knowledge would let us "
@@ -44,4 +51,8 @@ async def distil_skill(llm: _StructuredLLM, domain: str, summary: dict) -> Disti
         system_prompt=_DISTIL_SYSTEM,
         purpose="skill_distill",
     )
-    return result if isinstance(result, DistilledSkill) else DistilledSkill.model_validate(result)
+    return (
+        result
+        if isinstance(result, DistilledSkill)
+        else DistilledSkill.model_validate(result)
+    )

@@ -26,9 +26,13 @@ class TestSendPasswordResetEmail:
         monkeypatch.setattr(settings.email, "provider", "smtp")
         sent: list[tuple[str, str]] = []
 
-        def _fake_smtp_send(to: str, subject: str, text_body: str, html_body: str | None) -> None:
+        def _fake_smtp_send(
+            to: str, subject: str, text_body: str, html_body: str | None
+        ) -> None:
             sent.append((to, subject))
 
         monkeypatch.setattr(mailer, "_send_via_smtp", _fake_smtp_send)
-        await mailer.send_password_reset_email("who@x.com", "https://app/reset-password?token=xyz")
+        await mailer.send_password_reset_email(
+            "who@x.com", "https://app/reset-password?token=xyz"
+        )
         assert sent and sent[0][0] == "who@x.com"

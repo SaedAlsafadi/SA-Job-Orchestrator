@@ -29,13 +29,19 @@ class SecretsProvider(ABC):
     """
 
     @abstractmethod
-    async def encrypt(self, plaintext: bytes, *, context: dict[str, str]) -> EncryptedBlob: ...
+    async def encrypt(
+        self, plaintext: bytes, *, context: dict[str, str]
+    ) -> EncryptedBlob: ...
 
     @abstractmethod
-    async def decrypt(self, blob: EncryptedBlob, *, context: dict[str, str]) -> bytes: ...
+    async def decrypt(
+        self, blob: EncryptedBlob, *, context: dict[str, str]
+    ) -> bytes: ...
 
     @abstractmethod
-    async def rotate(self, blob: EncryptedBlob, *, context: dict[str, str]) -> EncryptedBlob: ...
+    async def rotate(
+        self, blob: EncryptedBlob, *, context: dict[str, str]
+    ) -> EncryptedBlob: ...
 
     @property
     @abstractmethod

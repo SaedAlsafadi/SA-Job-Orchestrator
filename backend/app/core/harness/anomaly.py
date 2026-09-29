@@ -108,7 +108,11 @@ async def detect_anomalies(
                 db,
                 category="apply_failure_rate",
                 severity="critical",
-                signals={"total": total, "failed": failed, "window_hours": RECENT_WINDOW_HOURS},
+                signals={
+                    "total": total,
+                    "failed": failed,
+                    "window_hours": RECENT_WINDOW_HOURS,
+                },
                 diagnosis=f"{failed}/{total} apps FAILED in the last {RECENT_WINDOW_HOURS}h",
                 now=now,
             )

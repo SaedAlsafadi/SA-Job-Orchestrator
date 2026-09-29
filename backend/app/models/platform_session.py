@@ -18,10 +18,15 @@ class PlatformSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """
 
     __tablename__ = "platform_sessions"
-    __table_args__ = (UniqueConstraint("user_id", "platform", name="uq_platform_session"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "platform", name="uq_platform_session"),
+    )
 
     user_id: Mapped[str] = mapped_column(
-        String(32), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

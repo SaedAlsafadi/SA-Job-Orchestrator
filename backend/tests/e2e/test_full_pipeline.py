@@ -41,7 +41,9 @@ async def _create_job_in_db(db: AsyncSession, idx: int = 1) -> Job:
 
 
 class TestFullJobSearchToApplicationPipeline:
-    @pytest.mark.skip(reason="Legacy Job Analyze V1 contract; current pipeline is covered by Phase 20 integration tests")
+    @pytest.mark.skip(
+        reason="Legacy Job Analyze V1 contract; current pipeline is covered by Phase 20 integration tests"
+    )
     async def test_full_job_search_to_application_pipeline(
         self, client: AsyncClient, db_session: AsyncSession
     ):
@@ -235,8 +237,10 @@ class TestSettingsPersistAcrossRequests:
         # state are not affected (the settings route uses a module-level global).
         await client.put(
             "/api/v1/settings/",
-            json={"apply_mode": defaults["apply_mode"],
-                  "min_ats_score": defaults["min_ats_score"]},
+            json={
+                "apply_mode": defaults["apply_mode"],
+                "min_ats_score": defaults["min_ats_score"],
+            },
         )
 
 

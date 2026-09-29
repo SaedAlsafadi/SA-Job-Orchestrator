@@ -1,7 +1,5 @@
 """Integration tests for the Analytics API routes."""
 
-
-
 API_PREFIX = "/api/v1/analytics"
 
 

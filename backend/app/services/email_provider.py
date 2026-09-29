@@ -79,7 +79,9 @@ class SMTPEmailProvider(EmailProvider):
     async def send(self, message: OutgoingEmail) -> SendResult:
         try:
             return await asyncio.to_thread(self._send_sync, message)
-        except Exception as exc:  # provider boundary: report, never raise past this line
+        except (
+            Exception
+        ) as exc:  # provider boundary: report, never raise past this line
             logger.error("application_email_send_failed", error=str(exc))
             return SendResult(status="failed", error=str(exc))
 

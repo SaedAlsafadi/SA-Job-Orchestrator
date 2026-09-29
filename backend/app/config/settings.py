@@ -36,14 +36,14 @@ class LLMSettings(BaseSettings):
     github_token: SecretStr = SecretStr("")
     preferred_provider: str = "openrouter"
     fallback_providers: list[str] = []
-    
+
     # Task Routing Models
     light_model: str = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
     heavy_model: str = "openrouter/deepseek/deepseek-v4-flash-0731"
-    
+
     # Legacy default, mapped to light_model to avoid accidental heavy billing
     default_model: str = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
-    
+
     temperature: float = 0.7
     max_tokens: int = 4096
     # AWS Bedrock: platform-authenticated via the standard AWS credential chain (env vars,
@@ -148,7 +148,9 @@ class StorageSettings(BaseSettings):
     # S3-compatible settings (used when provider == "s3").
     bucket: str = ""
     region: str = ""
-    endpoint_url: str = ""  # e.g. https://<account>.r2.cloudflarestorage.com for Cloudflare R2
+    endpoint_url: str = (
+        ""  # e.g. https://<account>.r2.cloudflarestorage.com for Cloudflare R2
+    )
     access_key_id: SecretStr = SecretStr("")
     secret_access_key: SecretStr = SecretStr("")
 
@@ -222,4 +224,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached application settings singleton."""
     return Settings()
-

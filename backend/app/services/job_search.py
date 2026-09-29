@@ -4,6 +4,7 @@ Handles job CRUD operations, search orchestration across platform
 scrapers, and ATS-based job analysis.
 """
 
+import asyncio
 import hashlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -18,26 +19,25 @@ from app.core.automation.platforms import platform_registry
 from app.core.automation.platforms.base import JobListing
 from app.core.exceptions import RecordNotFoundError
 from app.core.job_discovery.exa_search import ExaJobSearch
-from app.models.job import Job
-from app.models.resume import Resume
-from app.models.tailoring import CVTailoringSession
+from app.core.llm.client import LLMClient
+from app.core.llm.router import LLMTaskRouter
 from app.models.application import Application
 from app.models.application_package import ApplicationPackage
 from app.models.application_route import ApplicationRoute
 from app.models.candidate_profile import CandidateProfile
-from app.schemas.candidate_profile import CandidateProfileSchema
-from app.services.matching import CandidateJobMatcher
-from app.core.llm.client import LLMClient
-from app.core.llm.router import LLMTaskRouter
-import asyncio
+from app.models.job import Job
+from app.models.resume import Resume
+from app.models.tailoring import CVTailoringSession
 from app.observability.metrics import job_searches_total, jobs_found_total
-from app.schemas.matching import CandidateMatchResult
+from app.schemas.candidate_profile import CandidateProfileSchema
 from app.schemas.job import (
-    OpportunityOperationalState,
     JobListingResponse,
     JobListResponse,
     JobSearchRequest,
+    OpportunityOperationalState,
 )
+from app.schemas.matching import CandidateMatchResult
+from app.services.matching import CandidateJobMatcher
 
 logger = structlog.get_logger(__name__)
 
@@ -75,42 +75,93 @@ def _stored_match_score(score: int | float | None) -> float | None:
     return value / 100 if abs(value) > 1 else value
 
 
-async def _operational_states(db: AsyncSession, jobs: list[Job]) -> dict[str, dict[str, Any]]:
+async def _operational_states(
+    db: AsyncSession, jobs: list[Job]
+) -> dict[str, dict[str, Any]]:
     """Batch related workflow records for opportunity-card decisions."""
     ids = [job.id for job in jobs]
     if not ids:
         return {}
-    sessions = list((await db.execute(select(CVTailoringSession).where(CVTailoringSession.job_id.in_(ids)))).scalars())
-    tailored = list((await db.execute(select(Resume).where(Resume.job_id.in_(ids), Resume.type == "tailored"))).scalars())
-    applications = list((await db.execute(select(Application).where(Application.job_id.in_(ids)))).scalars())
-    packages = list((await db.execute(select(ApplicationPackage).where(ApplicationPackage.job_id.in_(ids), ApplicationPackage.is_current.is_(True)))).scalars())
-    routes = list((await db.execute(select(ApplicationRoute).where(ApplicationRoute.job_id.in_(ids)))).scalars())
+    sessions = list(
+        (
+            await db.execute(
+                select(CVTailoringSession).where(CVTailoringSession.job_id.in_(ids))
+            )
+        ).scalars()
+    )
+    tailored = list(
+        (
+            await db.execute(
+                select(Resume).where(Resume.job_id.in_(ids), Resume.type == "tailored")
+            )
+        ).scalars()
+    )
+    applications = list(
+        (
+            await db.execute(select(Application).where(Application.job_id.in_(ids)))
+        ).scalars()
+    )
+    packages = list(
+        (
+            await db.execute(
+                select(ApplicationPackage).where(
+                    ApplicationPackage.job_id.in_(ids),
+                    ApplicationPackage.is_current.is_(True),
+                )
+            )
+        ).scalars()
+    )
+    routes = list(
+        (
+            await db.execute(
+                select(ApplicationRoute).where(ApplicationRoute.job_id.in_(ids))
+            )
+        ).scalars()
+    )
 
     def latest(rows: list[Any], job_id: str) -> Any | None:
         matches = [row for row in rows if row.job_id == job_id]
-        return max(matches, key=lambda row: row.updated_at or row.created_at) if matches else None
+        return (
+            max(matches, key=lambda row: row.updated_at or row.created_at)
+            if matches
+            else None
+        )
 
     states: dict[str, dict[str, Any]] = {}
     for job in jobs:
         session = latest(sessions, job.id)
-        resume = next((r for r in tailored if session and r.id == session.final_resume_id), None) or latest(tailored, job.id)
+        resume = next(
+            (r for r in tailored if session and r.id == session.final_resume_id), None
+        ) or latest(tailored, job.id)
         application = latest(applications, job.id)
         package = latest(packages, job.id)
         route = next((r for r in routes if package and r.id == package.route_id), None)
         if route is None:
             candidates = [r for r in routes if r.job_id == job.id]
-            route = next((r for r in candidates if r.is_preferred), None) or (latest(candidates, job.id) if candidates else None)
+            route = next((r for r in candidates if r.is_preferred), None) or (
+                latest(candidates, job.id) if candidates else None
+            )
         route_type = route.route_type.upper() if route else None
         package_ready = False
         if package:
             package_ready = bool(package.resume_id and package.cover_letter_text)
             if route_type == "EMAIL":
-                package_ready = package_ready and bool(package.email_to and package.email_subject and package.email_body)
+                package_ready = package_ready and bool(
+                    package.email_to and package.email_subject and package.email_body
+                )
             package_ready = package_ready and package.qa_verdict != "blocked"
         raw = job.raw_data if isinstance(job.raw_data, dict) else {}
-        analysis_keys = {"strengths", "gaps", "critical_gaps", "recommendation", "requirement_analysis"}
+        analysis_keys = {
+            "strengths",
+            "gaps",
+            "critical_gaps",
+            "recommendation",
+            "requirement_analysis",
+        }
         states[job.id] = {
-            "match_exists": bool(analysis_keys.intersection(raw) or job.match_score is not None),
+            "match_exists": bool(
+                analysis_keys.intersection(raw) or job.match_score is not None
+            ),
             "tailoring_session_id": session.id if session else None,
             "tailoring_status": str(session.status) if session else None,
             "tailored_resume_id": resume.id if resume else None,
@@ -120,8 +171,15 @@ async def _operational_states(db: AsyncSession, jobs: list[Job]) -> dict[str, di
             "tailored_resume_verified": bool(
                 resume
                 and (
-                    (session and str(session.status) == "verified" and session.final_resume_id == resume.id)
-                    or (resume.content_text and (resume.file_path_pdf or resume.file_path_docx))
+                    (
+                        session
+                        and str(session.status) == "verified"
+                        and session.final_resume_id == resume.id
+                    )
+                    or (
+                        resume.content_text
+                        and (resume.file_path_pdf or resume.file_path_docx)
+                    )
                 )
             ),
             "application_id": application.id if application else None,
@@ -129,7 +187,9 @@ async def _operational_states(db: AsyncSession, jobs: list[Job]) -> dict[str, di
             "package_id": package.id if package else None,
             "package_version": package.version if package else None,
             "package_ready": package_ready,
-            "package_approved": bool(package and package.approval_id and package.approved_at),
+            "package_approved": bool(
+                package and package.approval_id and package.approved_at
+            ),
             "route_type": route_type,
             "route_url": route.url if route else None,
         }
@@ -209,9 +269,9 @@ async def search_jobs(
     # platform_job_id collapsed onto one row (silent data loss) — this also removes that N+1.
     existing_by_key: dict[tuple[str, str], Job] = {
         (j.platform, j.platform_job_id): j
-        for j in (
-            await db.execute(select(Job).where(Job.user_id == user_id))
-        ).scalars().all()
+        for j in (await db.execute(select(Job).where(Job.user_id == user_id)))
+        .scalars()
+        .all()
     }
     seen: set[tuple[str, str]] = set()
 
@@ -307,9 +367,15 @@ async def search_jobs(
             # ------------------------------------------------------------------
             # Phase 12 LLM Candidate Evaluation
             # ------------------------------------------------------------------
-            candidate_model = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user_id))).scalar_one_or_none()
+            candidate_model = (
+                await db.execute(
+                    select(CandidateProfile).where(CandidateProfile.user_id == user_id)
+                )
+            ).scalar_one_or_none()
             if candidate_model:
-                candidate = CandidateProfileSchema.model_validate(candidate_model, from_attributes=True)
+                candidate = CandidateProfileSchema.model_validate(
+                    candidate_model, from_attributes=True
+                )
                 llm = LLMTaskRouter(LLMClient())
                 matcher = CandidateJobMatcher(llm)
 
@@ -318,27 +384,44 @@ async def search_jobs(
                         try:
                             res = await matcher.match_candidate(candidate, j)
                             j.match_score = _stored_match_score(res.total_score or 0)
-                            
+
                             is_eligible = False
-                            if hasattr(res, "eligibility") and hasattr(res.eligibility, "is_eligible"):
+                            if hasattr(res, "eligibility") and hasattr(
+                                res.eligibility, "is_eligible"
+                            ):
                                 is_eligible = res.eligibility.is_eligible
                             elif hasattr(res, "is_eligible"):
                                 is_eligible = res.is_eligible
-                                
+
                             j.gcc_eligibility = {"is_eligible": is_eligible}
                             if res.strengths or res.gaps:
                                 j.raw_data = {
-                                    "strengths": [s.model_dump() if hasattr(s, "model_dump") else s.dict() if hasattr(s, "dict") else dict(s) for s in (res.strengths or [])],
+                                    "strengths": [
+                                        (
+                                            s.model_dump()
+                                            if hasattr(s, "model_dump")
+                                            else (
+                                                s.dict()
+                                                if hasattr(s, "dict")
+                                                else dict(s)
+                                            )
+                                        )
+                                        for s in (res.strengths or [])
+                                    ],
                                     "gaps": res.gaps or [],
                                     "critical_gaps": res.critical_gaps or [],
                                     "recommendation": res.recommendation or "",
                                 }
                         except Exception as eval_exc:
-                            logger.error("job_search.evaluation_failed", job_id=j.platform_job_id, error=str(eval_exc))
-                
+                            logger.error(
+                                "job_search.evaluation_failed",
+                                job_id=j.platform_job_id,
+                                error=str(eval_exc),
+                            )
+
                 # Evaluate concurrently
                 await asyncio.gather(*(_evaluate_job(j) for j in all_jobs))
-                
+
             await db.commit()
             for job in all_jobs:
                 await db.refresh(job)
@@ -471,7 +554,10 @@ async def get_job(db: AsyncSession, job_id: str) -> Job:
     """
     await _expire_stale_processing_jobs(db)
     from sqlalchemy.orm import selectinload
-    result = await db.execute(select(Job).options(selectinload(Job.routes)).where(Job.id == job_id))
+
+    result = await db.execute(
+        select(Job).options(selectinload(Job.routes)).where(Job.id == job_id)
+    )
     job = result.scalar_one_or_none()
     if job is None:
         raise RecordNotFoundError("Job", job_id)
@@ -500,23 +586,27 @@ async def analyze_job(
     resume_id: str | None = None,
     language: str = "en",
 ) -> CandidateMatchResult:
-    from app.models.candidate_profile import CandidateProfile
-    from app.schemas.candidate_profile import CandidateProfileSchema
-    from app.core.llm.factory import build_llm_router_for_user
-    from app.services.matching import CandidateJobMatcher
-    from app.schemas.matching import CandidateMatchResult
     from sqlalchemy import select
 
+    from app.core.llm.factory import build_llm_router_for_user
+    from app.models.candidate_profile import CandidateProfile
+    from app.schemas.candidate_profile import CandidateProfileSchema
+    from app.services.matching import CandidateJobMatcher
+
     job = await get_job(db, job_id)
-    
-    candidate = (await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == job.user_id))).scalar_one_or_none()
+
+    candidate = (
+        await db.execute(
+            select(CandidateProfile).where(CandidateProfile.user_id == job.user_id)
+        )
+    ).scalar_one_or_none()
     if not candidate:
         raise ValueError("No candidate profile found")
 
     schema = CandidateProfileSchema.model_validate(candidate)
     router = await build_llm_router_for_user(db, job.user_id)
     matcher = CandidateJobMatcher(router)
-    
+
     result = await matcher.match_candidate(schema, job, language=language)
 
     # Persist the score and its evidence atomically so every UI surface refers
@@ -526,8 +616,5 @@ async def analyze_job(
     job.raw_data = raw_data
     job.match_score = _stored_match_score(result.total_score)
     await db.commit()
-    
+
     return result
-
-
-

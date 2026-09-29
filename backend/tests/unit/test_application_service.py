@@ -87,10 +87,14 @@ class TestListApplications:
         )
         await app_service.approve_application(db_session, app_obj.id)
 
-        queued = await app_service.list_applications(db_session, status=ApplicationStatus.QUEUED)
+        queued = await app_service.list_applications(
+            db_session, status=ApplicationStatus.QUEUED
+        )
         assert queued.total == 2
 
-        approved = await app_service.list_applications(db_session, status=ApplicationStatus.APPROVED)
+        approved = await app_service.list_applications(
+            db_session, status=ApplicationStatus.APPROVED
+        )
         assert approved.total == 1
 
 
@@ -129,13 +133,17 @@ class TestUpdateStatus:
             db_session, ApplicationCreate(job_id=job.id), TEST_USER_ID
         )
 
-        update = ApplicationStatusUpdate(status=ApplicationStatus.REJECTED, notes="Not a fit")
+        update = ApplicationStatusUpdate(
+            status=ApplicationStatus.REJECTED, notes="Not a fit"
+        )
         updated = await app_service.update_status(db_session, created.id, update)
 
         assert updated.status == ApplicationStatus.REJECTED
         assert updated.notes == "Not a fit"
 
-    async def test_update_status_applied_sets_timestamp(self, db_session, sample_job_data):
+    async def test_update_status_applied_sets_timestamp(
+        self, db_session, sample_job_data
+    ):
         job = await _create_job(db_session, sample_job_data)
         created = await app_service.create_application(
             db_session, ApplicationCreate(job_id=job.id), TEST_USER_ID

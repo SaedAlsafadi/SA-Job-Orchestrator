@@ -203,7 +203,9 @@ async def download_resume(
         path=tmp_path,
         media_type=media_type,
         filename=f"{resume.name}.{format}",
-        background=BackgroundTask(os.remove, tmp_path),  # delete the temp after streaming
+        background=BackgroundTask(
+            os.remove, tmp_path
+        ),  # delete the temp after streaming
     )
 
 

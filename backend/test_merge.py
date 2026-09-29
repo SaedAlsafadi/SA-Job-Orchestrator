@@ -1,7 +1,10 @@
 import json
-from app.services.tailoring_merge import merge_tailoring_changes
-from app.core.llm.prompts.resume_tailor import TailoredResumeData, ExperienceEntry
+
+from app.core.llm.prompts.resume_tailor import (ExperienceEntry,
+                                                TailoredResumeData)
 from app.models.enums import ChangeType
+from app.services.tailoring_merge import merge_tailoring_changes
+
 
 class MockChange:
     def __init__(self, cid, ttype, tref, orig, prop):

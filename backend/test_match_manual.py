@@ -1,12 +1,15 @@
 import asyncio
 import json
+
 from sqlalchemy import select
+
+from app.config import get_settings
+from app.core.llm.client import LLMClient
 from app.db.session import async_session_factory
 from app.models.candidate_profile import CandidateProfile
 from app.models.job import Job
 from app.services.workflow_service import WorkflowService
-from app.config import get_settings
-from app.core.llm.client import LLMClient
+
 
 async def main():
     async with async_session_factory() as session:

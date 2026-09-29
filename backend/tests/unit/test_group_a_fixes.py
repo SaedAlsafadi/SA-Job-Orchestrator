@@ -22,8 +22,12 @@ from tests.unit.test_llm_client import _make_completion_response, _make_settings
 
 def _job(platform_job_id: str, owner: str = TEST_USER_ID) -> Job:
     return Job(
-        user_id=owner, platform="linkedin", platform_job_id=platform_job_id,
-        title="t", company="c", url="https://x",
+        user_id=owner,
+        platform="linkedin",
+        platform_job_id=platform_job_id,
+        title="t",
+        company="c",
+        url="https://x",
     )
 
 
@@ -47,7 +51,9 @@ class TestLoginTiming:
             )
         assert r.status_code == 401
         spy.assert_called_once()
-        assert spy.call_args.args[1] is None  # called with hashed=None -> DUMMY_HASH path
+        assert (
+            spy.call_args.args[1] is None
+        )  # called with hashed=None -> DUMMY_HASH path
 
 
 # --- A2 / A3: LLM client cost + fallback ------------------------------------
@@ -62,7 +68,9 @@ class TestLLMClientRobustness:
             ml.Usage = MagicMock
             result = await client.complete("prompt")
         assert result.content == "ok"
-        assert result.cost_usd is None  # unknown pricing is explicit, never reported as zero
+        assert (
+            result.cost_usd is None
+        )  # unknown pricing is explicit, never reported as zero
 
     async def test_unexpected_error_raises_typed_not_raw(self):
         client = _llm_client()
@@ -89,7 +97,9 @@ class TestTimelineAggregation:
             await db_session.flush()
             db_session.add(
                 Application(
-                    user_id=TEST_USER_ID, job_id=job.id, status=ApplicationStatus.QUEUED,
+                    user_id=TEST_USER_ID,
+                    job_id=job.id,
+                    status=ApplicationStatus.QUEUED,
                     apply_mode=ApplyMode.REVIEW,
                     created_at=day.replace(second=i * 10),
                 )
@@ -128,7 +138,9 @@ class TestCrossTenantCreate:
         await db_session.commit()
         with pytest.raises(RecordNotFoundError):
             await app_service.create_batch(
-                db_session, ApplicationBatchCreate(job_ids=[own.id, foreign.id]), TEST_USER_ID
+                db_session,
+                ApplicationBatchCreate(job_ids=[own.id, foreign.id]),
+                TEST_USER_ID,
             )
 
 
@@ -141,12 +153,16 @@ class TestBulkApproveGuard:
         db_session.add_all([job_a, job_b])
         await db_session.flush()
         pending = Application(
-            user_id=TEST_USER_ID, job_id=job_a.id,
-            status=ApplicationStatus.PENDING_REVIEW, apply_mode=ApplyMode.BATCH,
+            user_id=TEST_USER_ID,
+            job_id=job_a.id,
+            status=ApplicationStatus.PENDING_REVIEW,
+            apply_mode=ApplyMode.BATCH,
         )
         applied = Application(
-            user_id=TEST_USER_ID, job_id=job_b.id,
-            status=ApplicationStatus.APPLIED, apply_mode=ApplyMode.BATCH,
+            user_id=TEST_USER_ID,
+            job_id=job_b.id,
+            status=ApplicationStatus.APPLIED,
+            apply_mode=ApplyMode.BATCH,
         )
         db_session.add_all([pending, applied])
         await db_session.commit()

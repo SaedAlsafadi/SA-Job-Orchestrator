@@ -71,29 +71,80 @@ SKILL_VARIATIONS: dict[str, list[str]] = {
 # Skill category mapping for classification.
 SKILL_CATEGORIES: dict[str, list[str]] = {
     "programming_languages": [
-        "python", "javascript", "typescript", "java", "c++", "c#",
-        "go", "rust", "swift", "kotlin", "r", "ruby", "php", "scala",
+        "python",
+        "javascript",
+        "typescript",
+        "java",
+        "c++",
+        "c#",
+        "go",
+        "rust",
+        "swift",
+        "kotlin",
+        "r",
+        "ruby",
+        "php",
+        "scala",
     ],
     "web_frameworks": [
-        "react", "angular", "vue", "django", "flask", "fastapi",
-        "express", "node", "next.js", "nuxt.js", "spring",
+        "react",
+        "angular",
+        "vue",
+        "django",
+        "flask",
+        "fastapi",
+        "express",
+        "node",
+        "next.js",
+        "nuxt.js",
+        "spring",
     ],
     "databases": [
-        "sql", "postgresql", "mongodb", "mysql", "redis",
-        "elasticsearch", "cassandra", "dynamodb", "sqlite",
+        "sql",
+        "postgresql",
+        "mongodb",
+        "mysql",
+        "redis",
+        "elasticsearch",
+        "cassandra",
+        "dynamodb",
+        "sqlite",
     ],
     "cloud_devops": [
-        "aws", "gcp", "azure", "docker", "kubernetes", "ci/cd",
-        "terraform", "ansible", "jenkins", "linux", "devops",
+        "aws",
+        "gcp",
+        "azure",
+        "docker",
+        "kubernetes",
+        "ci/cd",
+        "terraform",
+        "ansible",
+        "jenkins",
+        "linux",
+        "devops",
     ],
     "data_ml": [
-        "machine learning", "deep learning", "natural language processing",
-        "computer vision", "data science", "tensorflow", "pytorch",
-        "scikit-learn", "pandas", "numpy", "spark", "hadoop",
+        "machine learning",
+        "deep learning",
+        "natural language processing",
+        "computer vision",
+        "data science",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
+        "spark",
+        "hadoop",
     ],
     "soft_skills": [
-        "agile", "leadership", "communication", "teamwork",
-        "problem solving", "project management", "mentoring",
+        "agile",
+        "leadership",
+        "communication",
+        "teamwork",
+        "problem solving",
+        "project management",
+        "mentoring",
     ],
 }
 
@@ -114,7 +165,9 @@ class SkillMatcher:
     def __init__(self, nlp: Any) -> None:
         self._nlp = nlp
         self._variation_index: dict[str, str] = self._build_variation_index()
-        logger.info("skill_matcher.initialized", variation_count=len(self._variation_index))
+        logger.info(
+            "skill_matcher.initialized", variation_count=len(self._variation_index)
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -227,6 +280,8 @@ class SkillMatcher:
         cleaned = re.sub(r"[^\w\s/#+.]", "", skill.lower()).strip()
         return self._variation_index.get(cleaned, cleaned)
 
-    def _is_fuzzy_match(self, skill_a: str, skill_b: str, threshold: float = 0.85) -> bool:
+    def _is_fuzzy_match(
+        self, skill_a: str, skill_b: str, threshold: float = 0.85
+    ) -> bool:
         """Return True if two skill strings are a fuzzy match."""
         return SequenceMatcher(None, skill_a, skill_b).ratio() >= threshold

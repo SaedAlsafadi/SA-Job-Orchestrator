@@ -1,6 +1,5 @@
 """Integration tests for the health check endpoint."""
 
-
 from app.config.constants import APP_VERSION
 
 

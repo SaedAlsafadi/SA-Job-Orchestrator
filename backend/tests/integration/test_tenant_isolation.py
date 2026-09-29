@@ -23,8 +23,12 @@ async def _seed(db, uid: str, n: int) -> None:
     await db.flush()
     for i in range(n):
         job = Job(
-            user_id=uid, platform="linkedin", platform_job_id=f"{uid[:4]}-{i}",
-            title="t", company="c", url="u",
+            user_id=uid,
+            platform="linkedin",
+            platform_job_id=f"{uid[:4]}-{i}",
+            title="t",
+            company="c",
+            url="u",
         )
         db.add(job)
         await db.flush()
@@ -66,7 +70,9 @@ class TestRowIsolation:
         token = current_user_id.set(USER_A)
         try:
             found = (
-                await db_session.execute(select(Application).where(Application.id == b_id))
+                await db_session.execute(
+                    select(Application).where(Application.id == b_id)
+                )
             ).scalar_one_or_none()
             assert found is None, "tenant A leaked into tenant B's row"
         finally:
@@ -96,17 +102,35 @@ class TestAggregateIsolation:
         token = current_user_id.set(USER_A)
         try:
             result = await app_service.list_applications(db_session)
-            assert result.total == 2, f"count_query leaked across tenants: total={result.total}"
+            assert (
+                result.total == 2
+            ), f"count_query leaked across tenants: total={result.total}"
         finally:
             current_user_id.reset(token)
 
     async def test_llm_usage_aggregate_is_scoped(self, db_session):
         db_session.add(User(id=USER_A, email="a2@x.com", hashed_password="x"))
         db_session.add(User(id=USER_B, email="b2@x.com", hashed_password="x"))
-        db_session.add(LLMUsage(user_id=USER_A, provider="openai", model="gpt-4o",
-                                purpose="resume_tailor", cost_usd=0.10, total_tokens=100))
-        db_session.add(LLMUsage(user_id=USER_B, provider="openai", model="gpt-4o",
-                                purpose="resume_tailor", cost_usd=0.20, total_tokens=200))
+        db_session.add(
+            LLMUsage(
+                user_id=USER_A,
+                provider="openai",
+                model="gpt-4o",
+                purpose="resume_tailor",
+                cost_usd=0.10,
+                total_tokens=100,
+            )
+        )
+        db_session.add(
+            LLMUsage(
+                user_id=USER_B,
+                provider="openai",
+                model="gpt-4o",
+                purpose="resume_tailor",
+                cost_usd=0.20,
+                total_tokens=200,
+            )
+        )
         await db_session.commit()
         token = current_user_id.set(USER_A)
         try:

@@ -22,6 +22,7 @@ class LinkTokenResponse(BaseModel):
     token: str
     bot_url: str
 
+
 class TelegramStatusResponse(BaseModel):
     status: str
     username: str | None = None
@@ -49,7 +50,8 @@ async def generate_link_token(
     if not runtime["bot_running"] or not bot_username:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=runtime["configuration_error"] or "Telegram bot is not configured and running.",
+            detail=runtime["configuration_error"]
+            or "Telegram bot is not configured and running.",
         )
     raw_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -74,12 +76,14 @@ async def get_telegram_status(
     db: AsyncSession = Depends(get_tenant_db),
 ) -> TelegramStatusResponse:
     """Check if the user is connected to Telegram."""
-    conn = (await db.execute(
-        select(TelegramConnection).where(
-            TelegramConnection.user_id == user.id,
-            TelegramConnection.is_active.is_(True),
+    conn = (
+        await db.execute(
+            select(TelegramConnection).where(
+                TelegramConnection.user_id == user.id,
+                TelegramConnection.is_active.is_(True),
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
 
     runtime = _bot_runtime_status()
     if not conn:
@@ -99,12 +103,14 @@ async def disconnect_telegram(
     db: AsyncSession = Depends(get_tenant_db),
 ) -> dict[str, str]:
     """Disconnect Telegram."""
-    conn = (await db.execute(
-        select(TelegramConnection).where(
-            TelegramConnection.user_id == user.id,
-            TelegramConnection.is_active.is_(True),
+    conn = (
+        await db.execute(
+            select(TelegramConnection).where(
+                TelegramConnection.user_id == user.id,
+                TelegramConnection.is_active.is_(True),
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
 
     if conn:
         conn.is_active = False

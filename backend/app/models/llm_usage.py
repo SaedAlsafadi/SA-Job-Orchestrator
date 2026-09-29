@@ -3,7 +3,13 @@
 from sqlalchemy import Boolean, Float, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.base import (
+    Base,
+    TenantMixin,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+    pg_enum,
+)
 from app.models.enums import LLMPurpose
 
 
@@ -33,7 +39,9 @@ class LLMUsage(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Context
-    purpose: Mapped[LLMPurpose] = mapped_column(pg_enum(LLMPurpose, "llm_purpose"), nullable=False)
+    purpose: Mapped[LLMPurpose] = mapped_column(
+        pg_enum(LLMPurpose, "llm_purpose"), nullable=False
+    )
     trace_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Outcome (populated by the usage callback in Phase 3)

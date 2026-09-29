@@ -51,17 +51,19 @@ def job_description() -> str:
 
 
 class TestAnalyzeExperience:
-    def test_returns_score_and_details(self, analyzer, sample_experience, job_description):
+    def test_returns_score_and_details(
+        self, analyzer, sample_experience, job_description
+    ):
         score, details = analyzer.analyze_experience(
             sample_experience, job_description, {}
         )
         assert isinstance(score, float)
         assert isinstance(details, list)
 
-    def test_score_between_zero_and_one(self, analyzer, sample_experience, job_description):
-        score, _ = analyzer.analyze_experience(
-            sample_experience, job_description, {}
-        )
+    def test_score_between_zero_and_one(
+        self, analyzer, sample_experience, job_description
+    ):
+        score, _ = analyzer.analyze_experience(sample_experience, job_description, {})
         assert 0.0 <= score <= 1.0
 
     def test_empty_experience_returns_zero(self, analyzer, job_description):
@@ -125,7 +127,9 @@ class TestDetectSeniority:
         assert level == "mid"
 
     def test_detects_management(self, analyzer):
-        level = analyzer._detect_seniority("director of engineering, leadership role, head of")
+        level = analyzer._detect_seniority(
+            "director of engineering, leadership role, head of"
+        )
         assert level == "management"
 
 

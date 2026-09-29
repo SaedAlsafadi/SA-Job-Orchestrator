@@ -34,7 +34,9 @@ from app.services.email_provider import OutgoingEmail, get_email_provider
 logger = structlog.get_logger(__name__)
 
 
-def validate_attachments(package: ApplicationPackage, resume_keys: set[str], cover_letter_keys: set[str]) -> None:
+def validate_attachments(
+    package: ApplicationPackage, resume_keys: set[str], cover_letter_keys: set[str]
+) -> None:
     """Attachment safety: every attachment must match an approved package component.
 
     Raises :class:`PackageError` when an attachment is not one of the package's own
@@ -244,7 +246,10 @@ async def send_package_email(
     approval.used_at = datetime.now(UTC)
     package.send_state = EmailSendState.PENDING
     package.sender_address = None
-    if app.status not in (ApplicationStatus.APPLIED, ApplicationStatus.SUBMISSION_UNKNOWN):
+    if app.status not in (
+        ApplicationStatus.APPLIED,
+        ApplicationStatus.SUBMISSION_UNKNOWN,
+    ):
         app.status = ApplicationStatus.SUBMITTING
     await db.commit()
 

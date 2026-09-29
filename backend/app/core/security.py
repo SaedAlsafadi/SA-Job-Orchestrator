@@ -44,9 +44,18 @@ def _secret() -> str:
 def create_access_token(sub: str, *, expires_minutes: int | None = None) -> str:
     """Mint a short-lived access token for ``sub`` (the user id)."""
     auth = get_settings().auth
-    minutes = expires_minutes if expires_minutes is not None else auth.access_token_expire_minutes
+    minutes = (
+        expires_minutes
+        if expires_minutes is not None
+        else auth.access_token_expire_minutes
+    )
     now = datetime.now(UTC)
-    payload = {"sub": sub, "type": "access", "iat": now, "exp": now + timedelta(minutes=minutes)}
+    payload = {
+        "sub": sub,
+        "type": "access",
+        "iat": now,
+        "exp": now + timedelta(minutes=minutes),
+    }
     return jwt.encode(payload, _secret(), algorithm=auth.algorithm)
 
 
@@ -67,7 +76,9 @@ def decode_token(token: str, *, expected_type: str | None = None) -> dict[str, A
     """Decode and validate a JWT. Raises :class:`AuthError` on any failure."""
     auth = get_settings().auth
     try:
-        payload: dict[str, Any] = jwt.decode(token, _secret(), algorithms=[auth.algorithm])
+        payload: dict[str, Any] = jwt.decode(
+            token, _secret(), algorithms=[auth.algorithm]
+        )
     except jwt.PyJWTError as exc:
         raise AuthError("Invalid or expired token") from exc
     if expected_type is not None and payload.get("type") != expected_type:

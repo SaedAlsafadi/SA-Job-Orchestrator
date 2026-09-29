@@ -1,19 +1,20 @@
 """Distributed locking mechanism for monitoring cycles."""
 
-import asyncio
-from datetime import datetime, UTC
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-import structlog
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+
+import structlog
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import get_settings
-from app.models.monitoring import MonitoringSchedule
 
 logger = structlog.get_logger(__name__)
 
+
 class MonitoringLockError(Exception):
     pass
+
 
 @asynccontextmanager
 async def acquire_monitoring_lock(db: AsyncSession, platform: str, source: str):
@@ -24,20 +25,24 @@ async def acquire_monitoring_lock(db: AsyncSession, platform: str, source: str):
     """
     settings = get_settings()
     has_redis = bool(settings.redis_url)
-    
+
     lock_key = f"monitor_lock:{platform}:{source}"
-    
+
     if has_redis:
         try:
             from redis.asyncio import Redis
-            import redis.exceptions
+
             redis_client = Redis.from_url(settings.redis_url)
-            
+
             # Simple SET NX PX lock
-            acquired = await redis_client.set(lock_key, "locked", nx=True, px=600000) # 10 min
+            acquired = await redis_client.set(
+                lock_key, "locked", nx=True, px=600000
+            )  # 10 min
             if not acquired:
-                raise MonitoringLockError(f"Could not acquire Redis lock for {lock_key}")
-            
+                raise MonitoringLockError(
+                    f"Could not acquire Redis lock for {lock_key}"
+                )
+
             try:
                 yield
             finally:
@@ -55,12 +60,14 @@ async def acquire_monitoring_lock(db: AsyncSession, platform: str, source: str):
 
     if not has_redis:
         # DB-backed fallback lock
-        from app.models.system_lock import SystemLock
-        from sqlalchemy.exc import IntegrityError
         from datetime import timedelta
-        
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.system_lock import SystemLock
+
         expires = datetime.now(UTC) + timedelta(minutes=10)
-        
+
         lock_rec = SystemLock(key=lock_key, expires_at=expires)
         db.add(lock_rec)
         try:
@@ -77,8 +84,10 @@ async def acquire_monitoring_lock(db: AsyncSession, platform: str, source: str):
                 existing_lock.expires_at = expires
                 await db.commit()
             else:
-                raise MonitoringLockError(f"Could not acquire DB lock for {lock_key} (race condition)")
-        
+                raise MonitoringLockError(
+                    f"Could not acquire DB lock for {lock_key} (race condition)"
+                )
+
         try:
             yield
         finally:

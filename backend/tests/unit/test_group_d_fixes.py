@@ -35,21 +35,29 @@ class TestAnomalyMonitor:
         db_session.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         for i in range(6):
             job = Job(
-                user_id=TEST_USER_ID, platform="linkedin", platform_job_id=f"j{i}",
-                title="t", company="c", url="https://x",
+                user_id=TEST_USER_ID,
+                platform="linkedin",
+                platform_job_id=f"j{i}",
+                title="t",
+                company="c",
+                url="https://x",
             )
             db_session.add(job)
             await db_session.flush()
             status = ApplicationStatus.FAILED if i < 4 else ApplicationStatus.APPLIED
             db_session.add(
                 Application(
-                    user_id=TEST_USER_ID, job_id=job.id, status=status,
+                    user_id=TEST_USER_ID,
+                    job_id=job.id,
+                    status=status,
                     apply_mode=ApplyMode.AUTONOMOUS,
                 )
             )
         await db_session.commit()
 
-        with patch.object(tasks, "async_session_factory", lambda: _SessionCM(db_session)):
+        with patch.object(
+            tasks, "async_session_factory", lambda: _SessionCM(db_session)
+        ):
             await tasks.monitor_system_health({"redis": None})
 
         issues = (await db_session.execute(select(SystemIssue))).scalars().all()
@@ -61,31 +69,42 @@ class TestAnomalyMonitor:
 
 class TestSkillFeedbackLoop:
     async def _skill_and_traj(self, db_session):
-        skill = await record_skill(db_session, "linkedin", "Easy Apply at .jobs-apply-button")
+        skill = await record_skill(
+            db_session, "linkedin", "Easy Apply at .jobs-apply-button"
+        )
         db_session.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         await db_session.commit()
         traj = await record.record_trajectory(
-            db_session, user_id=TEST_USER_ID, application_id="app-1",
-            platform="linkedin", skills_used=[skill.id],
+            db_session,
+            user_id=TEST_USER_ID,
+            application_id="app-1",
+            platform="linkedin",
+            skills_used=[skill.id],
         )
         return skill, traj
 
     async def test_success_verdict_increments_skill_score(self, db_session):
         skill, traj = await self._skill_and_traj(db_session)
-        await tasks._score_skills_from_verdict(db_session, traj, RunVerdictResult.SUCCESS)
+        await tasks._score_skills_from_verdict(
+            db_session, traj, RunVerdictResult.SUCCESS
+        )
         refreshed = await db_session.get(DomainSkill, skill.id)
         assert refreshed.score == 1
 
     async def test_failure_verdict_decrements_skill_score(self, db_session):
         skill, traj = await self._skill_and_traj(db_session)
-        await tasks._score_skills_from_verdict(db_session, traj, RunVerdictResult.FAILED)
+        await tasks._score_skills_from_verdict(
+            db_session, traj, RunVerdictResult.FAILED
+        )
         refreshed = await db_session.get(DomainSkill, skill.id)
         assert refreshed.score == -1
 
     async def test_repeated_failures_auto_retire(self, db_session):
         skill, traj = await self._skill_and_traj(db_session)
         for _ in range(3):
-            await tasks._score_skills_from_verdict(db_session, traj, RunVerdictResult.FAILED)
+            await tasks._score_skills_from_verdict(
+                db_session, traj, RunVerdictResult.FAILED
+            )
         refreshed = await db_session.get(DomainSkill, skill.id)
         assert refreshed.status == SkillStatus.RETIRED  # score <= -3 auto-retires
 
@@ -96,11 +115,13 @@ class TestSkillFeedbackLoop:
 class TestAdminSystemIssues:
     async def test_non_superuser_forbidden(self, anon_client):
         await anon_client.post(
-            "/api/v1/auth/register", json={"email": "u@x.com", "password": "password123"}
+            "/api/v1/auth/register",
+            json={"email": "u@x.com", "password": "password123"},
         )
         token = (
             await anon_client.post(
-                "/api/v1/auth/login", data={"username": "u@x.com", "password": "password123"}
+                "/api/v1/auth/login",
+                data={"username": "u@x.com", "password": "password123"},
             )
         ).json()["access_token"]
         r = await anon_client.get(
@@ -110,7 +131,8 @@ class TestAdminSystemIssues:
 
     async def test_superuser_allowed(self, anon_client, db_session):
         await anon_client.post(
-            "/api/v1/auth/register", json={"email": "admin@x.com", "password": "password123"}
+            "/api/v1/auth/register",
+            json={"email": "admin@x.com", "password": "password123"},
         )
         user = (
             await db_session.execute(select(User).where(User.email == "admin@x.com"))
@@ -120,7 +142,8 @@ class TestAdminSystemIssues:
 
         token = (
             await anon_client.post(
-                "/api/v1/auth/login", data={"username": "admin@x.com", "password": "password123"}
+                "/api/v1/auth/login",
+                data={"username": "admin@x.com", "password": "password123"},
             )
         ).json()["access_token"]
         r = await anon_client.get(

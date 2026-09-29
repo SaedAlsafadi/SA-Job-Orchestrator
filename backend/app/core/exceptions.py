@@ -128,7 +128,9 @@ class FormFillError(BrowserError):
     """Form interaction failure (fill, click, upload)."""
 
     def __init__(self, field: str = "", message: str = "") -> None:
-        full_message = f"Form fill failed for '{field}': {message}" if field else message
+        full_message = (
+            f"Form fill failed for '{field}': {message}" if field else message
+        )
         super().__init__(full_message)
         self.code = "BROWSER_FORM_FILL_ERROR"
 
@@ -147,7 +149,9 @@ class ParseError(DocumentError):
     """Failed to parse a document."""
 
     def __init__(self, file_path: str = "", message: str = "") -> None:
-        full_message = f"Failed to parse '{file_path}': {message}" if file_path else message
+        full_message = (
+            f"Failed to parse '{file_path}': {message}" if file_path else message
+        )
         super().__init__(full_message)
         self.code = "DOCUMENT_PARSE_ERROR"
 
@@ -164,7 +168,9 @@ class TemplateError(DocumentError):
     """Template not found or invalid."""
 
     def __init__(self, template_name: str = "", message: str = "") -> None:
-        full_message = f"Template '{template_name}' error: {message}" if template_name else message
+        full_message = (
+            f"Template '{template_name}' error: {message}" if template_name else message
+        )
         super().__init__(full_message)
         self.code = "DOCUMENT_TEMPLATE_ERROR"
 
@@ -186,7 +192,9 @@ class JobPlatformError(AutoApplyError):
     """Base job platform error."""
 
     def __init__(self, platform: str = "", message: str = "") -> None:
-        full_message = f"Platform '{platform}' error: {message}" if platform else message
+        full_message = (
+            f"Platform '{platform}' error: {message}" if platform else message
+        )
         super().__init__(full_message, code="PLATFORM_ERROR")
         self.platform = platform
 
@@ -194,7 +202,9 @@ class JobPlatformError(AutoApplyError):
 class AuthenticationError(JobPlatformError):
     """Authentication or login failure."""
 
-    def __init__(self, platform: str = "", message: str = "Authentication failed") -> None:
+    def __init__(
+        self, platform: str = "", message: str = "Authentication failed"
+    ) -> None:
         super().__init__(platform, message)
         self.code = "PLATFORM_AUTH_ERROR"
 
@@ -210,7 +220,9 @@ class SearchError(JobPlatformError):
 class ApplicationSubmissionError(JobPlatformError):
     """Job application submission failure."""
 
-    def __init__(self, platform: str = "", message: str = "Application submission failed") -> None:
+    def __init__(
+        self, platform: str = "", message: str = "Application submission failed"
+    ) -> None:
         super().__init__(platform, message)
         self.code = "PLATFORM_APPLICATION_ERROR"
 

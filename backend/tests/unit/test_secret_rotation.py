@@ -32,7 +32,10 @@ class TestRotateAll:
         await db_session.refresh(row)
         assert row.kek_id != old_kek_id  # re-wrapped under the new current KEK
         # And it still decrypts to the original secret.
-        assert await rotating.get_llm_key(db_session, TEST_USER_ID, "openai") == "sk-secret"
+        assert (
+            await rotating.get_llm_key(db_session, TEST_USER_ID, "openai")
+            == "sk-secret"
+        )
 
     async def test_skips_rows_already_on_current_kek(self, db_session):
         key = Fernet.generate_key().decode()
@@ -41,4 +44,6 @@ class TestRotateAll:
         store = CredentialStore(LocalSecretsProvider([key]))
         await store.put_llm_key(db_session, TEST_USER_ID, "openai", "sk-secret")
 
-        assert await store.rotate_all(db_session) == 0  # already current → nothing to do
+        assert (
+            await store.rotate_all(db_session) == 0
+        )  # already current → nothing to do

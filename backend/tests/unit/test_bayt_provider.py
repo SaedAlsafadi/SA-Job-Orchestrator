@@ -1,4 +1,5 @@
 import pytest
+
 from app.core.job_discovery.providers.bayt_provider import BaytDiscoveryProvider
 
 MOCK_BAYT_HTML = """
@@ -27,28 +28,35 @@ MOCK_BAYT_HTML = """
 </html>
 """
 
+
 @pytest.fixture
 def bayt_provider():
     return BaytDiscoveryProvider()
+
 
 def test_bayt_provider_capabilities(bayt_provider):
     caps = bayt_provider.capabilities()
     assert caps.global_search is True
     assert caps.direct_url is True
 
+
 def test_bayt_parse_search_page(bayt_provider):
     base_url = "https://www.bayt.com/en/saudi-arabia/jobs/search/"
     results = bayt_provider._parse_search_page(MOCK_BAYT_HTML, base_url)
-    
+
     assert len(results) == 2
-    
+
     job1 = results[0]
     assert job1["title"] == "Senior AI Engineer"
     assert job1["company"] == "Tech Innovators LLC"
     assert job1["location"] == "Riyadh, Saudi Arabia"
-    assert job1["url"] == "https://www.bayt.com/en/saudi-arabia/jobs/senior-ai-engineer-1234567/"
+    assert (
+        job1["url"]
+        == "https://www.bayt.com/en/saudi-arabia/jobs/senior-ai-engineer-1234567/"
+    )
     assert job1["platform_job_id"] == "1234567"
     assert "PyTorch" in job1["description"]
+
 
 def test_bayt_normalization(bayt_provider):
     raw_data = {
@@ -57,11 +65,11 @@ def test_bayt_normalization(bayt_provider):
         "location": "Riyadh, Saudi Arabia",
         "url": "https://www.bayt.com/en/saudi-arabia/jobs/senior-ai-engineer-1234567/",
         "platform_job_id": "1234567",
-        "description": "We are looking for a Senior AI Engineer with experience in PyTorch and LLMs."
+        "description": "We are looking for a Senior AI Engineer with experience in PyTorch and LLMs.",
     }
-    
+
     job = bayt_provider.normalize(raw_data)
-    
+
     assert job["title"] == "Senior AI Engineer"
     assert job["company"] == "Tech Innovators LLC"
     assert job["platform"] == "bayt"

@@ -40,7 +40,8 @@ async def build_llm_client_for_user(
     )
 
 
-async def build_llm_router_for_user(db: AsyncSession, user_id: str, credential_store: CredentialStore | None = None) -> LLMTaskRouter:
+async def build_llm_router_for_user(
+    db: AsyncSession, user_id: str, credential_store: CredentialStore | None = None
+) -> LLMTaskRouter:
     client = await build_llm_client_for_user(db, user_id, credential_store)
     return LLMTaskRouter(client)
-

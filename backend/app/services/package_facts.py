@@ -12,10 +12,30 @@ from difflib import SequenceMatcher
 from typing import TypedDict
 
 _MONTHS = {
-    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
-    "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
-    "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
-    "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
 }
 _DATE_TOKEN = (
     r"(?:present|current|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
@@ -111,7 +131,9 @@ def build_protected_entity_map(
     """Build the canonical generation contract with provenance references."""
     entities: list[ProtectedEntity] = []
 
-    def add(category: str, value: object, source: str, evidence_ref: str | None = None) -> None:
+    def add(
+        category: str, value: object, source: str, evidence_ref: str | None = None
+    ) -> None:
         cleaned = str(value or "").strip()
         if not cleaned:
             return
@@ -127,9 +149,16 @@ def build_protected_entity_map(
 
     identity = candidate.get("identity") or {}
     full_name = " ".join(
-        part for part in [identity.get("first_name", ""), identity.get("last_name", "")] if part
+        part
+        for part in [identity.get("first_name", ""), identity.get("last_name", "")]
+        if part
     ).strip()
-    add("candidate_name", full_name, "CandidateProfile.identity", "candidate_profile.identity")
+    add(
+        "candidate_name",
+        full_name,
+        "CandidateProfile.identity",
+        "candidate_profile.identity",
+    )
     for index, item in enumerate(candidate.get("experience") or []):
         add(
             "employer",
@@ -188,7 +217,9 @@ def format_protected_entity_contract(entities: list[ProtectedEntity]) -> str:
         "If you reference one, copy its CANONICAL value verbatim:",
     ]
     for entity in entities:
-        evidence = f"; evidence={entity['evidence_ref']}" if entity["evidence_ref"] else ""
+        evidence = (
+            f"; evidence={entity['evidence_ref']}" if entity["evidence_ref"] else ""
+        )
         lines.append(
             f"- {entity['category'].upper()}: {entity['canonical']} "
             f"(source={entity['source']}{evidence})"
@@ -215,7 +246,14 @@ def _entity_variant(
             # Short case-only strings (for example "IT" vs the pronoun "It") are
             # too ambiguous to rewrite without surrounding structured context.
             return None
-        return exact_casefold.start(), exact_casefold.end(), generated, "CASING", 1.0, True
+        return (
+            exact_casefold.start(),
+            exact_casefold.end(),
+            generated,
+            "CASING",
+            1.0,
+            True,
+        )
 
     canonical_words = _ENTITY_WORD_RE.findall(canonical)
     word_matches = list(_ENTITY_WORD_RE.finditer(text))
@@ -228,12 +266,14 @@ def _entity_variant(
     candidates: list[tuple[float, int, int, str]] = []
     for index in range(len(word_matches) - width + 1):
         first, last = word_matches[index], word_matches[index + width - 1]
-        generated = text[first.start():last.end()]
-        normalized = " ".join(match.group(0) for match in word_matches[index:index + width])
+        generated = text[first.start() : last.end()]
+        normalized = " ".join(
+            match.group(0) for match in word_matches[index : index + width]
+        )
         ratio = SequenceMatcher(
             None, normalized.casefold(), canonical_normalized.casefold()
         ).ratio()
-        if ratio >= .86:
+        if ratio >= 0.86:
             candidates.append((ratio, first.start(), last.end(), generated))
     if not candidates:
         return None
@@ -255,7 +295,7 @@ def _entity_variant(
             normalized_generated.casefold(),
             " ".join(other_words).casefold(),
         ).ratio()
-        if other_ratio >= .86 and other_ratio >= ratio - .05:
+        if other_ratio >= 0.86 and other_ratio >= ratio - 0.05:
             plausible += 1
     safe = plausible == 1 and difference in {"CASING", "SPACING", "TYPO"}
     return start, end, generated, difference, ratio, safe
@@ -276,20 +316,24 @@ def protected_entity_violations(
         if not variant:
             continue
         _, _, generated, difference, confidence, safe = variant
-        violations.append({
-            "category": entity["category"],
-            "canonical": entity["canonical"],
-            "generated": generated,
-            "difference": difference,
-            "source": entity["source"],
-            "evidence_ref": entity["evidence_ref"],
-            "confidence": round(confidence, 3),
-            "safe_to_restore": safe,
-        })
+        violations.append(
+            {
+                "category": entity["category"],
+                "canonical": entity["canonical"],
+                "generated": generated,
+                "difference": difference,
+                "source": entity["source"],
+                "evidence_ref": entity["evidence_ref"],
+                "confidence": round(confidence, 3),
+                "safe_to_restore": safe,
+            }
+        )
     return violations
 
 
-def protected_entity_issues(texts: list[str], facts: dict[str, list[str]]) -> list[dict[str, str]]:
+def protected_entity_issues(
+    texts: list[str], facts: dict[str, list[str]]
+) -> list[dict[str, str]]:
     """Flag likely renamed protected entities without requiring exact-string matching."""
     reverse_categories = {value: key for key, value in _FACT_KEYS.items()}
     entities: list[ProtectedEntity] = [
@@ -323,9 +367,11 @@ def restore_protected_entities(text: str, facts: dict[str, list[str]]) -> str:
     documents without inventing candidate facts.
     """
     restored = text
-    canonicals = list(dict.fromkeys(
-        canonical for values in facts.values() for canonical in values if canonical
-    ))
+    canonicals = list(
+        dict.fromkeys(
+            canonical for values in facts.values() for canonical in values if canonical
+        )
+    )
     for canonical in canonicals:
         if canonical in restored:
             continue
@@ -345,7 +391,10 @@ def llm_issue_overruled(issue: object, facts: dict[str, list[str]]) -> bool:
         if ranges and all(item["end_status"] == "NOT_FUTURE" for item in ranges):
             return True
     if ("unsupported" in lowered or "not supported" in lowered) and (
-        "degree" in lowered or "b.sc" in lowered or "bsc" in lowered or "bachelor" in lowered
+        "degree" in lowered
+        or "b.sc" in lowered
+        or "bsc" in lowered
+        or "bachelor" in lowered
     ):
         return bool(facts.get("degrees"))
     return False

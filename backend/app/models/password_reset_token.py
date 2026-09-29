@@ -19,7 +19,10 @@ class PasswordResetToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "password_reset_tokens"
 
     user_id: Mapped[str] = mapped_column(
-        String(32), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

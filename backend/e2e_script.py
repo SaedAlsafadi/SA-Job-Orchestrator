@@ -1,6 +1,9 @@
 import asyncio
+
 from fastapi.testclient import TestClient
+
 from app.main import app
+
 
 def run_e2e():
     client = TestClient(app)

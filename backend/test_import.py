@@ -1,13 +1,17 @@
 import asyncio
-from httpx import AsyncClient, ASGITransport
-from app.main import app
+
+from httpx import ASGITransport, AsyncClient
+
 from app.core.security import create_access_token
+from app.main import app
+
 
 async def test():
     token = create_access_token("f9305c63796d4430bcdb178025ea6d64")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        import docx
         from io import BytesIO
+
+        import docx
         doc = docx.Document()
         doc.add_paragraph("Saed Alsafadi")
         doc.add_paragraph("saed@email.com | +966 555 1234")

@@ -29,10 +29,16 @@ def upgrade() -> None:
         sa.Column("used_at", sa.DateTime(), nullable=True),
         sa.Column("id", sa.String(length=32), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False
+            "created_at",
+            sa.DateTime(),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False
+            "updated_at",
+            sa.DateTime(),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -42,7 +48,9 @@ def upgrade() -> None:
             batch_op.f("ix_password_reset_tokens_user_id"), ["user_id"], unique=False
         )
         batch_op.create_index(
-            batch_op.f("ix_password_reset_tokens_token_hash"), ["token_hash"], unique=False
+            batch_op.f("ix_password_reset_tokens_token_hash"),
+            ["token_hash"],
+            unique=False,
         )
 
 

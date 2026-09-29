@@ -1,8 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 import structlog
+
 from app.core.connectors.base import ApplicationConnector, ApplicationQuestion
 
 logger = structlog.get_logger(__name__)
+
 
 class WorkableApplicationConnector(ApplicationConnector):
     def name(self) -> str:
@@ -14,8 +17,8 @@ class WorkableApplicationConnector(ApplicationConnector):
     async def open_application(self, url: str, page) -> None:
         logger.info("Opening workable job page", url=url)
         await page.goto(url)
-        await page.wait_for_load_state('networkidle')
-        
+        await page.wait_for_load_state("networkidle")
+
         # Try to dismiss cookie banners
         try:
             cookie_selectors = [
@@ -23,7 +26,7 @@ class WorkableApplicationConnector(ApplicationConnector):
                 'button:has-text("Accept All")',
                 'button:has-text("Allow cookies")',
                 '[data-ui="cookie-consent-accept"]',
-                '#cookie-consent-button'
+                "#cookie-consent-button",
             ]
             for sel in cookie_selectors:
                 elements = await page.locator(sel).all()
@@ -34,18 +37,18 @@ class WorkableApplicationConnector(ApplicationConnector):
                         clicked_cookie = True
                         break
                 if clicked_cookie:
-                    await page.wait_for_timeout(1000) # wait for banner to disappear
+                    await page.wait_for_timeout(1000)  # wait for banner to disappear
                     break
         except Exception as e:
             logger.info("No cookie banner found or could not dismiss: " + str(e))
-        
+
         # Wait a bit just in case
         await page.wait_for_timeout(2000)
-        
+
         # Click Apply Now
         await self._click_apply_now(page)
 
-    async def _click_apply_now(self, page):
+    async def _click_apply_now(self, page) -> None:
         # Look for the apply button resiliently
         selectors = [
             'button[data-ui="apply-button"]',
@@ -53,9 +56,9 @@ class WorkableApplicationConnector(ApplicationConnector):
             'button:has-text("Apply for this job")',
             'button:has-text("Apply Now")',
             'a:has-text("Apply for this job")',
-            'a:has-text("Apply Now")'
+            'a:has-text("Apply Now")',
         ]
-        
+
         clicked = False
         for sel in selectors:
             elements = await page.locator(sel).all()
@@ -65,30 +68,37 @@ class WorkableApplicationConnector(ApplicationConnector):
                     await el.click(force=True)
                     clicked = True
                     break
-            if clicked: break
-            
+            if clicked:
+                break
+
         if not clicked:
-            logger.info("Apply button not found, perhaps we are already on an application page")
-            
+            logger.info(
+                "Apply button not found, perhaps we are already on an application page"
+            )
+
         # Wait for the panel/form to be visible
         try:
             # wait for form or dialog
-            await page.wait_for_selector('form, [role="dialog"], [data-ui="application-form"]', timeout=5000)
+            await page.wait_for_selector(
+                'form, [role="dialog"], [data-ui="application-form"]', timeout=5000
+            )
         except Exception:
-            logger.warning("Timeout waiting for application panel to open. Assuming it might already be open.")
+            logger.warning(
+                "Timeout waiting for application panel to open. Assuming it might already be open."
+            )
 
-    async def inspect_form(self, page) -> List[ApplicationQuestion]:
+    async def inspect_form(self, page) -> list[ApplicationQuestion]:
         # Inject JS to find all form fields (inputs, textareas, selects) inside the panel
         script = r"""
         () => {
             const fields = [];
             // Look for the main application container first
             let container = document.querySelector('form') || document.querySelector('[role="dialog"]') || document;
-            
+
             container.querySelectorAll('input, textarea, select').forEach(el => {
                 const type = el.type || el.tagName.toLowerCase();
                 if (type === 'hidden' || type === 'submit' || type === 'button' || type === 'file') return;
-                
+
                 // Helper to cleanly extract text from a label, ignoring nested inputs/selects/ul
                 const extractCleanText = (labelNode) => {
                     if (!labelNode) return '';
@@ -105,11 +115,11 @@ class WorkableApplicationConnector(ApplicationConnector):
 
                 // Find associated label
                 let labelText = '';
-                
+
                 // 1. Direct label
                 const labelEl = document.querySelector(`label[for="${el.id}"]`);
                 if (labelEl) labelText = extractCleanText(labelEl);
-                
+
                 // 2. Nested label
                 if (!labelText) {
                     const closestLabel = el.closest('label');
@@ -140,22 +150,22 @@ class WorkableApplicationConnector(ApplicationConnector):
                         }
                     }
                 }
-                
+
                 // 3. Aria / Placeholder / Name
                 if (!labelText) labelText = el.getAttribute('aria-label') || '';
                 if (!labelText) labelText = el.placeholder || '';
                 if (!labelText) labelText = el.name || el.id || '';
-                
+
                 // Clean up label text (truncate to max 150 chars just in case)
                 labelText = labelText.replace(/\n/g, ' ').replace(/\*/g, '').trim();
                 if (labelText.length > 150) labelText = labelText.substring(0, 150) + "...";
-                
+
                 let currentValue = el.value || "";
                 if ((type === 'radio' || type === 'checkbox') && !el.checked) {
                     currentValue = ""; // Not selected
                 }
                 let isPrefilled = currentValue.trim() !== "";
-                
+
                 // Deduplicate radios with the same name, we don't want 5 questions for 1 radio group
                 if ((type === 'radio' || type === 'checkbox') && el.name) {
                     const existing = fields.find(f => f.name === el.name);
@@ -166,7 +176,7 @@ class WorkableApplicationConnector(ApplicationConnector):
                         return; // Skip adding a new field
                     }
                 }
-                
+
                 fields.push({
                     id: el.name || el.id || labelText,
                     name: el.name,
@@ -185,16 +195,19 @@ class WorkableApplicationConnector(ApplicationConnector):
         questions = []
         for rf in raw_fields:
             qid = rf["id"]
-            if not qid: continue
-            questions.append(ApplicationQuestion(
-                question_id=qid,
-                label=rf["label"],
-                input_type=rf["type"],
-                required=rf["required"],
-                current_value=rf["current_value"],
-                prefilled=rf["prefilled"]
-            ))
-            
+            if not qid:
+                continue
+            questions.append(
+                ApplicationQuestion(
+                    question_id=qid,
+                    label=rf["label"],
+                    input_type=rf["type"],
+                    required=rf["required"],
+                    current_value=rf["current_value"],
+                    prefilled=rf["prefilled"],
+                )
+            )
+
         return questions
 
     async def detect_cv_presence(self, page) -> bool:
@@ -216,9 +229,9 @@ class WorkableApplicationConnector(ApplicationConnector):
             f'textarea[name="{question_id}"]',
             f'select[name="{question_id}"]',
             f'[data-ui="{question_id}"]',
-            f'[id="{question_id}"]'
+            f'[id="{question_id}"]',
         ]
-        
+
         filled = False
         for sel in selectors:
             elements = await page.locator(sel).all()
@@ -226,9 +239,11 @@ class WorkableApplicationConnector(ApplicationConnector):
                 for el in elements:
                     try:
                         tag = await el.evaluate("e => e.tagName.toLowerCase()")
-                        type_val = await el.evaluate("e => e.type ? e.type.toLowerCase() : ''")
-                        
-                        if tag == 'select':
+                        type_val = await el.evaluate(
+                            "e => e.type ? e.type.toLowerCase() : ''"
+                        )
+
+                        if tag == "select":
                             # Native select in Playwright
                             # Let's try selecting by label/text first, or value
                             try:
@@ -237,8 +252,8 @@ class WorkableApplicationConnector(ApplicationConnector):
                                 await el.select_option(value=value)
                             filled = True
                             break
-                        elif type_val in ['checkbox', 'radio']:
-                            is_true = str(value).lower() in ['true', 'yes', 'on', '1']
+                        elif type_val in ["checkbox", "radio"]:
+                            is_true = str(value).lower() in ["true", "yes", "on", "1"]
                             if is_true:
                                 await el.check()
                             else:
@@ -252,19 +267,21 @@ class WorkableApplicationConnector(ApplicationConnector):
                     except Exception as e:
                         logger.warning(f"Failed native fill for {sel}: {e}")
                         pass
-                        
+
                 if filled:
                     break
-                    
+
         if not filled:
-            logger.warning("Could not fill field with resilient selectors", question_id=question_id)
+            logger.warning(
+                "Could not fill field with resilient selectors", question_id=question_id
+            )
             raise ValueError(f"Could not fill field: {question_id}")
 
     async def upload_resume(self, page, file_path: str) -> None:
         selectors = [
             'input[type="file"][data-ui="resume"]',
             'input[type="file"][name="resume"]',
-            'input[type="file"]'
+            'input[type="file"]',
         ]
         uploaded = False
         for sel in selectors:
@@ -288,7 +305,7 @@ class WorkableApplicationConnector(ApplicationConnector):
             except ValueError:
                 question.requires_human = True
 
-    async def capture_state(self, page) -> Dict[str, Any]:
+    async def capture_state(self, page) -> dict[str, Any]:
         return {"url": page.url}
 
     async def submit(self, page) -> None:
@@ -296,9 +313,9 @@ class WorkableApplicationConnector(ApplicationConnector):
         selectors = [
             'button[data-ui="submit-button"]',
             'button:has-text("Submit application")',
-            'button[type="submit"]'
+            'button[type="submit"]',
         ]
-        
+
         clicked = False
         for sel in selectors:
             elements = await page.locator(sel).all()
@@ -307,10 +324,13 @@ class WorkableApplicationConnector(ApplicationConnector):
                     await el.click(force=True)
                     clicked = True
                     break
-            if clicked: break
-            
+            if clicked:
+                break
+
         if not clicked:
-            raise ValueError("Could not confidently identify submit control on Workable.")
+            raise ValueError(
+                "Could not confidently identify submit control on Workable."
+            )
 
     async def capture_confirmation(self, page) -> str:
         logger.info("Verifying submission confirmation")
@@ -318,17 +338,21 @@ class WorkableApplicationConnector(ApplicationConnector):
         try:
             # First quickly check if there are validation errors preventing submission
             await page.wait_for_timeout(2000)
-            error_elements = await page.locator('[data-ui="error-message"], .error, .has-error, .invalid-feedback').all()
+            error_elements = await page.locator(
+                '[data-ui="error-message"], .error, .has-error, .invalid-feedback'
+            ).all()
             for el in error_elements:
                 if await el.is_visible():
                     err_text = await el.inner_text()
                     if err_text and err_text.strip():
-                        raise ValueError(f"Validation error prevented submission: {err_text.strip()}")
-                        
+                        raise ValueError(
+                            f"Validation error prevented submission: {err_text.strip()}"
+                        )
+
             # Check for generic success messages often seen in Workable modal/page
             await page.wait_for_selector(
-                'text="Application submitted" , text="Success" , text="Thank you" , [data-ui="success-message"]', 
-                timeout=15000
+                'text="Application submitted" , text="Success" , text="Thank you" , [data-ui="success-message"]',
+                timeout=15000,
             )
             return "Confirmation verified"
         except ValueError as ve:

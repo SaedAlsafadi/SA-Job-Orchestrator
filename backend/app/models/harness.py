@@ -16,7 +16,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TenantMixin, TimestampMixin, UUIDPrimaryKeyMixin, pg_enum
+from app.models.base import (
+    Base,
+    TenantMixin,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+    pg_enum,
+)
 from app.models.enums import FailureClass, RunVerdictResult, SkillStatus
 
 
@@ -37,7 +43,9 @@ class RunTrajectory(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
     # IDs of the domain skills injected into this run's prompt — the verdict feeds back to
     # score them (the self-evolving feedback loop).
-    skills_used: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
+    skills_used: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
 
 
 class RunVerdict(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
@@ -111,7 +119,9 @@ class SystemIssue(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """A workflow/system anomaly detected by the harness (may be global or per-user)."""
 
     __tablename__ = "system_issues"
-    __table_args__ = (Index("ix_system_issue_status_detected", "status", "detected_at"),)
+    __table_args__ = (
+        Index("ix_system_issue_status_detected", "status", "detected_at"),
+    )
 
     user_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     category: Mapped[str] = mapped_column(String(50), nullable=False)

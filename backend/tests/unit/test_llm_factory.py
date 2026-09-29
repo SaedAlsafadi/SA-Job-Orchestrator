@@ -25,7 +25,11 @@ class TestBuildLLMClientForUser:
         store = _store()
         db_session.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         db_session.add(
-            UserLLMConfig(user_id=TEST_USER_ID, preferred_provider="openai", default_model="gpt-4o")
+            UserLLMConfig(
+                user_id=TEST_USER_ID,
+                preferred_provider="openai",
+                default_model="gpt-4o",
+            )
         )
         await db_session.commit()
         await store.put_llm_key(db_session, TEST_USER_ID, "openai", "sk-user-key")

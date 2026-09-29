@@ -60,7 +60,8 @@ class SettingsResponse(BaseModel):
     @field_validator("candidate_profile", mode="before")
     @classmethod
     def _coerce_candidate_profile(
-        cls, v: Any,
+        cls,
+        v: Any,
     ) -> CandidateProfileSchema | dict[str, Any]:
         if v is None:
             return CandidateProfileSchema()

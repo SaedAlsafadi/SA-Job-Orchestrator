@@ -92,15 +92,19 @@ async def get_current_package(
     """Return the current package for an application (ownership verified)."""
     await get_application_owned(db, application_id, user_id)
     return (
-        await db.execute(
-            select(ApplicationPackage)
-            .where(
-                ApplicationPackage.application_id == application_id,
-                ApplicationPackage.is_current.is_(True),
+        (
+            await db.execute(
+                select(ApplicationPackage)
+                .where(
+                    ApplicationPackage.application_id == application_id,
+                    ApplicationPackage.is_current.is_(True),
+                )
+                .order_by(ApplicationPackage.version.desc())
             )
-            .order_by(ApplicationPackage.version.desc())
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
 
 
 async def get_package_owned(
@@ -134,27 +138,36 @@ async def _next_version(db: AsyncSession, application_id: str) -> int:
 
 async def _mark_previous_not_current(db: AsyncSession, application_id: str) -> None:
     previous = (
-        await db.execute(
-            select(ApplicationPackage).where(
-                ApplicationPackage.application_id == application_id,
-                ApplicationPackage.is_current.is_(True),
+        (
+            await db.execute(
+                select(ApplicationPackage).where(
+                    ApplicationPackage.application_id == application_id,
+                    ApplicationPackage.is_current.is_(True),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for pkg in previous:
         pkg.is_current = False
 
 
 async def _default_route_id(db: AsyncSession, app: Application) -> str | None:
     route = (
-        await db.execute(
-            select(ApplicationRoute)
-            .where(ApplicationRoute.job_id == app.job_id)
-            .order_by(
-                ApplicationRoute.is_preferred.desc(), ApplicationRoute.resolved_at.desc()
+        (
+            await db.execute(
+                select(ApplicationRoute)
+                .where(ApplicationRoute.job_id == app.job_id)
+                .order_by(
+                    ApplicationRoute.is_preferred.desc(),
+                    ApplicationRoute.resolved_at.desc(),
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if route:
         return route.id
 
@@ -211,7 +224,9 @@ async def create_or_update_package(
 
     # Defaults from the application / current package when not explicitly provided.
     if route_id is None:
-        route_id = (current.route_id if current else None) or await _default_route_id(db, app)
+        route_id = (current.route_id if current else None) or await _default_route_id(
+            db, app
+        )
     if route_id:
         route = await db.get(ApplicationRoute, route_id)
         if route is None or route.user_id != user_id or route.job_id != app.job_id:
@@ -243,9 +258,7 @@ async def create_or_update_package(
             attachment_keys = current.attachment_keys
         elif resume:
             attachment_keys = [
-                key
-                for key in (resume.file_path_pdf, resume.file_path_docx)
-                if key
+                key for key in (resume.file_path_pdf, resume.file_path_docx) if key
             ]
     if answers is None and current:
         answers = current.answers
@@ -350,7 +363,9 @@ async def build_readiness(db: AsyncSession, package: ApplicationPackage) -> dict
         raise PackageError("Package job not found.")
 
     quality = assess_posting_quality(job)
-    work_auth = detect_work_requirements(f"{job.description or ''}\n{job.requirements or ''}")
+    work_auth = detect_work_requirements(
+        f"{job.description or ''}\n{job.requirements or ''}"
+    )
 
     documents: list[dict] = []
     missing: list[str] = []
@@ -368,7 +383,9 @@ async def build_readiness(db: AsyncSession, package: ApplicationPackage) -> dict
     if package.cover_letter_text:
         documents.append({"name": "Cover Letter", "ok": True, "detail": "drafted"})
     else:
-        documents.append({"name": "Cover Letter", "ok": False, "detail": "not generated"})
+        documents.append(
+            {"name": "Cover Letter", "ok": False, "detail": "not generated"}
+        )
         missing.append("cover letter")
 
     # Application email (email route only)
@@ -382,9 +399,13 @@ async def build_readiness(db: AsyncSession, package: ApplicationPackage) -> dict
         route_instructions = route.instructions if route else None
     if route_type == "EMAIL":
         if package.email_to and package.email_subject and package.email_body:
-            documents.append({"name": "Application Email", "ok": True, "detail": "drafted"})
+            documents.append(
+                {"name": "Application Email", "ok": True, "detail": "drafted"}
+            )
         else:
-            documents.append({"name": "Application Email", "ok": False, "detail": "not drafted"})
+            documents.append(
+                {"name": "Application Email", "ok": False, "detail": "not drafted"}
+            )
             missing.append("application email")
 
     # QA verdict

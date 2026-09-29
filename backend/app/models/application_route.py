@@ -16,25 +16,31 @@ class ApplicationRoute(UUIDPrimaryKeyMixin, TimestampMixin, TenantMixin, Base):
     job_id: Mapped[str] = mapped_column(
         ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False
     )
-    
-    route_type: Mapped[str] = mapped_column(String(50), nullable=False) # e.g., WORKABLE, EMAIL, COMPANY_WEBSITE, LINKEDIN, MANUAL
+
+    route_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # e.g., WORKABLE, EMAIL, COMPANY_WEBSITE, LINKEDIN, MANUAL
     url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     email: Mapped[str | None] = mapped_column(String(200), nullable=True)
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
-    
+
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     resolution_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     requires_human: Mapped[bool] = mapped_column(Boolean, default=False)
     is_preferred: Mapped[bool] = mapped_column(Boolean, default=False)
-    resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    
+    resolved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
     # Override tracking
     user_overridden: Mapped[bool] = mapped_column(Boolean, default=False)
     overridden_by_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    overridden_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
-    job: Mapped["Job"] = relationship(back_populates="routes") # noqa: F821
+    job: Mapped["Job"] = relationship(back_populates="routes")
 
     def __repr__(self) -> str:
         return f"<ApplicationRoute(route_type='{self.route_type}', confidence={self.confidence}, preferred={self.is_preferred})>"

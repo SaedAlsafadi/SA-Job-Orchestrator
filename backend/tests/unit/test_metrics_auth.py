@@ -28,7 +28,10 @@ class TestMetricsAuthorized:
         assert metrics_authorized(cfg, None) is False
 
     def test_production_fails_closed_when_token_unset(self):
-        assert metrics_authorized(_cfg(Environment.PRODUCTION, token=""), "Bearer ") is False
+        assert (
+            metrics_authorized(_cfg(Environment.PRODUCTION, token=""), "Bearer ")
+            is False
+        )
 
 
 class TestMetricsRoute:

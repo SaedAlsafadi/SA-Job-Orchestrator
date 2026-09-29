@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from pydantic import BaseModel, Field, ConfigDict, model_validator, field_validator
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 
 def generate_evidence_id(prefix: str) -> str:
     """Generate a stable short ID for evidence tracking."""
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
 
 class FlexibleModel(BaseModel):
     @model_validator(mode="before")
@@ -24,6 +27,7 @@ class FlexibleModel(BaseModel):
             return flattened
         return data
 
+
 class Identity(FlexibleModel):
     first_name: str = ""
     last_name: str = ""
@@ -34,17 +38,20 @@ class Identity(FlexibleModel):
     portfolio: str = ""
     professional_summary: str = ""
 
+
 class Location(FlexibleModel):
     country: str = ""
     city: str = ""
     preferred_locations: list[str] = Field(default_factory=list)
     willing_to_relocate: bool = False
-    remote_preference: str = "hybrid" # remote, hybrid, onsite
+    remote_preference: str = "hybrid"  # remote, hybrid, onsite
+
 
 class Employment(FlexibleModel):
     current_title: str = ""
     years_of_experience: int = 0
     notice_period: str = ""
+
 
 class WorkAuthorization(FlexibleModel):
     nationality: str = ""
@@ -52,12 +59,14 @@ class WorkAuthorization(FlexibleModel):
     work_authorization_status: str = ""
     iqama_transferable: bool = False
 
+
 class EducationEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("edu"))
     degree: str = ""
     institution: str = ""
     field_of_study: str = ""
     graduation_year: str = ""
+
 
 class ExperienceEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("exp"))
@@ -68,6 +77,7 @@ class ExperienceEntry(FlexibleModel):
     description: str = ""
     achievements: list[str] = Field(default_factory=list)
     technologies: list[str] = Field(default_factory=list)
+
 
 class SkillEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("skill"))
@@ -85,7 +95,9 @@ class SkillEntry(FlexibleModel):
             if "value" in data and "name" not in data:
                 return {
                     "name": data.get("value") or "",
-                    "evidence_id": data.get("evidence_id", generate_evidence_id("skill"))
+                    "evidence_id": data.get(
+                        "evidence_id", generate_evidence_id("skill")
+                    ),
                 }
             flattened = {}
             for k, v in data.items():
@@ -97,6 +109,7 @@ class SkillEntry(FlexibleModel):
             return flattened
         return data
 
+
 class ProjectEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("proj"))
     name: str = ""
@@ -105,11 +118,13 @@ class ProjectEntry(FlexibleModel):
     achievements: list[str] = Field(default_factory=list)
     url: str = ""
 
+
 class CertificationEntry(FlexibleModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("cert"))
     name: str = ""
     issuer: str = ""
     date: str = ""
+
 
 class Preferences(FlexibleModel):
     target_roles: list[str] = Field(default_factory=list)
@@ -119,6 +134,7 @@ class Preferences(FlexibleModel):
     salary_currency: str = "USD"
     employment_types: list[str] = Field(default_factory=list)
     excluded_companies: list[str] = Field(default_factory=list)
+
 
 class CandidateProfileSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -167,19 +183,25 @@ class CandidateProfileSchema(BaseModel):
             ids.add(cert.evidence_id)
         return ids
 
+
 class CandidateProfileResponse(CandidateProfileSchema):
     """Response model includes database IDs."""
+
     id: str
     user_id: str
     version: int
+
+
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+
 
 class DraftValue(BaseModel, Generic[T]):
     value: T | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source: str = "resume"
+
 
 class DraftIdentity(BaseModel):
     first_name: DraftValue[str] = Field(default_factory=DraftValue)
@@ -191,9 +213,11 @@ class DraftIdentity(BaseModel):
     portfolio: DraftValue[str] = Field(default_factory=DraftValue)
     professional_summary: DraftValue[str] = Field(default_factory=DraftValue)
 
+
 class DraftLocation(BaseModel):
     country: DraftValue[str] = Field(default_factory=DraftValue)
     city: DraftValue[str] = Field(default_factory=DraftValue)
+
 
 class DraftEducationEntry(BaseModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("edu"))
@@ -201,6 +225,7 @@ class DraftEducationEntry(BaseModel):
     institution: DraftValue[str] = Field(default_factory=DraftValue)
     field_of_study: DraftValue[str] = Field(default_factory=DraftValue)
     graduation_year: DraftValue[str] = Field(default_factory=DraftValue)
+
 
 class DraftExperienceEntry(BaseModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("exp"))
@@ -210,17 +235,20 @@ class DraftExperienceEntry(BaseModel):
     end_date: DraftValue[str] = Field(default_factory=DraftValue)
     description: DraftValue[str] = Field(default_factory=DraftValue)
 
+
 class DraftProjectEntry(BaseModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("proj"))
     name: DraftValue[str] = Field(default_factory=DraftValue)
     description: DraftValue[str] = Field(default_factory=DraftValue)
     url: DraftValue[str] = Field(default_factory=DraftValue)
 
+
 class DraftCertificationEntry(BaseModel):
     evidence_id: str = Field(default_factory=lambda: generate_evidence_id("cert"))
     name: DraftValue[str] = Field(default_factory=DraftValue)
     issuer: DraftValue[str] = Field(default_factory=DraftValue)
     date: DraftValue[str] = Field(default_factory=DraftValue)
+
 
 class CandidateProfileDraft(BaseModel):
     identity: DraftIdentity = Field(default_factory=DraftIdentity)
@@ -231,5 +259,3 @@ class CandidateProfileDraft(BaseModel):
     projects: list[DraftProjectEntry] = Field(default_factory=list)
     certifications: list[DraftCertificationEntry] = Field(default_factory=list)
     languages: list[DraftValue[str]] = Field(default_factory=list)
-
-

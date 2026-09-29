@@ -12,9 +12,16 @@ from tests.conftest import TEST_USER_ID
 
 async def _job(db, suffix: str = "1", score: float | None = None) -> Job:
     row = Job(
-        user_id=TEST_USER_ID, platform="linkedin", platform_job_id=f"phase20-{suffix}",
-        title=f"Phase 20 role {suffix}", company="Example", location="Remote",
-        url="https://example.com/job", description="Role", status="ready", match_score=score,
+        user_id=TEST_USER_ID,
+        platform="linkedin",
+        platform_job_id=f"phase20-{suffix}",
+        title=f"Phase 20 role {suffix}",
+        company="Example",
+        location="Remote",
+        url="https://example.com/job",
+        description="Role",
+        status="ready",
+        match_score=score,
         raw_data={"recommendation": "tailor"} if score is not None else {},
     )
     db.add(row)
@@ -23,21 +30,25 @@ async def _job(db, suffix: str = "1", score: float | None = None) -> Job:
     return row
 
 
-async def test_jobs_payload_normalizes_legacy_score_once(client, db_session, current_user):
+async def test_jobs_payload_normalizes_legacy_score_once(
+    client, db_session, current_user
+):
     await _job(db_session, score=47)
     response = await client.get("/api/v1/jobs/")
     assert response.status_code == 200
     assert response.json()["items"][0]["match_score"] == 0.47
 
 
-async def test_job_detail_serializes_application_routes(client, db_session, current_user):
-    job = await _job(db_session, "route-detail", score=.47)
+async def test_job_detail_serializes_application_routes(
+    client, db_session, current_user
+):
+    job = await _job(db_session, "route-detail", score=0.47)
     route = ApplicationRoute(
         user_id=TEST_USER_ID,
         job_id=job.id,
         route_type="COMPANY_WEBSITE",
         url="https://example.com/apply",
-        confidence=.9,
+        confidence=0.9,
         resolution_reason="Explicit application URL provided",
         requires_human=False,
         is_preferred=True,
@@ -56,7 +67,7 @@ async def test_job_detail_serializes_application_routes(client, db_session, curr
             "url": "https://example.com/apply",
             "email": None,
             "instructions": None,
-            "confidence": .9,
+            "confidence": 0.9,
             "resolution_reason": "Explicit application URL provided",
             "requires_human": False,
             "is_preferred": True,
@@ -65,22 +76,48 @@ async def test_job_detail_serializes_application_routes(client, db_session, curr
     ]
 
 
-async def test_dashboard_dismissal_persists_each_material_fingerprint(client, current_user):
-    payload = {"entity_type": "application", "entity_id": "a" * 32, "fingerprint": "queued:v1"}
-    assert (await client.post("/api/v1/dashboard/dismissals", json=payload)).status_code == 201
-    assert (await client.post("/api/v1/dashboard/dismissals", json=payload)).status_code == 201
+async def test_dashboard_dismissal_persists_each_material_fingerprint(
+    client, current_user
+):
+    payload = {
+        "entity_type": "application",
+        "entity_id": "a" * 32,
+        "fingerprint": "queued:v1",
+    }
+    assert (
+        await client.post("/api/v1/dashboard/dismissals", json=payload)
+    ).status_code == 201
+    assert (
+        await client.post("/api/v1/dashboard/dismissals", json=payload)
+    ).status_code == 201
     changed = {**payload, "fingerprint": "failed:v2"}
-    assert (await client.post("/api/v1/dashboard/dismissals", json=changed)).status_code == 201
+    assert (
+        await client.post("/api/v1/dashboard/dismissals", json=changed)
+    ).status_code == 201
     items = (await client.get("/api/v1/dashboard/dismissals")).json()["items"]
     assert {item["fingerprint"] for item in items} == {"queued:v1", "failed:v2"}
 
 
-async def test_referenced_resume_archives_without_breaking_application(client, db_session, current_user):
+async def test_referenced_resume_archives_without_breaking_application(
+    client, db_session, current_user
+):
     job = await _job(db_session, "archive")
-    resume = Resume(user_id=TEST_USER_ID, name="Referenced", type="base", template_id="modern", content_text="Full content")
+    resume = Resume(
+        user_id=TEST_USER_ID,
+        name="Referenced",
+        type="base",
+        template_id="modern",
+        content_text="Full content",
+    )
     db_session.add(resume)
     await db_session.flush()
-    application = Application(user_id=TEST_USER_ID, job_id=job.id, resume_id=resume.id, status="queued", apply_mode="review")
+    application = Application(
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        resume_id=resume.id,
+        status="queued",
+        apply_mode="review",
+    )
     db_session.add(application)
     await db_session.commit()
     response = await client.post(f"/api/v1/resumes/{resume.id}/archive")
@@ -92,15 +129,37 @@ async def test_referenced_resume_archives_without_breaking_application(client, d
     assert application.resume_id == resume.id
 
 
-async def test_tailored_resume_resolves_existing_revision_session(client, db_session, current_user):
-    job = await _job(db_session, "revise", score=.51)
-    base = Resume(user_id=TEST_USER_ID, name="Base", type="base", template_id="modern", content_text="Original")
+async def test_tailored_resume_resolves_existing_revision_session(
+    client, db_session, current_user
+):
+    job = await _job(db_session, "revise", score=0.51)
+    base = Resume(
+        user_id=TEST_USER_ID,
+        name="Base",
+        type="base",
+        template_id="modern",
+        content_text="Original",
+    )
     db_session.add(base)
     await db_session.flush()
-    tailored = Resume(user_id=TEST_USER_ID, name="Tailored", type="tailored", template_id="modern", base_resume_id=base.id, job_id=job.id, content_text="Draft")
+    tailored = Resume(
+        user_id=TEST_USER_ID,
+        name="Tailored",
+        type="tailored",
+        template_id="modern",
+        base_resume_id=base.id,
+        job_id=job.id,
+        content_text="Draft",
+    )
     db_session.add(tailored)
     await db_session.flush()
-    session = CVTailoringSession(user_id=TEST_USER_ID, job_id=job.id, base_resume_id=base.id, status="verified", final_resume_id=tailored.id)
+    session = CVTailoringSession(
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        base_resume_id=base.id,
+        status="verified",
+        final_resume_id=tailored.id,
+    )
     db_session.add(session)
     await db_session.commit()
     response = await client.get(f"/api/v1/tailoring/resume/{tailored.id}")
@@ -108,9 +167,17 @@ async def test_tailored_resume_resolves_existing_revision_session(client, db_ses
     assert response.json()["id"] == session.id
 
 
-async def test_legacy_tailored_resume_opens_model_free_revision_session(client, db_session, current_user):
-    job = await _job(db_session, "legacy-revise", score=.47)
-    base = Resume(user_id=TEST_USER_ID, name="Base", type="base", template_id="modern", content_text="Original")
+async def test_legacy_tailored_resume_opens_model_free_revision_session(
+    client, db_session, current_user
+):
+    job = await _job(db_session, "legacy-revise", score=0.47)
+    base = Resume(
+        user_id=TEST_USER_ID,
+        name="Base",
+        type="base",
+        template_id="modern",
+        content_text="Original",
+    )
     db_session.add(base)
     await db_session.flush()
     tailored = Resume(

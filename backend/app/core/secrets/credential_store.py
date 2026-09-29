@@ -88,10 +88,16 @@ class CredentialStore:
         return data.decode() if data is not None else None
 
     async def save_session_cookies(
-        self, db: AsyncSession, user_id: str, platform: str, storage_state: dict[str, Any]
+        self,
+        db: AsyncSession,
+        user_id: str,
+        platform: str,
+        storage_state: dict[str, Any],
     ) -> None:
         """Encrypt and upsert a platform's browser ``storage_state`` (assisted-login session)."""
-        await self._put(db, user_id, _KIND_COOKIES, platform, json.dumps(storage_state).encode())
+        await self._put(
+            db, user_id, _KIND_COOKIES, platform, json.dumps(storage_state).encode()
+        )
 
     async def load_session_cookies(
         self, db: AsyncSession, user_id: str, platform: str
@@ -127,8 +133,14 @@ class CredentialStore:
         for row in rows:
             if row.kek_id == current:
                 continue
-            context = {"user_id": row.user_id, "kind": row.kind, "provider": row.provider}
-            new_blob = await self._provider.rotate(EncryptedBlob(**row.blob), context=context)
+            context = {
+                "user_id": row.user_id,
+                "kind": row.kind,
+                "provider": row.provider,
+            }
+            new_blob = await self._provider.rotate(
+                EncryptedBlob(**row.blob), context=context
+            )
             row.blob = new_blob.model_dump()
             row.kek_id = new_blob.kek_id
             rotated += 1

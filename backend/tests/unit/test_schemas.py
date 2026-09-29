@@ -3,11 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.analytics import (
-    ATSScoreDistribution,
-    DashboardStats,
-    LLMUsageStats,
-)
+from app.schemas.analytics import ATSScoreDistribution, DashboardStats, LLMUsageStats
 from app.schemas.application import (
     ApplicationBatchCreate,
     ApplicationCreate,
@@ -144,7 +140,9 @@ class TestApplicationCreate:
         assert app.apply_mode == "review"
 
     def test_explicit_fields(self):
-        app = ApplicationCreate(job_id="job1", resume_id="res1", apply_mode="autonomous")
+        app = ApplicationCreate(
+            job_id="job1", resume_id="res1", apply_mode="autonomous"
+        )
         assert app.resume_id == "res1"
         assert app.apply_mode == "autonomous"
 

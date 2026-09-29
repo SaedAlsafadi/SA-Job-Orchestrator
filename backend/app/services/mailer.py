@@ -44,7 +44,9 @@ def _reset_bodies(reset_link: str) -> tuple[str, str]:
     return text, html
 
 
-def _send_via_smtp(to: str, subject: str, text_body: str, html_body: str | None) -> None:
+def _send_via_smtp(
+    to: str, subject: str, text_body: str, html_body: str | None
+) -> None:
     """Synchronous SMTP send (run off the event loop via a worker thread)."""
     cfg = get_settings().email
     msg = EmailMessage()
@@ -68,7 +70,9 @@ async def send_password_reset_email(to: str, reset_link: str) -> None:
     cfg = get_settings().email
     text_body, html_body = _reset_bodies(reset_link)
     if cfg.provider == "smtp":
-        await asyncio.to_thread(_send_via_smtp, to, _RESET_SUBJECT, text_body, html_body)
+        await asyncio.to_thread(
+            _send_via_smtp, to, _RESET_SUBJECT, text_body, html_body
+        )
         logger.info("password_reset_email_sent", to=to, provider="smtp")
         return
     # ``log`` provider: emit the link so the flow is exercisable without a mail server. In

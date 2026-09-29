@@ -33,26 +33,64 @@ class WorkAuthorizationResult:
 
 # Each pattern maps to a canonical requirement label. Only explicit phrasings match.
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("sponsorship_unavailable", re.compile(
-        r"\b(no|not|unavailable|cannot|can'?t|does not|doesn'?t)\b[^.]{0,30}\b(sponsorship|visa sponsorship|provide sponsorship)\b", re.I)),
-    ("sponsorship_unavailable", re.compile(
-        r"\b(sponsorship|visa)\b[^.]{0,20}\b(not|is not)\b[^.]{0,20}\b(available|provided|offered)\b", re.I)),
-    ("work_authorization_required", re.compile(
-        r"\b(must|only|required|candidates? (must|should))\b[^.]{0,40}\b(work authorization|authorised to work|authorized to work|right to work)\b", re.I)),
-    ("saudi_citizen_required", re.compile(
-        r"\b(saudi (citizens?|nationals?)|saudization)\b[^.]{0,30}\b(only|must|required)\b", re.I)),
-    ("saudi_citizen_required", re.compile(
-        r"\b(only|open (only|to))\b[^.]{0,20}\bsaudi (citizens?|nationals?)\b", re.I)),
-    ("gcc_restriction", re.compile(
-        r"\bgcc (citizens?|nationals?)\b[^.]{0,30}\b(only|must|required)\b", re.I)),
-    ("local_residency_required", re.compile(
-        r"\b(transferable (iqama|residency)|valid (iqama|residency permit))\b[^.]{0,30}\b(required|must|only)\b", re.I)),
+    (
+        "sponsorship_unavailable",
+        re.compile(
+            r"\b(no|not|unavailable|cannot|can'?t|does not|doesn'?t)\b[^.]{0,30}\b(sponsorship|visa sponsorship|provide sponsorship)\b",
+            re.I,
+        ),
+    ),
+    (
+        "sponsorship_unavailable",
+        re.compile(
+            r"\b(sponsorship|visa)\b[^.]{0,20}\b(not|is not)\b[^.]{0,20}\b(available|provided|offered)\b",
+            re.I,
+        ),
+    ),
+    (
+        "work_authorization_required",
+        re.compile(
+            r"\b(must|only|required|candidates? (must|should))\b[^.]{0,40}\b(work authorization|authorised to work|authorized to work|right to work)\b",
+            re.I,
+        ),
+    ),
+    (
+        "saudi_citizen_required",
+        re.compile(
+            r"\b(saudi (citizens?|nationals?)|saudization)\b[^.]{0,30}\b(only|must|required)\b",
+            re.I,
+        ),
+    ),
+    (
+        "saudi_citizen_required",
+        re.compile(
+            r"\b(only|open (only|to))\b[^.]{0,20}\bsaudi (citizens?|nationals?)\b", re.I
+        ),
+    ),
+    (
+        "gcc_restriction",
+        re.compile(
+            r"\bgcc (citizens?|nationals?)\b[^.]{0,30}\b(only|must|required)\b", re.I
+        ),
+    ),
+    (
+        "local_residency_required",
+        re.compile(
+            r"\b(transferable (iqama|residency)|valid (iqama|residency permit))\b[^.]{0,30}\b(required|must|only)\b",
+            re.I,
+        ),
+    ),
 ]
 
 # Explicit statements that authorization is available (status NONE).
 _AVAILABLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("sponsorship_available", re.compile(
-        r"\b(visa )?sponsorship\b[^.]{0,30}\b(available|provided|offered|supported)\b", re.I)),
+    (
+        "sponsorship_available",
+        re.compile(
+            r"\b(visa )?sponsorship\b[^.]{0,30}\b(available|provided|offered|supported)\b",
+            re.I,
+        ),
+    ),
 ]
 
 
@@ -67,7 +105,7 @@ def detect_work_requirements(job_text: str) -> WorkAuthorizationResult:
             requirements.append(label)
             # Keep a short verbatim snippet as evidence for the review UI.
             start = max(0, match.start() - 30)
-            snippet = (job_text[start:match.end() + 30]).strip().replace("\n", " ")
+            snippet = (job_text[start : match.end() + 30]).strip().replace("\n", " ")
             evidence.append(snippet)
 
     if requirements:

@@ -96,7 +96,10 @@ def sample_job_data() -> dict:
         "job_type": "full-time",
         "remote": True,
         "match_score": 0.85,
-        "skills_required": {"required": ["python", "fastapi", "postgresql"], "preferred": []},
+        "skills_required": {
+            "required": ["python", "fastapi", "postgresql"],
+            "preferred": [],
+        },
         "status": "new",
     }
 
@@ -126,6 +129,7 @@ def _build_test_app(db_session: AsyncSession, *, authenticated: bool):
     app.dependency_overrides[get_tenant_db] = override_get_tenant_db
 
     if authenticated:
+
         async def override_get_current_user():
             return User(id=TEST_USER_ID, email="test@example.com", is_active=True)
 

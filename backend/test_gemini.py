@@ -1,7 +1,10 @@
 import asyncio
+
 from pydantic import BaseModel
-from app.core.llm.client import LLMClient
+
 from app.config.settings import get_settings
+from app.core.llm.client import LLMClient
+
 
 class Dummy(BaseModel):
     name: str

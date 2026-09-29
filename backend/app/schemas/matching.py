@@ -1,17 +1,24 @@
-from enum import StrEnum
-from pydantic import BaseModel, Field
 from datetime import datetime
+from enum import StrEnum
+
+from pydantic import BaseModel, Field
+
 from app.services.eligibility import EligibilityResult
 
+
 class MatchEvidence(BaseModel):
-    evidence_id: str = Field(description="The exact evidence_id from the CandidateProfile")
+    evidence_id: str = Field(
+        description="The exact evidence_id from the CandidateProfile"
+    )
     description: str = Field(description="Why this evidence is relevant to the job")
+
 
 class RequirementStatus(StrEnum):
     MATCH = "MATCH"
     PARTIAL = "PARTIAL"
     GAP = "GAP"
     UNKNOWN = "UNKNOWN"
+
 
 class RequirementImportance(StrEnum):
     CRITICAL = "CRITICAL"
@@ -35,19 +42,37 @@ class EvidenceType(StrEnum):
     NONE = "NONE"
     UNKNOWN = "UNKNOWN"
 
+
 class RequirementAnalysis(BaseModel):
     requirement_id: str = Field(description="A unique short identifier like 'req-1'")
-    original_text: str = Field(description="The raw requirement text from the job description")
-    normalized_requirement: str = Field(description="A clean, concise statement of the requirement")
-    category: str = Field(description="HARD_REQUIREMENT, CORE_RESPONSIBILITY, DOMAIN_EXPERIENCE, PREFERRED, or TRANSFERABLE_COMPETENCY")
+    original_text: str = Field(
+        description="The raw requirement text from the job description"
+    )
+    normalized_requirement: str = Field(
+        description="A clean, concise statement of the requirement"
+    )
+    category: str = Field(
+        description="HARD_REQUIREMENT, CORE_RESPONSIBILITY, DOMAIN_EXPERIENCE, PREFERRED, or TRANSFERABLE_COMPETENCY"
+    )
     importance: RequirementImportance
     status: RequirementStatus
-    evidence_ids: list[str] = Field(description="Exact evidence_ids from CandidateProfile supporting the status", default_factory=list)
-    explanation: str = Field(description="Short explanation of the candidate's status against this requirement")
+    evidence_ids: list[str] = Field(
+        description="Exact evidence_ids from CandidateProfile supporting the status",
+        default_factory=list,
+    )
+    explanation: str = Field(
+        description="Short explanation of the candidate's status against this requirement"
+    )
     evidence_type: EvidenceType = EvidenceType.UNKNOWN
     candidate_evidence: list[MatchEvidence] = Field(default_factory=list)
-    contribution: float = Field(default=0.0, ge=0.0, le=100.0, description="Deterministic percentage-point contribution")
+    contribution: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Deterministic percentage-point contribution",
+    )
     max_contribution: float = Field(default=0.0, ge=0.0, le=100.0)
+
 
 class DimensionStatus(StrEnum):
     VALID_SCORE = "VALID_SCORE"
@@ -55,10 +80,12 @@ class DimensionStatus(StrEnum):
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
+
 class DimensionScore(BaseModel):
     status: DimensionStatus
     score: int | None = Field(default=None, description="Score 0-100 if valid")
     explanation: str | None = None
+
 
 class MatchVerdict(StrEnum):
     STRONG_MATCH = "STRONG_MATCH"
@@ -66,6 +93,7 @@ class MatchVerdict(StrEnum):
     PARTIAL_MATCH = "PARTIAL_MATCH"
     WEAK_MATCH = "WEAK_MATCH"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+
 
 class MatchDimensions(BaseModel):
     skills: DimensionScore
@@ -75,19 +103,29 @@ class MatchDimensions(BaseModel):
     # For now, just these 3 as requested.
     ats_keywords: DimensionScore | None = None
 
+
 class LLMMatchResult(BaseModel):
     verdict: MatchVerdict
-    confidence: float = Field(description="Confidence in this match result from 0.0 to 1.0")
+    confidence: float = Field(
+        description="Confidence in this match result from 0.0 to 1.0"
+    )
     data_quality: str = Field(description="'HIGH', 'LIMITED', or 'POOR'")
     data_quality_explanation: str | None = Field(default=None)
-    explanation: str = Field(description="2-4 sentences explaining why this candidate is a good/bad/uncertain match")
+    explanation: str = Field(
+        description="2-4 sentences explaining why this candidate is a good/bad/uncertain match"
+    )
     recommendation: str = Field(description="'apply', 'review', or 'skip'")
     strong_matches: list[str] = Field(description="Concise points of strong alignment")
     gaps: list[str] = Field(description="Concise missing skills or experience")
-    critical_gaps: list[str] = Field(description="Dealbreaker gaps or missing requirements")
-    blockers: list[str] = Field(description="Genuine blockers like hard eligibility fails or missing work auth")
+    critical_gaps: list[str] = Field(
+        description="Dealbreaker gaps or missing requirements"
+    )
+    blockers: list[str] = Field(
+        description="Genuine blockers like hard eligibility fails or missing work auth"
+    )
     dimensions: MatchDimensions
     requirement_analysis: list[RequirementAnalysis]
+
 
 class MatchProvenance(BaseModel):
     candidate_profile_version: int
@@ -96,6 +134,7 @@ class MatchProvenance(BaseModel):
     model_name: str
     generated_at: datetime
     ats_method: str = "deterministic_fallback"
+
 
 class CandidateMatchResult(BaseModel):
     eligibility: EligibilityResult
@@ -113,4 +152,3 @@ class CandidateMatchResult(BaseModel):
     blockers: list[str] = Field(default_factory=list)
     requirement_analysis: list[RequirementAnalysis] = Field(default_factory=list)
     provenance: MatchProvenance
-

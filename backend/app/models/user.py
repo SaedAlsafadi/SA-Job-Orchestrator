@@ -13,7 +13,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __tablename__ = "users"
 
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(
+        String(320), unique=True, index=True, nullable=False
+    )
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -21,7 +23,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Soft-delete (D9): hidden immediately, purged after a grace period in Phase 4.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    profile: Mapped["CandidateProfile"] = relationship(  # type: ignore # noqa: F821
+    profile: Mapped["CandidateProfile"] = relationship(  # type: ignore
         back_populates="user", cascade="all, delete-orphan", uselist=False
     )
 

@@ -34,9 +34,13 @@ def test_cover_letter_templates_exist() -> None:
 def test_dockerfiles_copy_templates() -> None:
     for df in (_DOCKERFILE_API, _DOCKERFILE_WORKER):
         text = df.read_text(encoding="utf-8")
-        assert "COPY templates/" in text, f"{df.name} does not COPY templates/ into the image"
+        assert (
+            "COPY templates/" in text
+        ), f"{df.name} does not COPY templates/ into the image"
 
 
 def test_api_dockerfile_trusts_proxy_headers() -> None:
     text = _DOCKERFILE_API.read_text(encoding="utf-8")
-    assert "--proxy-headers" in text, "API image must run uvicorn with --proxy-headers behind Caddy"
+    assert (
+        "--proxy-headers" in text
+    ), "API image must run uvicorn with --proxy-headers behind Caddy"

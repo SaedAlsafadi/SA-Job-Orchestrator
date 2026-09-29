@@ -72,7 +72,9 @@ def _build_steps(history: Any) -> list[dict[str, Any]]:
         for i, item in enumerate(raw_items[:_MAX_STEPS_STORED]):
             model_output = getattr(item, "model_output", None)
             state = getattr(item, "state", None)
-            brain = getattr(model_output, "current_state", None) if model_output else None
+            brain = (
+                getattr(model_output, "current_state", None) if model_output else None
+            )
             steps.append(
                 {
                     "n": i + 1,
@@ -117,7 +119,9 @@ def _current_step_actions(history: Any) -> list[str]:
         names: list[str] = []
         for a in per_step[-1]:
             if isinstance(a, dict):
-                key = next((k for k in a if k not in ("interacted_element", "result")), None)
+                key = next(
+                    (k for k in a if k not in ("interacted_element", "result")), None
+                )
                 if key:
                     names.append(str(key))
         if names:
@@ -184,7 +188,9 @@ def extract_trajectory(history: Any) -> dict[str, Any]:
         "agent_self_report": _call(history, "final_result", None),
         "tokens": int(getattr(usage, "total_tokens", 0) or 0),
         "cost_usd": float(getattr(usage, "total_cost", 0.0) or 0.0),
-        "duration_ms": int((_call(history, "total_duration_seconds", 0.0) or 0.0) * 1000),
+        "duration_ms": int(
+            (_call(history, "total_duration_seconds", 0.0) or 0.0) * 1000
+        ),
         "status": "completed" if (done and successful is not False) else "failed",
     }
 
@@ -206,7 +212,9 @@ def make_step_observer(
             for name in actions:  # one increment per action this step (not per step)
                 browser_actions_total.labels(platform=platform, action=name).inc()
             if redis is not None:
-                step_n = _call(history, "number_of_steps", 0) if history is not None else 0
+                step_n = (
+                    _call(history, "number_of_steps", 0) if history is not None else 0
+                )
                 await publish_progress(
                     redis,
                     user_id,

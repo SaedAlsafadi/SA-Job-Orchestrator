@@ -12,14 +12,8 @@ from functools import wraps
 from typing import Any, TypeVar
 
 import structlog
-from sqlalchemy.exc import (
-    DBAPIError,
-    OperationalError,
-    SQLAlchemyError,
-)
-from sqlalchemy.exc import (
-    IntegrityError as SAIntegrityError,
-)
+from sqlalchemy.exc import DBAPIError, OperationalError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError as SAIntegrityError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -27,13 +21,8 @@ from tenacity import (
     wait_exponential,
 )
 
-from app.core.exceptions import (
-    DatabaseConnectionError as DBConnectionError,
-)
-from app.core.exceptions import (
-    IntegrityError,
-    QueryError,
-)
+from app.core.exceptions import DatabaseConnectionError as DBConnectionError
+from app.core.exceptions import IntegrityError, QueryError
 
 logger = structlog.get_logger(__name__)
 
@@ -60,19 +49,13 @@ def handle_db_errors(func: Callable[..., T]) -> Callable[..., T]:
         try:
             return await func(*args, **kwargs)
         except SAIntegrityError as exc:
-            logger.error(
-                "db_integrity_error", func=func.__name__, error=str(exc)
-            )
+            logger.error("db_integrity_error", func=func.__name__, error=str(exc))
             raise IntegrityError(str(exc)) from exc
         except OperationalError as exc:
-            logger.error(
-                "db_connection_error", func=func.__name__, error=str(exc)
-            )
+            logger.error("db_connection_error", func=func.__name__, error=str(exc))
             raise DBConnectionError(str(exc)) from exc
         except SQLAlchemyError as exc:
-            logger.error(
-                "db_query_error", func=func.__name__, error=str(exc)
-            )
+            logger.error("db_query_error", func=func.__name__, error=str(exc))
             raise QueryError(str(exc)) from exc
 
     return wrapper  # type: ignore[return-value]

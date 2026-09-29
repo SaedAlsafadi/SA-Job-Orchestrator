@@ -42,7 +42,11 @@ async def review_run(
     if judge.verdict != RunVerdictResult.SUCCESS:
         diagnosis = diagnose(signals)
         await record.record_diagnosis(
-            db, user_id=traj.user_id, run_id=traj.id, diagnosis=diagnosis, signals=signals
+            db,
+            user_id=traj.user_id,
+            run_id=traj.id,
+            diagnosis=diagnosis,
+            signals=signals,
         )
         failure_class = diagnosis.failure_class
 
@@ -61,4 +65,8 @@ async def review_run(
         failure_class=failure_class,
         skill_saved=skill_id is not None,
     )
-    return {"verdict": judge.verdict, "failure_class": failure_class, "skill_id": skill_id}
+    return {
+        "verdict": judge.verdict,
+        "failure_class": failure_class,
+        "skill_id": skill_id,
+    }

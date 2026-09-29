@@ -52,19 +52,27 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
     total_apps_result = await db.execute(select(func.count(Application.id)))
     total_apps = total_apps_result.scalar() or 0
 
-    def _count_status(status: str):  # noqa: ANN202
+    def _count_status(status: str):
         return select(func.count(Application.id)).where(
             Application.status == status,
         )
 
-    pending = (await db.execute(_count_status(ApplicationStatus.PENDING_REVIEW))).scalar() or 0
+    pending = (
+        await db.execute(_count_status(ApplicationStatus.PENDING_REVIEW))
+    ).scalar() or 0
     applied = (await db.execute(_count_status(ApplicationStatus.APPLIED))).scalar() or 0
-    interview = (await db.execute(_count_status(ApplicationStatus.INTERVIEW))).scalar() or 0
-    rejected = (await db.execute(_count_status(ApplicationStatus.REJECTED))).scalar() or 0
+    interview = (
+        await db.execute(_count_status(ApplicationStatus.INTERVIEW))
+    ).scalar() or 0
+    rejected = (
+        await db.execute(_count_status(ApplicationStatus.REJECTED))
+    ).scalar() or 0
     offer = (await db.execute(_count_status(ApplicationStatus.OFFER))).scalar() or 0
 
     avg_ats_result = await db.execute(
-        select(func.avg(Application.ats_score)).where(Application.ats_score.isnot(None)),
+        select(func.avg(Application.ats_score)).where(
+            Application.ats_score.isnot(None)
+        ),
     )
     avg_ats = avg_ats_result.scalar() or 0.0
 
@@ -96,8 +104,9 @@ async def get_funnel(db: AsyncSession) -> list[ApplicationFunnelData]:
         List of funnel stage data.
     """
     result = await db.execute(
-        select(Application.status, func.count(Application.id))
-        .group_by(Application.status),
+        select(Application.status, func.count(Application.id)).group_by(
+            Application.status
+        ),
     )
     counts = {row[0]: row[1] for row in result.all()}
 
@@ -182,6 +191,7 @@ async def get_timeline(db: AsyncSession) -> list[TimelineEntry]:
     Returns:
         Daily timeline entries.
     """
+
     async def _per_day(col: Any, *, only_non_null: bool = False) -> dict[str, int]:
         # Truncate to the day (YYYY-MM-DD) IN SQL so each day is one group; grouping by the
         # full timestamp would make every row its own group and the dict would overwrite

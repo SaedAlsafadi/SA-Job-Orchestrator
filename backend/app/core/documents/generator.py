@@ -18,13 +18,12 @@ from pydantic import BaseModel, ConfigDict
 from app.core.documents.docx_renderer import DOCXRenderer
 from app.core.documents.pdf_renderer import PDFRenderer
 from app.core.exceptions import GenerationError
-from app.core.llm.client import LLMClient
-from app.core.llm.router import LLMTaskRouter, LLMTask
 from app.core.llm.prompts.cover_letter import (
     CoverLetterTemplate,
     render_prompt,
     select_best_template,
 )
+from app.core.llm.router import LLMTask, LLMTaskRouter
 from app.observability.metrics import documents_generated_total
 
 logger = structlog.get_logger(__name__)
@@ -205,7 +204,10 @@ class DocumentGenerator:
 
         # Generate content via LLM
         content = await self._generate_letter_content(
-            template, job_description, resume_text, company_info,
+            template,
+            job_description,
+            resume_text,
+            company_info,
         )
 
         # Render in parallel
@@ -217,7 +219,9 @@ class DocumentGenerator:
             tasks.append(
                 asyncio.ensure_future(
                     self._render_cover_letter_pdf(
-                        content, template, pdf_out,
+                        content,
+                        template,
+                        pdf_out,
                     ),
                 ),
             )
@@ -308,7 +312,9 @@ class DocumentGenerator:
                 purpose="resume_tailor",
             )
             tailored = result.model_dump()
-            logger.info("resume_tailored_via_llm", skills_count=len(tailored.get("skills", [])))
+            logger.info(
+                "resume_tailored_via_llm", skills_count=len(tailored.get("skills", []))
+            )
             return tailored
         except Exception:
             logger.exception("resume_tailoring_failed")
@@ -326,11 +332,14 @@ class DocumentGenerator:
             return self._fallback_cover_letter(job_description)
 
         prompt = render_prompt(
-            template, job_description, resume_text, company_info,
+            template,
+            job_description,
+            resume_text,
+            company_info,
         )
         response = await self._llm.complete(
             task=LLMTask.COVER_LETTER,
-            prompt=prompt, 
+            prompt=prompt,
         )
         return response.content
 
@@ -354,9 +363,7 @@ class DocumentGenerator:
         output_path: Path,
     ) -> Path:
         """Render cover letter text to PDF using a template."""
-        template_dir = (
-            self._templates_dir / "cover_letter" / template.value
-        )
+        template_dir = self._templates_dir / "cover_letter" / template.value
 
         # Use template if available, otherwise fall back to inline HTML
         if (template_dir / "template.html").exists():
@@ -372,7 +379,9 @@ class DocumentGenerator:
             # (the templates' CSS styles `.body p`) and mark safe so autoescape leaves the tags —
             # otherwise the whole letter collapses into one run-on block. Escape the text first.
             paragraphs_html = "".join(
-                f"<p>{Markup.escape(p.strip())}</p>" for p in content.split("\n\n") if p.strip()
+                f"<p>{Markup.escape(p.strip())}</p>"
+                for p in content.split("\n\n")
+                if p.strip()
             )
             html_content = html_tpl.render(content=Markup(paragraphs_html))
 
@@ -382,7 +391,9 @@ class DocumentGenerator:
                 css_string = css_path.read_text(encoding="utf-8")
 
             return await self._pdf.render_html_string(
-                html_content, output_path, css_string,
+                html_content,
+                output_path,
+                css_string,
             )
 
         # Inline fallback
@@ -392,7 +403,8 @@ class DocumentGenerator:
             f"{_text_to_html(content)}</body></html>"
         )
         return await self._pdf.render_html_string(
-            html, output_path,
+            html,
+            output_path,
         )
 
 
@@ -400,4 +412,3 @@ def _text_to_html(text: str) -> str:
     """Convert plain text with double-newline paragraphs to HTML."""
     paragraphs = text.split("\n\n")
     return "".join(f"<p>{p.strip()}</p>" for p in paragraphs if p.strip())
-

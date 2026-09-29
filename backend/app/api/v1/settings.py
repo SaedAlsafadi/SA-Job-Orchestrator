@@ -17,7 +17,9 @@ router = APIRouter()
 
 async def _get_or_create_settings(db: AsyncSession, user_id: str) -> UserSettings:
     """Return the user's settings row, creating defaults if absent."""
-    result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+    result = await db.execute(
+        select(UserSettings).where(UserSettings.user_id == user_id)
+    )
     settings = result.scalar_one_or_none()
     if settings is None:
         settings = UserSettings(user_id=user_id)
@@ -28,7 +30,9 @@ async def _get_or_create_settings(db: AsyncSession, user_id: str) -> UserSetting
             # Concurrent first-write from the same user — re-fetch the winner's row.
             await db.rollback()
             settings = (
-                await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+                await db.execute(
+                    select(UserSettings).where(UserSettings.user_id == user_id)
+                )
             ).scalar_one()
         else:
             await db.refresh(settings)
@@ -62,7 +66,9 @@ async def update_settings(
     await db.commit()
     await db.refresh(settings)
 
-    logger.info("settings_updated", user_id=user.id, changed_fields=list(update_data.keys()))
+    logger.info(
+        "settings_updated", user_id=user.id, changed_fields=list(update_data.keys())
+    )
     return SettingsResponse.model_validate(settings)
 
 

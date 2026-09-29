@@ -6,10 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.core.ats.skill_matcher import (
-    SKILL_CATEGORIES,
-    SkillMatcher,
-)
+from app.core.ats.skill_matcher import SKILL_CATEGORIES, SkillMatcher
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -103,7 +100,9 @@ class TestExtractSkills:
 
 
 class TestCategorizeSkills:
-    def test_places_language_in_programming_languages(self, matcher: SkillMatcher) -> None:
+    def test_places_language_in_programming_languages(
+        self, matcher: SkillMatcher
+    ) -> None:
         result = matcher.categorize_skills(["python", "java"])
         assert "python" in result["programming_languages"]
         assert "java" in result["programming_languages"]

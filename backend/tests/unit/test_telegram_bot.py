@@ -8,11 +8,17 @@ import pytest
 from app.services.telegram import bot
 
 
-def _settings(*, token="123456:secret", username="MyCareerBot", enabled=True, polling=True):
+def _settings(
+    *, token="123456:secret", username="MyCareerBot", enabled=True, polling=True
+):
     return SimpleNamespace(
         telegram_enabled=enabled,
         telegram_polling=polling,
-        telegram_bot_token=SimpleNamespace(get_secret_value=lambda: token) if token is not None else None,
+        telegram_bot_token=(
+            SimpleNamespace(get_secret_value=lambda: token)
+            if token is not None
+            else None
+        ),
         telegram_bot_username=username,
         telegram_proxy=None,
     )
@@ -72,7 +78,9 @@ async def test_invalid_token_failure_is_actionable_and_never_echoes_token(monkey
 async def test_configured_username_must_match_get_me(monkeypatch):
     monkeypatch.setattr(bot, "get_settings", lambda: _settings(username="ExpectedBot"))
     app = SimpleNamespace(
-        bot=SimpleNamespace(get_me=AsyncMock(return_value=SimpleNamespace(username="DifferentBot"))),
+        bot=SimpleNamespace(
+            get_me=AsyncMock(return_value=SimpleNamespace(username="DifferentBot"))
+        ),
         bot_data={},
         add_handler=MagicMock(),
         initialize=AsyncMock(),
@@ -95,7 +103,9 @@ async def test_polling_bot_is_running_only_after_verified_get_me(monkeypatch):
     monkeypatch.setattr(bot, "get_settings", lambda: _settings())
     updater = SimpleNamespace(start_polling=AsyncMock(), running=False)
     app = SimpleNamespace(
-        bot=SimpleNamespace(get_me=AsyncMock(return_value=SimpleNamespace(username="MyCareerBot"))),
+        bot=SimpleNamespace(
+            get_me=AsyncMock(return_value=SimpleNamespace(username="MyCareerBot"))
+        ),
         bot_data={},
         add_handler=MagicMock(),
         updater=updater,

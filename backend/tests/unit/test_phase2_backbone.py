@@ -35,7 +35,9 @@ class TestSessionCookieStore:
 
     async def test_missing_returns_none(self, db_session):
         store = _store()
-        assert await store.load_session_cookies(db_session, TEST_USER_ID, "indeed") is None
+        assert (
+            await store.load_session_cookies(db_session, TEST_USER_ID, "indeed") is None
+        )
 
 
 class TestInterventionRendezvous:
@@ -56,7 +58,10 @@ class TestRuntimeFactory:
         assert result.confirmation_id is None
 
     def test_build_browser_profile_carries_session_and_identity(self):
-        pytest.importorskip("browser_use", reason="Optional live browser automation dependency is not installed")
+        pytest.importorskip(
+            "browser_use",
+            reason="Optional live browser automation dependency is not installed",
+        )
         state = {"cookies": [], "origins": []}
         profile = build_browser_profile(
             storage_state=state,
@@ -76,23 +81,33 @@ class TestRunApplyPrerequisites:
     async def _seed(self, db, *, with_resume: bool):
         db.add(User(id=TEST_USER_ID, email="u@x.com", hashed_password="x"))
         job = Job(
-            user_id=TEST_USER_ID, platform="linkedin", platform_job_id="j1",
-            title="t", company="c", url="https://x",
+            user_id=TEST_USER_ID,
+            platform="linkedin",
+            platform_job_id="j1",
+            title="t",
+            company="c",
+            url="https://x",
         )
         db.add(job)
         await db.flush()
         resume_id = None
         if with_resume:
             resume = Resume(
-                user_id=TEST_USER_ID, name="r", type="base",
-                template_id="modern", file_path_pdf="/tmp/r.pdf",
+                user_id=TEST_USER_ID,
+                name="r",
+                type="base",
+                template_id="modern",
+                file_path_pdf="/tmp/r.pdf",
             )
             db.add(resume)
             await db.flush()
             resume_id = resume.id
         app = Application(
-            user_id=TEST_USER_ID, job_id=job.id, resume_id=resume_id,
-            status="queued", apply_mode="autonomous",
+            user_id=TEST_USER_ID,
+            job_id=job.id,
+            resume_id=resume_id,
+            status="queued",
+            apply_mode="autonomous",
         )
         db.add(app)
         await db.commit()

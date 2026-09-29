@@ -106,7 +106,9 @@ async def run_apply(
         )
 
     cfg = (
-        await db.execute(select(UserLLMConfig).where(UserLLMConfig.user_id == app.user_id))
+        await db.execute(
+            select(UserLLMConfig).where(UserLLMConfig.user_id == app.user_id)
+        )
     ).scalar_one_or_none()
     llm_settings = get_settings().llm
     provider = cfg.preferred_provider if cfg else llm_settings.preferred_provider
@@ -132,11 +134,17 @@ async def run_apply(
 
     profile = build_browser_profile(
         storage_state=storage_state,
-        allowed_domains=[f"https://*.{job.platform}.com", f"https://{job.platform}.com"],
+        allowed_domains=[
+            f"https://*.{job.platform}.com",
+            f"https://{job.platform}.com",
+        ],
     )
     llm = build_apply_llm(api_key, model)
     agent = build_apply_agent(
-        _build_task(job, resume_path), llm=llm, profile=profile, extend_system_message=extend
+        _build_task(job, resume_path),
+        llm=llm,
+        profile=profile,
+        extend_system_message=extend,
     )
     on_step_end = make_step_observer(redis, app.user_id, app.id, job.platform)
 
@@ -210,8 +218,12 @@ async def _record_and_review(
             )
         async with async_session_factory() as obs_db:
             traj = await record_trajectory(
-                obs_db, user_id=app.user_id, application_id=app.id,
-                platform=platform, skills_used=skills_used, **traj_kwargs,
+                obs_db,
+                user_id=app.user_id,
+                application_id=app.id,
+                platform=platform,
+                skills_used=skills_used,
+                **traj_kwargs,
             )
             traj_id = traj.id
         if redis is not None:
@@ -219,4 +231,6 @@ async def _record_and_review(
                 REVIEW_TASK, traj_id, signals, _job_id=f"review:{traj_id}"
             )
     except Exception as exc:  # observability is best-effort, not load-bearing
-        logger.warning("apply.record_and_review_failed", application_id=app.id, error=str(exc))
+        logger.warning(
+            "apply.record_and_review_failed", application_id=app.id, error=str(exc)
+        )

@@ -15,23 +15,34 @@ from tests.conftest import TEST_USER_ID
 
 async def _seed(db, *, with_resume: bool) -> Application:
     job = Job(
-        user_id=TEST_USER_ID, platform="linkedin", platform_job_id="j1",
-        title="Engineer", company="Acme", url="https://x", description="Python role",
+        user_id=TEST_USER_ID,
+        platform="linkedin",
+        platform_job_id="j1",
+        title="Engineer",
+        company="Acme",
+        url="https://x",
+        description="Python role",
     )
     db.add(job)
     await db.flush()
     resume_id = None
     if with_resume:
         resume = Resume(
-            user_id=TEST_USER_ID, name="r", type="base",
-            template_id="modern", content_text="Python developer",
+            user_id=TEST_USER_ID,
+            name="r",
+            type="base",
+            template_id="modern",
+            content_text="Python developer",
         )
         db.add(resume)
         await db.flush()
         resume_id = resume.id
     app = Application(
-        user_id=TEST_USER_ID, job_id=job.id, resume_id=resume_id,
-        status="queued", apply_mode=ApplyMode.REVIEW,
+        user_id=TEST_USER_ID,
+        job_id=job.id,
+        resume_id=resume_id,
+        status="queued",
+        apply_mode=ApplyMode.REVIEW,
     )
     db.add(app)
     await db.commit()

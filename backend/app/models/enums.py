@@ -123,8 +123,10 @@ class SkillStatus(StrEnum):
     ACTIVE = "active"
     RETIRED = "retired"
 
+
 class TailoringStatus(StrEnum):
     """Lifecycle of a CV tailoring session."""
+
     DRAFT = "draft"
     REVIEWING = "reviewing"
     APPROVED = "approved"
@@ -132,20 +134,26 @@ class TailoringStatus(StrEnum):
     VERIFIED = "verified"
     FAILED = "failed"
 
+
 class ChangeType(StrEnum):
     """Type of proposed CV change."""
+
     ADD = "add"
     MODIFY = "modify"
     REMOVE = "remove"
 
+
 class ReviewerStatus(StrEnum):
     """User decision on a proposed change."""
+
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
+
 class ReviewSeverity(StrEnum):
     """AI Review severity level."""
+
     SAFE = "safe"
     WARNING = "warning"
     BLOCKED = "blocked"
@@ -154,6 +162,7 @@ class ReviewSeverity(StrEnum):
 class QAVerdict(StrEnum):
     """Application-package QA verdict (Phase 19). PASS may proceed; WARNING requires
     explicit user review; BLOCKED prevents approval until fixed."""
+
     PASS = "pass"
     WARNING = "warning"
     BLOCKED = "blocked"
@@ -162,6 +171,7 @@ class QAVerdict(StrEnum):
 class PostingQualitySignal(StrEnum):
     """Lightweight heuristic signal about a posting's legitimacy — a signal, never a
     definitive scam determination."""
+
     LIKELY_LEGITIMATE = "likely_legitimate"
     NEEDS_REVIEW = "needs_review"
     SUSPICIOUS = "suspicious"
@@ -170,11 +180,8 @@ class PostingQualitySignal(StrEnum):
 class EmailSendState(StrEnum):
     """Lifecycle of an application-email send. ``SENT`` means the provider ACCEPTED the
     message (relay acceptance) — delivery is never claimed without delivery evidence."""
+
     PENDING = "pending"
     SENT = "sent"
     FAILED = "failed"
     UNKNOWN = "unknown"
-
-
-
-

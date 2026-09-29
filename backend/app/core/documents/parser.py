@@ -12,28 +12,43 @@ from app.core.exceptions import ParseError
 logger = structlog.get_logger(__name__)
 
 _SECTION_HEADERS: list[str] = [
-    "summary", "objective", "professional summary", "profile",
-    "experience", "work experience", "professional experience", "employment",
-    "education", "academic background",
-    "skills", "technical skills", "core competencies", "competencies",
-    "certifications", "certificates", "licenses",
-    "projects", "personal projects", "key projects",
-    "publications", "awards", "honors",
-    "volunteer", "volunteering", "community involvement",
-    "languages", "interests", "references",
-    "additional information", "activities",
+    "summary",
+    "objective",
+    "professional summary",
+    "profile",
+    "experience",
+    "work experience",
+    "professional experience",
+    "employment",
+    "education",
+    "academic background",
+    "skills",
+    "technical skills",
+    "core competencies",
+    "competencies",
+    "certifications",
+    "certificates",
+    "licenses",
+    "projects",
+    "personal projects",
+    "key projects",
+    "publications",
+    "awards",
+    "honors",
+    "volunteer",
+    "volunteering",
+    "community involvement",
+    "languages",
+    "interests",
+    "references",
+    "additional information",
+    "activities",
 ]
 
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
-_PHONE_RE = re.compile(
-    r"(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
-)
-_LINKEDIN_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?linkedin\.com/in/[a-zA-Z0-9_-]+"
-)
-_GITHUB_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?github\.com/[a-zA-Z0-9_-]+"
-)
+_PHONE_RE = re.compile(r"(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}")
+_LINKEDIN_RE = re.compile(r"(?:https?://)?(?:www\.)?linkedin\.com/in/[a-zA-Z0-9_-]+")
+_GITHUB_RE = re.compile(r"(?:https?://)?(?:www\.)?github\.com/[a-zA-Z0-9_-]+")
 
 
 class ParsedResume(BaseModel):
@@ -87,13 +102,9 @@ class DocumentParser:
 
         try:
             if suffix == ".pdf":
-                raw_text = await loop.run_in_executor(
-                    None, self._parse_pdf_sync, path
-                )
+                raw_text = await loop.run_in_executor(None, self._parse_pdf_sync, path)
             else:
-                raw_text = await loop.run_in_executor(
-                    None, self._parse_docx_sync, path
-                )
+                raw_text = await loop.run_in_executor(None, self._parse_docx_sync, path)
         except ParseError:
             raise
         except Exception as exc:

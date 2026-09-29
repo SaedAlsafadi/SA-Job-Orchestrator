@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 
 # Target metadata for autogenerate
 target_metadata = Base.metadata
-print('TABLES IN METADATA:', target_metadata.tables.keys())
+print("TABLES IN METADATA:", target_metadata.tables.keys())
 
 
 def run_migrations_offline() -> None:
@@ -47,7 +47,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection) -> None:  # noqa: ANN001
+def do_run_migrations(connection) -> None:
     """Execute migrations with the given connection."""
     context.configure(
         connection=connection,

@@ -15,7 +15,9 @@ class TestPersistGeneratedDocument:
         pdf.write_bytes(b"PDFDATA")
         docx = tmp_path / "a.docx"
         docx.write_bytes(b"DOCXDATA")
-        doc = MagicMock(type="resume", document_id="doc1", pdf_path=str(pdf), docx_path=str(docx))
+        doc = MagicMock(
+            type="resume", document_id="doc1", pdf_path=str(pdf), docx_path=str(docx)
+        )
         store = LocalFileStorage(str(tmp_path / "store"), "sig-secret")
 
         with patch.object(documents, "get_storage", return_value=store):
@@ -30,7 +32,9 @@ class TestPersistGeneratedDocument:
     async def test_cover_letter_uses_cover_letter_prefix(self, tmp_path):
         pdf = tmp_path / "c.pdf"
         pdf.write_bytes(b"CL")
-        doc = MagicMock(type="cover_letter", document_id="cl1", pdf_path=str(pdf), docx_path=None)
+        doc = MagicMock(
+            type="cover_letter", document_id="cl1", pdf_path=str(pdf), docx_path=None
+        )
         store = LocalFileStorage(str(tmp_path / "store"), "sig-secret")
 
         with patch.object(documents, "get_storage", return_value=store):
@@ -78,7 +82,8 @@ class TestAtsGate:
     async def test_scoring_exception_does_not_block(self, db_session):
         app = MagicMock(resume_id="r1", job_id="j1", id="a1")
         with patch(
-            "app.services.resume.score_resume", new=AsyncMock(side_effect=RuntimeError("boom"))
+            "app.services.resume.score_resume",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             ok, _ = await tasks._ats_gate_ok(db_session, app)
         assert ok is True  # scoring failure must not block the apply

@@ -76,13 +76,17 @@ class GeneratedCoverLetter(BaseModel):
     """Structured cover-letter output."""
 
     subject_line: str = Field(description="Short subject/title of the letter")
-    body: str = Field(description="Full cover letter text (plain prose, blank-line paragraphs)")
+    body: str = Field(
+        description="Full cover letter text (plain prose, blank-line paragraphs)"
+    )
 
 
 class GeneratedApplicationEmail(BaseModel):
     """Structured application-email output."""
 
-    recipient: str = Field(description="The recipient email address (must come from the route/posting)")
+    recipient: str = Field(
+        description="The recipient email address (must come from the route/posting)"
+    )
     subject: str
     body: str
 
@@ -102,7 +106,9 @@ class GeneratedAnswers(BaseModel):
 
 
 class QAIssue(BaseModel):
-    kind: str = Field(description="e.g. wrong_company, wrong_title, wrong_recipient, unsupported_claim, stale_document, missing_document, suspicious_posting, arabic_quality, keyword_stuffing")
+    kind: str = Field(
+        description="e.g. wrong_company, wrong_title, wrong_recipient, unsupported_claim, stale_document, missing_document, suspicious_posting, arabic_quality, keyword_stuffing"
+    )
     detail: str
     severity: str = Field(description="'info' | 'warning' | 'blocker'")
 
@@ -117,13 +123,16 @@ def _email_sanity_error(body: str, cover_letter_text: str | None) -> str:
     if word_count > 170:
         return f"The draft is too long ({word_count} words)."
     if cover_letter_text:
-        email_words = {w.casefold().strip(".,:;!?()") for w in body.split() if len(w) > 3}
+        email_words = {
+            w.casefold().strip(".,:;!?()") for w in body.split() if len(w) > 3
+        }
         cover_words = {
             w.casefold().strip(".,:;!?()")
-            for w in cover_letter_text.split() if len(w) > 3
+            for w in cover_letter_text.split()
+            if len(w) > 3
         }
         overlap = len(email_words & cover_words) / max(1, len(email_words))
-        if overlap > .72:
+        if overlap > 0.72:
             return f"The draft substantially duplicates the cover letter ({overlap:.0%} overlap)."
     return ""
 
@@ -206,7 +215,9 @@ async def generate_package_cover_letter(
     the prompt restricts the model to the provided evidence, and the output always goes
     through human review before it can be approved.
     """
-    job, candidate, resume_text = await _load_generation_context(db, application_id, user_id)
+    job, candidate, resume_text = await _load_generation_context(
+        db, application_id, user_id
+    )
     protected_entities = build_protected_entity_map(
         candidate,
         resume_text,
@@ -308,7 +319,9 @@ async def generate_package_email(
     in the posting text is untrusted until the user visibly verifies it in review — the
     model is told to echo the provided recipient, never to invent one.
     """
-    job, candidate, resume_text = await _load_generation_context(db, application_id, user_id)
+    job, candidate, resume_text = await _load_generation_context(
+        db, application_id, user_id
+    )
     protected_facts = build_protected_facts(candidate, resume_text)
     system_prompt = (
         "You draft concise job-application emails. "
@@ -344,7 +357,9 @@ async def generate_package_email(
             system_prompt=system_prompt,
         )
         if route_email:
-            result.recipient = route_email  # recipient safety: never trust the model here
+            result.recipient = (
+                route_email  # recipient safety: never trust the model here
+            )
         result.body = restore_protected_entities(result.body, protected_facts)
         sanity_error = _email_sanity_error(result.body, cover_letter_text)
         entity_issues = protected_entity_issues([result.body], protected_facts)
@@ -353,8 +368,12 @@ async def generate_package_email(
         if not sanity_error:
             break
     if sanity_error or result is None:
-        raise PackageError(sanity_error or "Application email generation failed validation.")
-    logger.info("package_email_generated", application_id=application_id, language=language)
+        raise PackageError(
+            sanity_error or "Application email generation failed validation."
+        )
+    logger.info(
+        "package_email_generated", application_id=application_id, language=language
+    )
     return result
 
 
@@ -390,7 +409,11 @@ async def generate_package_answers(
         output_schema=GeneratedAnswers,
         system_prompt=system_prompt,
     )
-    logger.info("package_answers_generated", application_id=application_id, count=len(result.answers))
+    logger.info(
+        "package_answers_generated",
+        application_id=application_id,
+        count=len(result.answers),
+    )
     return result
 
 
@@ -415,39 +438,104 @@ async def run_package_qa(
 
     # --- Deterministic pre-checks ---
     if not package.resume_id:
-        issues.append(QAIssue(kind="missing_document", detail="No resume version in package", severity="blocker"))
+        issues.append(
+            QAIssue(
+                kind="missing_document",
+                detail="No resume version in package",
+                severity="blocker",
+            )
+        )
     if not package.cover_letter_text:
-        issues.append(QAIssue(kind="missing_document", detail="No cover letter in package", severity="blocker"))
+        issues.append(
+            QAIssue(
+                kind="missing_document",
+                detail="No cover letter in package",
+                severity="blocker",
+            )
+        )
     resume_text = ""
     if package.resume_id:
         resume = await db.get(Resume, package.resume_id)
         resume_text = (resume.content_text or "") if resume else ""
 
-    _, candidate, _ = await _load_generation_context(db, package.application_id, package.user_id)
+    _, candidate, _ = await _load_generation_context(
+        db, package.application_id, package.user_id
+    )
     protected_facts = build_protected_facts(candidate, resume_text)
-    route = await db.get(ApplicationRoute, package.route_id) if package.route_id else None
+    route = (
+        await db.get(ApplicationRoute, package.route_id) if package.route_id else None
+    )
     route_type = (route.route_type if route else "MANUAL").upper()
     if route_type == "EMAIL" and not package.email_to:
-        issues.append(QAIssue(kind="missing_recipient", detail="No recipient set for the application email", severity="blocker"))
-    if route_type != "EMAIL" and any([package.email_to, package.email_subject, package.email_body]):
-        issues.append(QAIssue(kind="route_mismatch", detail=f"{route_type} package must not contain an automatic application email", severity="blocker"))
+        issues.append(
+            QAIssue(
+                kind="missing_recipient",
+                detail="No recipient set for the application email",
+                severity="blocker",
+            )
+        )
+    if route_type != "EMAIL" and any(
+        [package.email_to, package.email_subject, package.email_body]
+    ):
+        issues.append(
+            QAIssue(
+                kind="route_mismatch",
+                detail=f"{route_type} package must not contain an automatic application email",
+                severity="blocker",
+            )
+        )
     if not package.is_current:
-        issues.append(QAIssue(kind="stale_document", detail="QA can only run on the current package version", severity="blocker"))
+        issues.append(
+            QAIssue(
+                kind="stale_document",
+                detail="QA can only run on the current package version",
+                severity="blocker",
+            )
+        )
     expected_hash = compute_content_hash(
-        application_id=package.application_id, route_id=package.route_id, resume_id=package.resume_id,
-        cover_letter_text=package.cover_letter_text, email_to=package.email_to,
-        email_subject=package.email_subject, email_body=package.email_body,
-        attachment_keys=package.attachment_keys, answers=package.answers, language=package.language,
+        application_id=package.application_id,
+        route_id=package.route_id,
+        resume_id=package.resume_id,
+        cover_letter_text=package.cover_letter_text,
+        email_to=package.email_to,
+        email_subject=package.email_subject,
+        email_body=package.email_body,
+        attachment_keys=package.attachment_keys,
+        answers=package.answers,
+        language=package.language,
     )
     if expected_hash != package.content_hash:
-        issues.append(QAIssue(kind="package_hash", detail="Package content does not match its locked hash", severity="blocker"))
-    for item in date_ranges("\n".join([resume_text, package.cover_letter_text or "", package.email_body or ""])):
+        issues.append(
+            QAIssue(
+                kind="package_hash",
+                detail="Package content does not match its locked hash",
+                severity="blocker",
+            )
+        )
+    for item in date_ranges(
+        "\n".join(
+            [resume_text, package.cover_letter_text or "", package.email_body or ""]
+        )
+    ):
         if item["end_status"] == "FUTURE":
-            issues.append(QAIssue(kind="future_date", detail=f'{item["range"]} ends after {date.today().isoformat()}', severity="warning"))
-    issues.extend(QAIssue(**item) for item in protected_entity_issues(
-        [package.cover_letter_text or "", package.email_body or "", json.dumps(package.answers or [])],
-        protected_facts,
-    ))
+            issues.append(
+                QAIssue(
+                    kind="future_date",
+                    detail=f'{item["range"]} ends after {date.today().isoformat()}',
+                    severity="warning",
+                )
+            )
+    issues.extend(
+        QAIssue(**item)
+        for item in protected_entity_issues(
+            [
+                package.cover_letter_text or "",
+                package.email_body or "",
+                json.dumps(package.answers or []),
+            ],
+            protected_facts,
+        )
+    )
 
     system_prompt = (
         "You are a meticulous application QA reviewer. Review the COMPLETE application "
@@ -479,13 +567,23 @@ async def run_package_qa(
             output_schema=QAResult,
             system_prompt=system_prompt,
         )
-        issues.extend(i for i in llm_result.issues if not llm_issue_overruled(i, protected_facts))
+        issues.extend(
+            i for i in llm_result.issues if not llm_issue_overruled(i, protected_facts)
+        )
         verdict = llm_result.verdict
-        if verdict == QAVerdict.WARNING and not any(i.severity in {"warning", "blocker"} for i in issues):
+        if verdict == QAVerdict.WARNING and not any(
+            i.severity in {"warning", "blocker"} for i in issues
+        ):
             verdict = QAVerdict.PASS
     except Exception as exc:  # LLM failure must not produce a false PASS
         logger.error("package_qa_llm_failed", error=str(exc))
-        issues.append(QAIssue(kind="qa_engine_error", detail=f"QA engine failed: {exc}", severity="warning"))
+        issues.append(
+            QAIssue(
+                kind="qa_engine_error",
+                detail=f"QA engine failed: {exc}",
+                severity="warning",
+            )
+        )
         verdict = QAVerdict.WARNING
 
     # Deterministic findings are authoritative in both directions: a model cannot

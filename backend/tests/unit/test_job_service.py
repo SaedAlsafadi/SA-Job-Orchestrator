@@ -22,11 +22,13 @@ def _fix_job_data(sample_job_data: dict) -> dict:
 
 class TestSearchJobs:
     async def test_search_jobs_returns_empty_when_no_platforms(
-        self, db_session,
+        self,
+        db_session,
     ):
         """Search should return empty results when platforms produce nothing."""
         request = JobSearchRequest(
-            query="python developer", platforms=[],
+            query="python developer",
+            platforms=[],
         )
         with patch.object(
             job_search.platform_registry,
@@ -56,12 +58,15 @@ class TestSearchJobs:
         mock_platform.search = AsyncMock(return_value=[mock_listing])
 
         request = JobSearchRequest(
-            query="python developer", platforms=["linkedin"],
+            query="python developer",
+            platforms=["linkedin"],
         )
 
         with (
             patch.object(
-                job_search.platform_registry, "has", return_value=True,
+                job_search.platform_registry,
+                "has",
+                return_value=True,
             ),
             patch.object(
                 job_search.platform_registry,
@@ -83,12 +88,15 @@ class TestSearchJobs:
         )
 
         request = JobSearchRequest(
-            query="python developer", platforms=["linkedin"],
+            query="python developer",
+            platforms=["linkedin"],
         )
 
         with (
             patch.object(
-                job_search.platform_registry, "has", return_value=True,
+                job_search.platform_registry,
+                "has",
+                return_value=True,
             ),
             patch.object(
                 job_search.platform_registry,
@@ -126,12 +134,16 @@ class TestListJobs:
         assert result2.has_next is False
 
     async def test_list_jobs_filter_by_status(
-        self, db_session, sample_job_data,
+        self,
+        db_session,
+        sample_job_data,
     ):
         fixed = _fix_job_data(sample_job_data)
         for i, status in enumerate(["new", "new", "saved"]):
             data = {
-                **fixed, "platform_job_id": f"job-{i}", "status": status,
+                **fixed,
+                "platform_job_id": f"job-{i}",
+                "status": status,
             }
             db_session.add(Job(**data))
         await db_session.commit()
@@ -196,7 +208,9 @@ class TestDeleteJob:
 
 class TestAnalyzeJob:
     async def test_analyze_job_requires_candidate_profile(
-        self, db_session, sample_job_data,
+        self,
+        db_session,
+        sample_job_data,
     ):
         """Real matching must not fabricate a placeholder without candidate data."""
         job = Job(**sample_job_data)

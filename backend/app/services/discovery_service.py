@@ -1,19 +1,21 @@
-from typing import List, Dict, Any, Tuple
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from datetime import datetime, UTC
-import structlog
+from datetime import UTC, datetime
+from typing import Any
 
-from app.models.job import Job
-from app.core.connectors.workable_source import WorkableJobSource
+import structlog
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.connectors.greenhouse_source import GreenhouseJobSource
 from app.core.connectors.lever_source import LeverJobSource
-from app.services.monitoring.utils import get_canonical_url, compute_content_hash
+from app.core.connectors.workable_source import WorkableJobSource
+from app.models.job import Job
+from app.services.monitoring.utils import compute_content_hash, get_canonical_url
 
 logger = structlog.get_logger(__name__)
 
+
 class DiscoveryService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.sources = [WorkableJobSource(), GreenhouseJobSource(), LeverJobSource()]
 
@@ -27,41 +29,45 @@ class DiscoveryService:
             return self.sources[2]
         raise ValueError(f"No source connector supports URL: {url}")
 
-    def get_all_capabilities(self) -> Dict[str, Any]:
+    def get_all_capabilities(self) -> dict[str, Any]:
         return {s.name(): s.capabilities().model_dump() for s in self.sources}
 
-    async def discover_and_store(self, user_id: str, url: str) -> List[Tuple[Job, bool, bool]]:
+    async def discover_and_store(
+        self, user_id: str, url: str
+    ) -> list[tuple[Job, bool, bool]]:
         source = self._get_source(url)
         raw_jobs = await source.discover_jobs(url)
-        
+
         saved_jobs = []
         for raw in raw_jobs:
             normalized = source.normalize_job(raw)
             job, is_new, is_changed = await self._upsert_job(user_id, normalized)
             saved_jobs.append((job, is_new, is_changed))
-            
+
         await self.db.commit()
         return saved_jobs
 
-    async def _upsert_job(self, user_id: str, norm: Dict[str, Any]) -> Tuple[Job, bool, bool]:
+    async def _upsert_job(
+        self, user_id: str, norm: dict[str, Any]
+    ) -> tuple[Job, bool, bool]:
         platform = norm["platform"]
         platform_job_id = norm["platform_job_id"]
-        
+
         canonical_url = get_canonical_url(norm.get("url", ""))
         content_hash = compute_content_hash(norm)
-        
+
         stmt = select(Job).where(
             Job.user_id == user_id,
             Job.platform == platform,
-            Job.platform_job_id == platform_job_id
+            Job.platform_job_id == platform_job_id,
         )
         result = await self.db.execute(stmt)
         existing = result.scalar_one_or_none()
-        
+
         if existing:
             is_new = False
             is_changed = False
-            
+
             if existing.content_hash != content_hash:
                 is_changed = True
                 existing.content_hash = content_hash
@@ -78,10 +84,10 @@ class DiscoveryService:
                 existing.work_model = norm.get("work_model")
                 # update timestamp to trigger re-evaluation logically if needed
                 existing.updated_at = datetime.now(UTC)
-                
+
             if existing.canonical_url != canonical_url:
                 existing.canonical_url = canonical_url
-                
+
             return existing, is_new, is_changed
         else:
             new_job = Job(
@@ -108,7 +114,7 @@ class DiscoveryService:
                 work_model=norm.get("work_model"),
                 posted_date=norm.get("posted_date"),
                 raw_data=norm.get("raw_data", {}),
-                status="new"
+                status="new",
             )
             self.db.add(new_job)
             return new_job, True, False

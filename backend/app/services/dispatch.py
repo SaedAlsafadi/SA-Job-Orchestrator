@@ -54,7 +54,9 @@ async def enqueue_apply(
     return job_id
 
 
-async def dispatch_for_mode(db: AsyncSession, pool: ArqRedis | None, app: Application) -> None:
+async def dispatch_for_mode(
+    db: AsyncSession, pool: ArqRedis | None, app: Application
+) -> None:
     """Set status by ``apply_mode`` and enqueue when autonomous. The single chokepoint
     where ``apply_mode`` stops being cosmetic."""
     if app.apply_mode == ApplyMode.AUTONOMOUS:

@@ -23,7 +23,9 @@ logger = structlog.get_logger(__name__)
 
 def _fingerprint(storage_state: dict[str, Any]) -> str:
     """A stable hash of the session, so a re-import can be recognised as the same login."""
-    return hashlib.sha256(json.dumps(storage_state, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(storage_state, sort_keys=True).encode()
+    ).hexdigest()
 
 
 def to_response(row: PlatformSession) -> PlatformSessionResponse:
