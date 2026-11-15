@@ -265,7 +265,7 @@ Key limitations:
 - No production deployment exists; local-only validation
 - Arabic document quality is provider-dependent
 - Discovery orchestrator requires provider API keys (Exa AI) for job search
-- 11 backend tests are failing in harness/dedup/job-service areas (see test baseline)
+- An earlier test baseline ([docs/test-baseline.md](docs/test-baseline.md)) recorded failures in the legacy skill-harness tests. The current results are in [docs/TESTING.md](docs/TESTING.md).
 
 ---
 
@@ -317,7 +317,7 @@ docs/
 
 ## Attribution and License
 
-This project was built on top of an open-source foundation. See [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) for the complete attribution statement including the upstream project, what was retained, and what was developed from scratch.
+This project is a fork of [AutoApply AI](https://github.com/Rayyan9477/AutoApply-AI-Agentic-Browser-Automation-for-Job-Search) by Rayyan Ahmed (Rayyan9477), extended into a multi-tenant AI platform. Neither the upstream project nor this fork has a `LICENSE` file, so the code is shared for portfolio review only. See [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) for what was retained and what was built from scratch.
 
 **Substantial custom development includes:**
 - Full multi-tenant authentication system (JWT + Argon2)

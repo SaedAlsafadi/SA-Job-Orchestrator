@@ -2,17 +2,13 @@
 
 ## Project Foundation
 
-SA Job Orchestrator was built on top of an open-source foundation. The original project provided the initial repository structure, some base configuration patterns, and the starting point for the frontend scaffolding.
-
-> **Note:** The original upstream project information has not been fully verified. If you are reviewing this for license compliance, please check the git history for the initial commit and any `LICENSE` file from that commit.
+SA Job Orchestrator is a fork of **[Rayyan9477/AutoApply-AI-Agentic-Browser-Automation-for-Job-Search](https://github.com/Rayyan9477/AutoApply-AI-Agentic-Browser-Automation-for-Job-Search)** ("AutoApply AI") by Rayyan Ahmed. That project supplied the starting repository structure, some base configuration patterns and the initial frontend scaffolding. The git history keeps the upstream commits (authored by Rayyan9477 / Rayyan Ahmed) separate from the later commits by Saed Alsafadi.
 
 ---
 
 ## License
 
-This project's license follows from the original fork's license. The current `LICENSE` file at the repository root should be consulted for the applicable terms.
-
-If no `LICENSE` file is present or its terms are unclear, **this repository should not be treated as openly licensed** without explicit clarification from the author.
+When checked on 2026-11-15, the upstream repository had no `LICENSE` file, and this repository has none either. **Do not treat this repository as openly licensed.** It is published for portfolio review and technical reference only.
 
 ---
 
@@ -23,7 +19,7 @@ The following may have been retained from or inspired by the upstream project:
 - Base Docker Compose configuration patterns
 - Some frontend component scaffold
 
-Exact attribution cannot be determined without examining the initial commit against the upstream repository.
+To see exactly what came from upstream, compare this repository with the upstream project, or filter the git history by author.
 
 ---
 
@@ -155,7 +151,7 @@ No commercial or proprietary libraries are used.
 
 ---
 
-## Original Author
+## Author of the Extensions
 
 Saed Alsafadi  
 GitHub: [github.com/SaedAlsafadi](https://github.com/SaedAlsafadi)
